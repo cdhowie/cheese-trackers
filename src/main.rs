@@ -85,23 +85,37 @@ impl<D> AppState<D> {
         }
     }
 
+    /// Synchronize a tracker in the database with fetched state from
+    /// Archipelago.
     async fn synchronize_tracker(
         db: &mut (impl db::DataAccess + Send),
         tracker_id: String,
         games: Vec<tracker::Game>,
         hints: Vec<tracker::Hint>,
     ) -> Result<(), TrackerUpdateError> {
+        // This function is quite complicated, but basically it boils down to
+        // two parts:
+        //
+        // * If this is the first time we've seen this tracker ID, put the AP
+        //   tracker data into the DB.
+        // * If not, make sure the data is consistent and then update any
+        //   changed pieces of data.
+
         let now = Utc::now();
 
+        // Both arms return a mapping of game player names to their respective
+        // database IDs.  We use this data to populate the hints table.
         let name_to_id = match db.get_tracker_by_ap_tracker_id(&tracker_id).await? {
             None => {
                 let tracker = db
-                    .create_ap_tracker(db::model::ApTracker {
+                    .create_ap_trackers([db::model::ApTracker {
                         id: 0,
                         tracker_id,
                         updated_at: now.naive_utc(),
-                    })
-                    .await?;
+                    }])
+                    .try_next()
+                    .await?
+                    .ok_or(TrackerUpdateError::Database(sqlx::Error::RowNotFound))?;
 
                 // Hints only contain the game's name so we need a way to map
                 // those to the database IDs.
@@ -114,7 +128,7 @@ impl<D> AppState<D> {
                         .map_err(|_| TrackerUpdateError::NumericConversion(game.position))?;
 
                     let game = db
-                        .create_ap_game(ApGame {
+                        .create_ap_games([ApGame {
                             id: 0,
                             tracker_id: tracker.id,
                             position: game.position.try_into().map_err(|_| {
@@ -129,8 +143,10 @@ impl<D> AppState<D> {
                             discord_ping: false,
                             status: GameStatus::Unblocked,
                             last_checked: None,
-                        })
-                        .await?;
+                        }])
+                        .try_next()
+                        .await?
+                        .ok_or(TrackerUpdateError::Database(sqlx::Error::RowNotFound))?;
 
                     name_to_id.insert(game.name, game.id);
                 }
@@ -204,22 +220,29 @@ impl<D> AppState<D> {
             }
         };
 
-        for hint in hints {
-            db.create_ap_hint(ApHint {
-                id: 0,
-                finder_game_id: *name_to_id
-                    .get(&hint.finder)
-                    .ok_or_else(|| TrackerUpdateError::HintGameMissing(hint.finder))?,
-                receiver_game_id: *name_to_id
-                    .get(&hint.receiver)
-                    .ok_or_else(|| TrackerUpdateError::HintGameMissing(hint.receiver))?,
-                item: hint.item,
-                location: hint.location,
-                entrance: hint.entrance,
-                found: hint.found,
-            })
-            .await?;
-        }
+        db.create_ap_hints(
+            hints
+                .into_iter()
+                .map(|hint| {
+                    Ok::<_, TrackerUpdateError>(ApHint {
+                        id: 0,
+                        finder_game_id: *name_to_id
+                            .get(&hint.finder)
+                            .ok_or_else(|| TrackerUpdateError::HintGameMissing(hint.finder))?,
+                        receiver_game_id: *name_to_id
+                            .get(&hint.receiver)
+                            .ok_or_else(|| TrackerUpdateError::HintGameMissing(hint.receiver))?,
+                        item: hint.item,
+                        location: hint.location,
+                        entrance: hint.entrance,
+                        found: hint.found,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        )
+        // This drives the stream to completion.
+        .try_for_each(|_| std::future::ready(Ok(())))
+        .await?;
 
         Ok(())
     }

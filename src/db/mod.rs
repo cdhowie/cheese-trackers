@@ -55,11 +55,17 @@ pub trait DataAccess {
         's: 'f,
         'r: 'f;
 
-    /// Creates a new [`ApTracker`] in the database.
+    /// Creates one or more new [`ApTracker`]s in the database.
     ///
-    /// The `id` field of the passed argument is ignored.  It will be populated
-    /// with the real ID in the returned value.
-    fn create_ap_tracker(&mut self, tracker: ApTracker) -> BoxFuture<'_, sqlx::Result<ApTracker>>;
+    /// The `id` field of the values is ignored.  It will be populated with the
+    /// real IDs in the returned values.
+    fn create_ap_trackers<'s, 'v, 'f>(
+        &'s mut self,
+        trackers: impl IntoIterator<Item = ApTracker> + Send + 'v,
+    ) -> BoxStream<'f, sqlx::Result<ApTracker>>
+    where
+        's: 'f,
+        'v: 's;
 
     /// Updates an existing [`ApTracker`].
     ///
@@ -100,11 +106,17 @@ pub trait DataAccess {
     fn delete_ap_hints_by_tracker_id(&mut self, tracker_id: i32)
         -> BoxFuture<'_, sqlx::Result<()>>;
 
-    /// Creates a new [`ApGame`] in the database.
+    /// Creates one or more new [`ApGame`]s in the database.
     ///
-    /// The `id` field of the passed argument is ignored.  It will be populated
-    /// with the real ID in the returned value.
-    fn create_ap_game(&mut self, game: ApGame) -> BoxFuture<'_, sqlx::Result<ApGame>>;
+    /// The `id` field of the values is ignored.  It will be populated with the
+    /// real IDs in the returned values.
+    fn create_ap_games<'s, 'v, 'f>(
+        &'s mut self,
+        games: impl IntoIterator<Item = ApGame> + Send + 'v,
+    ) -> BoxStream<'f, sqlx::Result<ApGame>>
+    where
+        's: 'f,
+        'v: 'f;
 
     /// Updates an existing [`ApGame`].
     ///
@@ -128,11 +140,17 @@ pub trait DataAccess {
         's: 'f,
         'c: 'f;
 
-    /// Creates a new [`ApHint`] in the database.
+    /// Creates one or more new [`ApHint`]s in the database.
     ///
-    /// The `id` field of the passed argument is ignored.  It will be populated
-    /// with the real ID in the returned value.
-    fn create_ap_hint(&mut self, game: ApHint) -> BoxFuture<'_, sqlx::Result<ApHint>>;
+    /// The `id` field of the values is ignored.  It will be populated with the
+    /// real IDs in the returned values.
+    fn create_ap_hints<'s, 'v, 'f>(
+        &'s mut self,
+        hints: impl IntoIterator<Item = ApHint> + Send + 'v,
+    ) -> BoxStream<'f, sqlx::Result<ApHint>>
+    where
+        's: 'f,
+        'v: 'f;
 }
 
 impl DataAccessProvider for PgPool {
@@ -157,38 +175,59 @@ fn missing_primary_key<T>() -> String {
     )
 }
 
-async fn pg_insert<T>(executor: &mut PgConnection, value: T) -> sqlx::Result<T>
+fn pg_insert<'a, T>(
+    executor: &'a mut PgConnection,
+    values: impl IntoIterator<Item = T> + 'a,
+) -> impl Stream<Item = sqlx::Result<T>> + 'a
 where
-    T: model::Model + for<'a> FromRow<'a, PgRow> + Send + Unpin,
+    T: model::Model + for<'b> FromRow<'b, PgRow> + Send + Unpin + 'a,
 {
-    // Insert ignores the primary key.  To remove the matching value we need to
-    // know its position.  The contract of Model::columns() and
-    // Model::into_values() ensures that we can simply omit the value from the
-    // matching position.
-    let id_pos = T::columns()
-        .iter()
-        .position(|&i| i == T::primary_key())
-        .ok_or_else(|| missing_primary_key::<T>())
-        .unwrap();
+    stream! {
+        // Insert ignores the primary key.  To remove the matching value we need
+        // to know its position.  The contract of Model::columns() and
+        // Model::into_values() ensures that we can simply omit the value from
+        // the matching position.
+        let id_pos = T::columns()
+            .iter()
+            .position(|&i| i == T::primary_key())
+            .ok_or_else(|| missing_primary_key::<T>())
+            .unwrap();
 
-    let (sql, values) = Query::insert()
-        .into_table(T::table())
-        .columns(
-            T::columns()
-                .iter()
-                .copied()
-                .filter(|&i| i != T::primary_key()),
-        )
-        .values_panic(
-            value
-                .into_values()
-                .enumerate()
-                .filter_map(|(pos, v)| (pos != id_pos).then_some(v)),
-        )
-        .returning_all()
-        .build_sqlx(PostgresQueryBuilder);
+        let mut query = Query::insert().build_with(|q| {
+            q
+                .into_table(T::table())
+                .columns(
+                    T::columns()
+                        .iter()
+                        .copied()
+                        .filter(|&i| i != T::primary_key()),
+                );
+        });
 
-    sqlx::query_as_with(&sql, values).fetch_one(executor).await
+        let mut any = false;
+        for value in values {
+            any = true;
+            query.values_panic(
+                value
+                    .into_values()
+                    .enumerate()
+                    .filter_map(|(pos, v)| (pos != id_pos).then_some(v)),
+            );
+        }
+
+        if !any {
+            // Insert no records is a no-op.
+            return;
+        }
+
+        let (sql, values) = query
+            .returning_all()
+            .build_sqlx(PostgresQueryBuilder);
+
+        for await row in sqlx::query_as_with(&sql, values).fetch(executor) {
+            yield row;
+        }
+    }
 }
 
 async fn pg_select_one<T>(
@@ -294,8 +333,15 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         .boxed()
     }
 
-    fn create_ap_tracker(&mut self, tracker: ApTracker) -> BoxFuture<'_, sqlx::Result<ApTracker>> {
-        pg_insert(self.0.as_mut(), tracker).boxed()
+    fn create_ap_trackers<'s, 'v, 'f>(
+        &'s mut self,
+        trackers: impl IntoIterator<Item = ApTracker> + Send + 'v,
+    ) -> BoxStream<'f, sqlx::Result<ApTracker>>
+    where
+        's: 'f,
+        'v: 's,
+    {
+        pg_insert(self.0.as_mut(), trackers).boxed()
     }
 
     fn update_ap_tracker<'f, 's, 'c>(
@@ -368,8 +414,15 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         .boxed()
     }
 
-    fn create_ap_game(&mut self, game: ApGame) -> BoxFuture<'_, sqlx::Result<ApGame>> {
-        pg_insert(self.0.as_mut(), game).boxed()
+    fn create_ap_games<'s, 'v, 'f>(
+        &'s mut self,
+        games: impl IntoIterator<Item = ApGame> + Send + 'v,
+    ) -> BoxStream<'f, sqlx::Result<ApGame>>
+    where
+        's: 'f,
+        'v: 'f,
+    {
+        pg_insert(self.0.as_mut(), games).boxed()
     }
 
     fn update_ap_game<'f, 's, 'c>(
@@ -384,8 +437,15 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         pg_update(self.0.as_mut(), game, columns).boxed()
     }
 
-    fn create_ap_hint(&mut self, game: ApHint) -> BoxFuture<'_, sqlx::Result<ApHint>> {
-        pg_insert(self.0.as_mut(), game).boxed()
+    fn create_ap_hints<'s, 'v, 'f>(
+        &'s mut self,
+        hints: impl IntoIterator<Item = ApHint> + Send + 'v,
+    ) -> BoxStream<'f, sqlx::Result<ApHint>>
+    where
+        's: 'f,
+        'v: 'f,
+    {
+        pg_insert(self.0.as_mut(), hints).boxed()
     }
 }
 
