@@ -1,0 +1,467 @@
+//! Database access.
+//!
+//! This module implements [a database-agnostic data access trait](DataAccess).
+//! This mechanism allows switching the underlying data type without any code
+//! changes, while also permitting per-backend optimizations.
+
+use std::collections::HashMap;
+
+use async_stream::stream;
+use futures::{future::BoxFuture, stream::BoxStream, FutureExt, Stream, StreamExt};
+use sea_query::{Asterisk, Expr, PostgresQueryBuilder, Query, SimpleExpr};
+use sea_query_binder::SqlxBinder;
+use sqlx::{postgres::PgRow, FromRow, PgConnection, PgPool, Postgres};
+
+pub mod model;
+
+use model::*;
+
+/// Provides access to the database.
+pub trait DataAccessProvider {
+    /// Creates a new data access value, such as by acquiring a connection from
+    /// a pool.
+    fn create_data_access(
+        &self,
+    ) -> BoxFuture<'_, Result<Box<dyn TransactableDataAccess + Send>, sqlx::Error>>;
+}
+
+/// Transaction creation.
+pub trait Transactable {
+    /// Creates a new transaction.
+    fn begin(
+        &mut self,
+    ) -> BoxFuture<'_, Result<Box<dyn DataAccessTransaction<'_> + Send + '_>, sqlx::Error>>;
+}
+
+/// Database transaction.
+pub trait Transaction<'a> {
+    /// Commits the transaction.
+    fn commit(self: Box<Self>) -> BoxFuture<'a, Result<(), sqlx::Error>>;
+
+    /// Rolls back the transaction.
+    fn rollback(self: Box<Self>) -> BoxFuture<'a, Result<(), sqlx::Error>>;
+}
+
+/// Database-agnostic data access.
+pub trait DataAccess {
+    /// Gets an [`ApTracker`] by its Archipelago tracker ID.
+    fn get_tracker_by_ap_tracker_id<'s, 'r, 'f>(
+        &'s mut self,
+        ap_tracker_id: &'r str,
+    ) -> BoxFuture<'f, sqlx::Result<Option<ApTracker>>>
+    where
+        's: 'f,
+        'r: 'f;
+
+    /// Creates a new [`ApTracker`] in the database.
+    ///
+    /// The `id` field of the passed argument is ignored.  It will be populated
+    /// with the real ID in the returned value.
+    fn create_ap_tracker(&mut self, tracker: ApTracker) -> BoxFuture<'_, sqlx::Result<ApTracker>>;
+
+    /// Updates an existing [`ApTracker`].
+    ///
+    /// If an existing tracker is found, this function will return `true`;
+    /// otherwise, it will return `false`.
+    ///
+    /// If `columns` is empty, all columns (except the primary key) will be
+    /// updated.
+    ///
+    /// # Panics
+    ///
+    /// This function may panic if `columns` contains duplicate identifiers or
+    /// contains the primary key for the table.  (Implementations may also
+    /// ignore the presence of duplicates and/or the primary key, but this is
+    /// not guaranteed.)
+    fn update_ap_tracker<'f, 's, 'c>(
+        &'s mut self,
+        tracker: ApTracker,
+        columns: &'c [ApTrackerIden],
+    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    where
+        's: 'f,
+        'c: 'f;
+
+    /// Gets all of the [`ApGame`]s for a tracker by the tracker's ID.
+    fn get_ap_games_by_tracker_id(
+        &mut self,
+        tracker_id: i32,
+    ) -> BoxStream<'_, sqlx::Result<ApGame>>;
+
+    /// Gets all of the [`ApHint`]s for a tracker by the tracker's ID.
+    fn get_ap_hints_by_tracker_id(
+        &mut self,
+        tracker_id: i32,
+    ) -> BoxStream<'_, sqlx::Result<ApHint>>;
+
+    /// Deletes all of the [`ApHint`]s for a tracker by the tracker's ID.
+    fn delete_ap_hints_by_tracker_id(&mut self, tracker_id: i32)
+        -> BoxFuture<'_, sqlx::Result<()>>;
+
+    /// Creates a new [`ApGame`] in the database.
+    ///
+    /// The `id` field of the passed argument is ignored.  It will be populated
+    /// with the real ID in the returned value.
+    fn create_ap_game(&mut self, game: ApGame) -> BoxFuture<'_, sqlx::Result<ApGame>>;
+
+    /// Updates an existing [`ApGame`].
+    ///
+    /// If an existing game is found, this function will return `true`;
+    /// otherwise, it will return `false`.
+    ///
+    /// If `columns` is empty, all columns (except the primary key) will be
+    /// updated.
+    ///
+    /// # Panics
+    ///
+    /// This function may panic if `columns` contains duplicate identifiers or
+    /// contains the primary key for the table.  (Implementations may also ignore
+    /// the presence of duplicates and/or the primary key, but this is not guaranteed.)
+    fn update_ap_game<'f, 's, 'c>(
+        &'s mut self,
+        game: ApGame,
+        columns: &'c [ApGameIden],
+    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    where
+        's: 'f,
+        'c: 'f;
+
+    /// Creates a new [`ApHint`] in the database.
+    ///
+    /// The `id` field of the passed argument is ignored.  It will be populated
+    /// with the real ID in the returned value.
+    fn create_ap_hint(&mut self, game: ApHint) -> BoxFuture<'_, sqlx::Result<ApHint>>;
+}
+
+/// Union of [`Transactable`] and [`DataAccess`].
+pub trait TransactableDataAccess: Transactable + DataAccess {}
+impl<T: Transactable + DataAccess> TransactableDataAccess for T {}
+
+/// Union of [`DataAccess`] and [`Transaction`].
+pub trait DataAccessTransaction<'a>: DataAccess + Transaction<'a> {}
+impl<'a, T: DataAccess + Transaction<'a>> DataAccessTransaction<'a> for T {}
+
+impl DataAccessProvider for PgPool {
+    fn create_data_access(
+        &self,
+    ) -> BoxFuture<'_, Result<Box<dyn TransactableDataAccess + Send>, sqlx::Error>> {
+        Box::pin(async {
+            self.acquire()
+                .await
+                .map(|c| -> Box<dyn TransactableDataAccess + Send> { Box::new(PgDataAccess(c)) })
+        })
+    }
+}
+
+/// Provides access to PostgreSQL databases.
+///
+/// Access to the inner database connection is intentionally omitted.  All
+/// database access should happen in an implementation of [`DataAccess`].
+#[derive(Debug)]
+pub struct PgDataAccess<T>(T);
+
+fn missing_primary_key<T>() -> String {
+    format!(
+        "{0}::columns() does not contain {0}::primary_key()",
+        std::any::type_name::<T>()
+    )
+}
+
+async fn pg_insert<T>(executor: &mut PgConnection, value: T) -> sqlx::Result<T>
+where
+    T: model::Model + for<'a> FromRow<'a, PgRow> + Send + Unpin,
+{
+    // Insert ignores the primary key.  To remove the matching value we need to
+    // know its position.  The contract of Model::columns() and
+    // Model::into_values() ensures that we can simply omit the value from the
+    // matching position.
+    let id_pos = T::columns()
+        .iter()
+        .position(|&i| i == T::primary_key())
+        .ok_or_else(|| missing_primary_key::<T>())
+        .unwrap();
+
+    let (sql, values) = Query::insert()
+        .into_table(T::table())
+        .columns(
+            T::columns()
+                .iter()
+                .copied()
+                .filter(|&i| i != T::primary_key()),
+        )
+        .values_panic(
+            value
+                .into_values()
+                .enumerate()
+                .filter_map(|(pos, v)| (pos != id_pos).then_some(v)),
+        )
+        .returning_all()
+        .build_sqlx(PostgresQueryBuilder);
+
+    sqlx::query_as_with(&sql, values).fetch_one(executor).await
+}
+
+async fn pg_select_one<T>(
+    executor: &mut PgConnection,
+    condition: SimpleExpr,
+) -> sqlx::Result<Option<T>>
+where
+    T: Model + for<'a> FromRow<'a, PgRow> + Send + Unpin,
+{
+    let (sql, values) = Query::select()
+        .column(Asterisk)
+        .from(T::table())
+        .and_where(condition)
+        .limit(1)
+        .build_sqlx(PostgresQueryBuilder);
+
+    sqlx::query_as_with(&sql, values)
+        .fetch_optional(executor)
+        .await
+}
+
+fn pg_select_many<'a, T>(
+    executor: &'a mut PgConnection,
+    condition: SimpleExpr,
+) -> impl Stream<Item = sqlx::Result<T>> + 'a
+where
+    T: Model + for<'b> FromRow<'b, PgRow> + Send + Unpin + 'a,
+{
+    let (sql, values) = Query::select()
+        .column(Asterisk)
+        .from(T::table())
+        .and_where(condition)
+        .build_sqlx(PostgresQueryBuilder);
+
+    stream! {
+        for await row in sqlx::query_as_with(&sql, values).fetch(executor) {
+            yield row;
+        }
+    }
+}
+
+async fn pg_update<T>(
+    executor: &mut PgConnection,
+    value: T,
+    columns: &[T::Iden],
+) -> sqlx::Result<bool>
+where
+    T: Model,
+{
+    // Would be nice to avoid converting to a map here, but this simplifies a
+    // lot of the code below.
+    let mut values: HashMap<_, _> = T::columns()
+        .iter()
+        .copied()
+        .zip(value.into_values())
+        .collect();
+
+    let pkey = values
+        .remove(&T::primary_key())
+        .ok_or_else(|| missing_primary_key::<T>())
+        .unwrap();
+
+    let columns = if columns.is_empty() {
+        T::columns()
+    } else {
+        columns
+    };
+
+    let (sql, values) = Query::update()
+        .table(T::table())
+        .values(columns.iter().copied().filter_map(|col| {
+            (col != T::primary_key()).then_some((
+                col,
+                values
+                    .remove(&col)
+                    .ok_or_else(|| format!("column {col:?} appears twice"))
+                    .unwrap(),
+            ))
+        }))
+        .and_where(Expr::col(T::primary_key()).eq(pkey))
+        .returning(Query::returning().column(T::primary_key()))
+        .build_sqlx(PostgresQueryBuilder);
+
+    sqlx::query_with(&sql, values)
+        .fetch_optional(executor)
+        .await
+        .map(|r| r.is_some())
+}
+
+impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for PgDataAccess<T> {
+    fn get_tracker_by_ap_tracker_id<'s, 'r, 'f>(
+        &'s mut self,
+        ap_tracker_id: &'r str,
+    ) -> BoxFuture<'f, sqlx::Result<Option<ApTracker>>>
+    where
+        's: 'f,
+        'r: 'f,
+    {
+        pg_select_one(
+            self.0.as_mut(),
+            Expr::col(ApTrackerIden::TrackerId).eq(ap_tracker_id),
+        )
+        .boxed()
+    }
+
+    fn create_ap_tracker(&mut self, tracker: ApTracker) -> BoxFuture<'_, sqlx::Result<ApTracker>> {
+        pg_insert(self.0.as_mut(), tracker).boxed()
+    }
+
+    fn update_ap_tracker<'f, 's, 'c>(
+        &'s mut self,
+        tracker: ApTracker,
+        columns: &'c [ApTrackerIden],
+    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    where
+        's: 'f,
+        'c: 'f,
+    {
+        pg_update(self.0.as_mut(), tracker, columns).boxed()
+    }
+
+    fn get_ap_games_by_tracker_id(
+        &mut self,
+        tracker_id: i32,
+    ) -> BoxStream<'_, sqlx::Result<ApGame>> {
+        pg_select_many(
+            self.0.as_mut(),
+            Expr::col(ApGameIden::TrackerId).eq(tracker_id),
+        )
+        .boxed()
+    }
+
+    fn get_ap_hints_by_tracker_id(
+        &mut self,
+        tracker_id: i32,
+    ) -> BoxStream<'_, sqlx::Result<ApHint>> {
+        let (sql, values) = Query::select()
+            .column((ApHintIden::Table, Asterisk))
+            .from(ApHintIden::Table)
+            .inner_join(
+                ApGameIden::Table,
+                Expr::col((ApHintIden::Table, ApHintIden::FinderGameId))
+                    .equals((ApGameIden::Table, ApGameIden::Id)),
+            )
+            .and_where(Expr::col((ApGameIden::Table, ApGameIden::TrackerId)).eq(tracker_id))
+            .build_sqlx(PostgresQueryBuilder);
+
+        stream! {
+            for await row in sqlx::query_as_with(&sql, values).fetch(self.0.as_mut()) {
+                yield row;
+            }
+        }
+        .boxed()
+    }
+
+    fn delete_ap_hints_by_tracker_id(
+        &mut self,
+        tracker_id: i32,
+    ) -> BoxFuture<'_, sqlx::Result<()>> {
+        async move {
+            let (sql, values) = Query::delete()
+                .from_table(ApHintIden::Table)
+                .and_where(Expr::col(ApHintIden::FinderGameId).in_subquery(
+                    Query::select().build_with(|q| {
+                        q.column(ApGameIden::Id)
+                            .from(ApGameIden::Table)
+                            .and_where(Expr::col(ApGameIden::TrackerId).eq(tracker_id));
+                    }),
+                ))
+                .build_sqlx(PostgresQueryBuilder);
+
+            sqlx::query_with(&sql, values)
+                .execute(self.0.as_mut())
+                .await
+                .map(|_| ())
+        }
+        .boxed()
+    }
+
+    fn create_ap_game(&mut self, game: ApGame) -> BoxFuture<'_, sqlx::Result<ApGame>> {
+        pg_insert(self.0.as_mut(), game).boxed()
+    }
+
+    fn update_ap_game<'f, 's, 'c>(
+        &'s mut self,
+        game: ApGame,
+        columns: &'c [ApGameIden],
+    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    where
+        's: 'f,
+        'c: 'f,
+    {
+        pg_update(self.0.as_mut(), game, columns).boxed()
+    }
+
+    fn create_ap_hint(&mut self, game: ApHint) -> BoxFuture<'_, sqlx::Result<ApHint>> {
+        pg_insert(self.0.as_mut(), game).boxed()
+    }
+}
+
+impl<'a> Transaction<'a> for PgDataAccess<sqlx::Transaction<'a, Postgres>> {
+    fn commit(self: Box<Self>) -> BoxFuture<'a, Result<(), sqlx::Error>> {
+        self.0.commit().boxed()
+    }
+
+    fn rollback(self: Box<Self>) -> BoxFuture<'a, Result<(), sqlx::Error>> {
+        self.0.rollback().boxed()
+    }
+}
+
+impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send + 'static> Transactable
+    for PgDataAccess<T>
+{
+    fn begin(
+        &mut self,
+    ) -> BoxFuture<'_, Result<Box<dyn DataAccessTransaction<'_> + Send + '_>, sqlx::Error>> {
+        async move {
+            sqlx::Connection::begin(self.0.as_mut())
+                .await
+                .map(|t| -> Box<dyn DataAccessTransaction + Send> { Box::new(PgDataAccess(t)) })
+        }
+        .boxed()
+    }
+}
+
+/// Build values using a closure.
+///
+/// Seaquery query types are built using chained `&mut` calls which means the
+/// result cannot be directly used, as the final result is a `&mut` instead of
+/// an owned query.  Their documentation uses a final `.to_owned()` call, but
+/// this unnecessarily clones the whole query structure.
+///
+/// Usually an owned query is unnecessary, but in come contexts (e.g.
+/// subselects) it can be required, and the workaround is:
+///
+/// ```
+/// .in_subquery({
+///     let mut q = Query::select();
+///     q.from(...)...;
+///     q
+/// })
+/// ```
+///
+/// This generic wrapper allows building such queries in a more natural syntax:
+///
+/// ```
+/// .in_subquery(
+///     Query::select().build_with(|q| {
+///         q.from(...)...;
+///     })
+/// )
+/// ```
+trait BuildWith: Sized {
+    /// Builds a value using the provided closure.
+    ///
+    /// This function takes a value, applies the provided closure to it, then
+    /// returns the value.
+    fn build_with(self, b: impl FnOnce(&mut Self)) -> Self;
+}
+
+impl<T> BuildWith for T {
+    fn build_with(mut self, b: impl FnOnce(&mut Self)) -> Self {
+        b(&mut self);
+        self
+    }
+}

@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# Creates a podman pod containing the database and pgadmin.
+
+podman pod create \
+    --name mwtracker \
+    --publish '127.0.0.1::5432' \
+    --publish '127.0.0.1::80' || exit 1
+
+podman run \
+    --pod mwtracker \
+    --name mwtracker_db \
+    --detach \
+    --volume "$(pwd)/../mwtracker.schema.sql:/docker-entrypoint-initdb.d/mwtracker.schema.sql:ro" \
+    --env POSTGRES_USER=mwtracker \
+    --env POSTGRES_PASSWORD=mwtracker \
+    --env POSTGRES_DB=mwtracker \
+    docker.io/postgres:16.1 || exit 1
+
+podman run \
+    --pod mwtracker \
+    --name mwtracker_pgadmin \
+    --detach \
+    --env PGADMIN_DEFAULT_EMAIL=mwtracker@example.com \
+    --env PGADMIN_DEFAULT_PASSWORD=mwtracker \
+    --env PGADMIN_DISABLE_POSTFIX=yes \
+    --volume "$(pwd)/servers.json:/pgadmin4/servers.json:ro" \
+    docker.io/dpage/pgadmin4:8.2

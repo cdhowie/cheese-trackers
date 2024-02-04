@@ -1,0 +1,20 @@
+{
+    "Servers": {
+        "1": {
+            "Name": "mwtracker",
+            "Group": "Servers",
+            "Host": "localhost",
+            "Port": 5432,
+            "MaintenanceDB": "postgres",
+            "Username": "mwtracker",
+            "UseSSHTunnel": 0,
+            "TunnelPort": "22",
+            "TunnelAuthentication": 0,
+            "KerberosAuthentication": false,
+            "ConnectionParameters": {
+                "sslmode": "disable",
+                "connect_timeout": 10
+            }
+        }
+    }
+}
