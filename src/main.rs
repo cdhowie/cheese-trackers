@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use chrono::Utc;
+use chrono::{NaiveDateTime, Utc};
 use db::{
     model::{ApGame, ApGameIden, ApHint, ApTracker, ApTrackerIden, GameStatus},
     DataAccess, DataAccessProvider, Transactable, Transaction,
@@ -420,12 +420,77 @@ where
     }))
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct UpdateGameRequest {
+    pub discord_username: Option<String>,
+    pub discord_ping: bool,
+    pub status: GameStatus,
+    pub last_checked: Option<NaiveDateTime>,
+}
+
+async fn update_game<D>(
+    State(state): State<Arc<AppState<D>>>,
+    Path((tracker_id, game_id)): Path<(String, i32)>,
+    Json(game_update): Json<UpdateGameRequest>,
+) -> Result<impl IntoResponse, StatusCode>
+where
+    D: DataAccessProvider + Send + Sync + 'static,
+{
+    let mut db = state
+        .data_provider
+        .create_data_access()
+        .await
+        .unexpected()?;
+    let mut tx = db.begin().await.unexpected()?;
+
+    let tracker = tx
+        .get_tracker_by_ap_tracker_id(&tracker_id)
+        .await
+        .unexpected()?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let mut game = tx
+        .get_ap_game(game_id)
+        .await
+        .unexpected()?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    if game.tracker_id != tracker.id {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    game.discord_username = game_update.discord_username;
+    game.discord_ping = game_update.discord_ping;
+    game.status = game_update.status;
+    game.last_checked = game_update.last_checked;
+
+    tx.update_ap_game(
+        game,
+        &[
+            ApGameIden::DiscordUsername,
+            ApGameIden::DiscordPing,
+            ApGameIden::Status,
+            ApGameIden::LastChecked,
+        ],
+    )
+    .await
+    .unexpected()?;
+
+    tx.commit().await.unexpected()?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 fn create_router<D>(state: AppState<D>) -> axum::Router<()>
 where
     D: DataAccessProvider + Send + Sync + 'static,
 {
     axum::Router::new()
         .route("/tracker/:tracker_id", axum::routing::get(get_tracker))
+        .route(
+            "/tracker/:tracker_id/game/:game_id",
+            axum::routing::put(update_game),
+        )
         .with_state(Arc::new(state))
 }
 

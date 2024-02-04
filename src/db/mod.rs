@@ -118,6 +118,9 @@ pub trait DataAccess {
         's: 'f,
         'v: 'f;
 
+    /// Gets an [`ApGame`] by its database ID.
+    fn get_ap_game(&mut self, game_id: i32) -> BoxFuture<'_, sqlx::Result<Option<ApGame>>>;
+
     /// Updates an existing [`ApGame`].
     ///
     /// If an existing game is found, this function will return `true`;
@@ -423,6 +426,10 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         'v: 'f,
     {
         pg_insert(self.0.as_mut(), games).boxed()
+    }
+
+    fn get_ap_game(&mut self, game_id: i32) -> BoxFuture<'_, sqlx::Result<Option<ApGame>>> {
+        pg_select_one(self.0.as_mut(), Expr::col(ApGameIden::Id).eq(game_id)).boxed()
     }
 
     fn update_ap_game<'f, 's, 'c>(
