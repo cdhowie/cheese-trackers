@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
+    response::IntoResponse,
     Json,
 };
 use chrono::Utc;
@@ -358,21 +359,21 @@ impl<D> AppState<D> {
     }
 }
 
-#[derive(Debug, serde::Serialize)]
-struct TrackerResponse {
-    #[serde(flatten)]
-    pub tracker: ApTracker,
-    pub games: Vec<ApGame>,
-    pub hints: Vec<ApHint>,
-}
-
-async fn get_tracker_by_id<D>(
+async fn get_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
     Path(tracker_id): Path<String>,
-) -> Result<Json<TrackerResponse>, StatusCode>
+) -> Result<impl IntoResponse, StatusCode>
 where
     D: DataAccessProvider + Send + Sync + 'static,
 {
+    #[derive(Debug, serde::Serialize)]
+    struct GetTrackerResponse {
+        #[serde(flatten)]
+        pub tracker: ApTracker,
+        pub games: Vec<ApGame>,
+        pub hints: Vec<ApHint>,
+    }
+
     {
         let r = state.update_tracker(tracker_id.clone()).await;
         if r.as_ref()
@@ -412,7 +413,7 @@ where
     tx.rollback().await.unexpected()?;
     drop(db);
 
-    Ok(Json(TrackerResponse {
+    Ok(Json(GetTrackerResponse {
         tracker,
         games,
         hints,
@@ -424,10 +425,7 @@ where
     D: DataAccessProvider + Send + Sync + 'static,
 {
     axum::Router::new()
-        .route(
-            "/tracker/:tracker_id",
-            axum::routing::get(get_tracker_by_id),
-        )
+        .route("/tracker/:tracker_id", axum::routing::get(get_tracker))
         .with_state(Arc::new(state))
 }
 
