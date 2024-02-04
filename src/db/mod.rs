@@ -10,7 +10,7 @@ use async_stream::stream;
 use futures::{future::BoxFuture, stream::BoxStream, FutureExt, Stream, StreamExt};
 use sea_query::{Asterisk, Expr, PostgresQueryBuilder, Query, SimpleExpr};
 use sea_query_binder::SqlxBinder;
-use sqlx::{postgres::PgRow, FromRow, PgConnection, PgPool, Postgres};
+use sqlx::{pool::PoolConnection, postgres::PgRow, FromRow, PgConnection, PgPool, Postgres};
 
 pub mod model;
 
@@ -18,28 +18,30 @@ use model::*;
 
 /// Provides access to the database.
 pub trait DataAccessProvider {
+    type DataAccess: DataAccess + Transactable + Send;
+
     /// Creates a new data access value, such as by acquiring a connection from
     /// a pool.
-    fn create_data_access(
-        &self,
-    ) -> BoxFuture<'_, Result<Box<dyn TransactableDataAccess + Send>, sqlx::Error>>;
+    fn create_data_access(&self) -> BoxFuture<'_, Result<Self::DataAccess, sqlx::Error>>;
 }
 
 /// Transaction creation.
 pub trait Transactable {
+    type Transaction<'a>: DataAccess + Transaction<'a> + Send
+    where
+        Self: 'a;
+
     /// Creates a new transaction.
-    fn begin(
-        &mut self,
-    ) -> BoxFuture<'_, Result<Box<dyn DataAccessTransaction<'_> + Send + '_>, sqlx::Error>>;
+    fn begin(&mut self) -> BoxFuture<'_, Result<Self::Transaction<'_>, sqlx::Error>>;
 }
 
 /// Database transaction.
 pub trait Transaction<'a> {
     /// Commits the transaction.
-    fn commit(self: Box<Self>) -> BoxFuture<'a, Result<(), sqlx::Error>>;
+    fn commit(self) -> BoxFuture<'a, Result<(), sqlx::Error>>;
 
     /// Rolls back the transaction.
-    fn rollback(self: Box<Self>) -> BoxFuture<'a, Result<(), sqlx::Error>>;
+    fn rollback(self) -> BoxFuture<'a, Result<(), sqlx::Error>>;
 }
 
 /// Database-agnostic data access.
@@ -133,23 +135,11 @@ pub trait DataAccess {
     fn create_ap_hint(&mut self, game: ApHint) -> BoxFuture<'_, sqlx::Result<ApHint>>;
 }
 
-/// Union of [`Transactable`] and [`DataAccess`].
-pub trait TransactableDataAccess: Transactable + DataAccess {}
-impl<T: Transactable + DataAccess> TransactableDataAccess for T {}
-
-/// Union of [`DataAccess`] and [`Transaction`].
-pub trait DataAccessTransaction<'a>: DataAccess + Transaction<'a> {}
-impl<'a, T: DataAccess + Transaction<'a>> DataAccessTransaction<'a> for T {}
-
 impl DataAccessProvider for PgPool {
-    fn create_data_access(
-        &self,
-    ) -> BoxFuture<'_, Result<Box<dyn TransactableDataAccess + Send>, sqlx::Error>> {
-        Box::pin(async {
-            self.acquire()
-                .await
-                .map(|c| -> Box<dyn TransactableDataAccess + Send> { Box::new(PgDataAccess(c)) })
-        })
+    type DataAccess = PgDataAccess<PoolConnection<Postgres>>;
+
+    fn create_data_access(&self) -> BoxFuture<'_, Result<Self::DataAccess, sqlx::Error>> {
+        Box::pin(async { self.acquire().await.map(PgDataAccess) })
     }
 }
 
@@ -400,11 +390,11 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
 }
 
 impl<'a> Transaction<'a> for PgDataAccess<sqlx::Transaction<'a, Postgres>> {
-    fn commit(self: Box<Self>) -> BoxFuture<'a, Result<(), sqlx::Error>> {
+    fn commit(self) -> BoxFuture<'a, Result<(), sqlx::Error>> {
         self.0.commit().boxed()
     }
 
-    fn rollback(self: Box<Self>) -> BoxFuture<'a, Result<(), sqlx::Error>> {
+    fn rollback(self) -> BoxFuture<'a, Result<(), sqlx::Error>> {
         self.0.rollback().boxed()
     }
 }
@@ -412,13 +402,13 @@ impl<'a> Transaction<'a> for PgDataAccess<sqlx::Transaction<'a, Postgres>> {
 impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send + 'static> Transactable
     for PgDataAccess<T>
 {
-    fn begin(
-        &mut self,
-    ) -> BoxFuture<'_, Result<Box<dyn DataAccessTransaction<'_> + Send + '_>, sqlx::Error>> {
+    type Transaction<'a> = PgDataAccess<sqlx::Transaction<'a, Postgres>>;
+
+    fn begin(&mut self) -> BoxFuture<'_, Result<Self::Transaction<'_>, sqlx::Error>> {
         async move {
             sqlx::Connection::begin(self.0.as_mut())
                 .await
-                .map(|t| -> Box<dyn DataAccessTransaction + Send> { Box::new(PgDataAccess(t)) })
+                .map(PgDataAccess)
         }
         .boxed()
     }

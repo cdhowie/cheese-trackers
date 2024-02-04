@@ -8,13 +8,12 @@ use axum::{
 use chrono::Utc;
 use db::{
     model::{ApGame, ApGameIden, ApHint, ApTracker, ApTrackerIden, GameStatus},
-    DataAccessProvider,
+    DataAccess, DataAccessProvider, Transactable, Transaction,
 };
 use futures::{
     future::{BoxFuture, Shared},
     FutureExt, TryFutureExt, TryStreamExt,
 };
-use sqlx::PgPool;
 use tokio::{net::TcpListener, signal::unix::SignalKind, sync::RwLock};
 use url::Url;
 
@@ -66,34 +65,28 @@ enum TrackerUpdateError {
 
 type InflightTrackerUpdateFuture = BoxFuture<'static, Result<(), Arc<TrackerUpdateError>>>;
 
-struct AppState {
+struct AppState<D> {
     reqwest_client: reqwest::Client,
-    data_provider: Box<dyn DataAccessProvider + Send + Sync>,
+    data_provider: D,
     tracker_base_url: Url,
 
     inflight_tracker_updates: RwLock<HashMap<String, Shared<InflightTrackerUpdateFuture>>>,
     tracker_update_interval: chrono::Duration,
 }
 
-impl AppState {
-    pub async fn new(config: &conf::Config) -> Result<Self, Box<dyn std::error::Error>> {
-        Ok(Self {
+impl<D> AppState<D> {
+    fn new(config: conf::Config, data_provider: D) -> Self {
+        Self {
             reqwest_client: reqwest::Client::builder().build().unwrap(),
-            data_provider: match &config.database {
-                conf::Database::Postgres { connection_string } => {
-                    Box::new(PgPool::connect(connection_string).await?)
-                }
-            },
+            data_provider,
             tracker_base_url: "https://archipelago.gg/tracker/".parse().unwrap(),
             inflight_tracker_updates: RwLock::default(),
             tracker_update_interval: config.tracker_update_interval,
-        })
+        }
     }
-}
 
-impl AppState {
     async fn synchronize_tracker(
-        db: &mut (dyn db::DataAccessTransaction<'_> + Send),
+        db: &mut (impl db::DataAccess + Send),
         tracker_id: String,
         games: Vec<tracker::Game>,
         hints: Vec<tracker::Hint>,
@@ -234,7 +227,10 @@ impl AppState {
     async fn update_tracker(
         self: &Arc<Self>,
         tracker_id: String,
-    ) -> Result<(), Arc<TrackerUpdateError>> {
+    ) -> Result<(), Arc<TrackerUpdateError>>
+    where
+        D: DataAccessProvider + Send + Sync + 'static,
+    {
         // This is broken out into a separate statement to ensure the lock guard
         // is dropped as soon as possible.
         let existing = self
@@ -294,7 +290,7 @@ impl AppState {
 
                 let (games, hints) = tracker::parse_tracker_html(&html)?;
 
-                Self::synchronize_tracker(&mut *tx, tracker_id, games, hints).await?;
+                Self::synchronize_tracker(&mut tx, tracker_id, games, hints).await?;
 
                 tx.commit().await?;
 
@@ -338,10 +334,13 @@ struct TrackerResponse {
     pub hints: Vec<ApHint>,
 }
 
-async fn get_tracker_by_id(
-    State(state): State<Arc<AppState>>,
+async fn get_tracker_by_id<D>(
+    State(state): State<Arc<AppState<D>>>,
     Path(tracker_id): Path<String>,
-) -> Result<Json<TrackerResponse>, StatusCode> {
+) -> Result<Json<TrackerResponse>, StatusCode>
+where
+    D: DataAccessProvider + Send + Sync + 'static,
+{
     {
         let r = state.update_tracker(tracker_id.clone()).await;
         if r.as_ref()
@@ -388,34 +387,47 @@ async fn get_tracker_by_id(
     }))
 }
 
+fn create_router<D>(state: AppState<D>) -> axum::Router<()>
+where
+    D: DataAccessProvider + Send + Sync + 'static,
+{
+    axum::Router::new()
+        .route(
+            "/tracker/:tracker_id",
+            axum::routing::get(get_tracker_by_id),
+        )
+        .with_state(Arc::new(state))
+}
+
+async fn create_router_from_config(
+    config: conf::Config,
+) -> Result<axum::Router<()>, Box<dyn std::error::Error>> {
+    Ok(match &config.database {
+        conf::Database::Postgres { connection_string } => {
+            let data_provider = sqlx::PgPool::connect(connection_string).await?;
+            create_router(AppState::new(config, data_provider))
+        }
+    })
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = conf::load()?;
+    let listen = config.http_listen;
 
-    let router = axum::Router::new();
+    let router = create_router_from_config(config).await?;
 
-    let state = Arc::new(AppState::new(&config).await?);
-
-    axum::serve(
-        TcpListener::bind(config.http_listen).await?,
-        router
-            .route(
-                "/tracker/:tracker_id",
-                axum::routing::get(get_tracker_by_id),
-            )
-            .with_state(state)
-            .into_make_service(),
-    )
-    .with_graceful_shutdown(async {
-        match signal::any([SignalKind::interrupt(), SignalKind::terminate()]) {
-            Ok(f) => f.await,
-            Err(e) => {
-                eprintln!("Unable to listen for shutdown signals: {e}");
-                std::future::pending().await
+    axum::serve(TcpListener::bind(listen).await?, router)
+        .with_graceful_shutdown(async {
+            match signal::any([SignalKind::interrupt(), SignalKind::terminate()]) {
+                Ok(f) => f.await,
+                Err(e) => {
+                    eprintln!("Unable to listen for shutdown signals: {e}");
+                    std::future::pending().await
+                }
             }
-        }
-    })
-    .await?;
+        })
+        .await?;
 
     Ok(())
 }
