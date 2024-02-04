@@ -124,6 +124,31 @@ impl From<GameStatus> for SimpleExpr {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize)]
+#[sqlx(type_name = "tracker_game_status", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum TrackerGameStatus {
+    Disconnected,
+    Connected,
+    Playing,
+    GoalCompleted,
+}
+
+impl From<TrackerGameStatus> for SimpleExpr {
+    fn from(value: TrackerGameStatus) -> Self {
+        SimpleExpr::Value(
+            match value {
+                TrackerGameStatus::Disconnected => "disconnected",
+                TrackerGameStatus::Connected => "connected",
+                TrackerGameStatus::Playing => "playing",
+                TrackerGameStatus::GoalCompleted => "goal_completed",
+            }
+            .into(),
+        )
+        .cast_as(Alias::new("tracker_game_status"))
+    }
+}
+
 db_struct! {
     pub struct ApTracker {
         pub id: i32,
@@ -139,6 +164,7 @@ db_struct! {
         pub position: i32,
         pub name: String,
         pub game: String,
+        pub tracker_status: TrackerGameStatus,
         pub checks_done: i32,
         pub checks_total: i32,
         #[serde(skip_serializing_if = "Option::is_none")]

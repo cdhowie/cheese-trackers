@@ -136,6 +136,7 @@ impl<D> AppState<D> {
                             })?,
                             name: game.name,
                             game: game.game,
+                            tracker_status: game.status,
                             checks_done: checks.completed,
                             checks_total: checks.total,
                             last_activity: game.last_activity.map(|d| (now - d).naive_utc()),
@@ -195,12 +196,20 @@ impl<D> AppState<D> {
 
                     name_to_id.insert(tracker_game.name, db_game.id);
 
+                    db_game.tracker_status = tracker_game.status;
                     db_game.checks_done = tracker_checks.completed;
                     db_game.last_activity =
                         tracker_game.last_activity.map(|d| (now - d).naive_utc());
 
-                    db.update_ap_game(db_game, &[ApGameIden::ChecksDone, ApGameIden::LastActivity])
-                        .await?;
+                    db.update_ap_game(
+                        db_game,
+                        &[
+                            ApGameIden::TrackerStatus,
+                            ApGameIden::ChecksDone,
+                            ApGameIden::LastActivity,
+                        ],
+                    )
+                    .await?;
                 }
 
                 // Synchronizing hints is a bit tricky because the data we

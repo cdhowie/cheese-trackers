@@ -10,6 +10,8 @@ use serde::{
     forward_to_deserialize_any, Deserialize, Deserializer,
 };
 
+use crate::db::model::TrackerGameStatus;
+
 /// Refers to a specific tracker table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrackerTable {
@@ -83,10 +85,26 @@ pub struct Game {
     pub position: u32,
     pub name: String,
     pub game: String,
+    #[serde(deserialize_with = "de_status")]
+    pub status: TrackerGameStatus,
     #[serde(deserialize_with = "de_parsed")]
     pub checks: Checks<u32>,
     #[serde(deserialize_with = "de_last_activity")]
     pub last_activity: Option<chrono::Duration>,
+}
+
+fn de_status<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TrackerGameStatus, D::Error> {
+    Ok(match String::deserialize(deserializer)?.as_str() {
+        "Disconnected" => TrackerGameStatus::Disconnected,
+        "Connected" => TrackerGameStatus::Connected,
+        "Playing" => TrackerGameStatus::Playing,
+        "Goal Completed" => TrackerGameStatus::GoalCompleted,
+        s => {
+            return Err(D::Error::custom(format!(
+                "could not parse tracker game status {s:?}",
+            )))
+        }
+    })
 }
 
 /// Error type indicating failure to parse [`Checks`].
