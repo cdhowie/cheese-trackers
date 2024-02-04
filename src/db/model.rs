@@ -95,6 +95,7 @@ macro_rules! db_struct {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize)]
 #[sqlx(type_name = "game_status", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 pub enum GameStatus {
     Unblocked,
     Bk,
