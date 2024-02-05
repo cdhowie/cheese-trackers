@@ -198,7 +198,7 @@ loadTracker();
         <table class="table table-sm table-hover text-center">
             <thead style="position: sticky; top: 0; z-index: 100">
                 <tr>
-                    <td colspan="13">
+                    <td colspan="11">
                         <div class="btn-group">
                             <template v-for="filter in ownerFilters">
                                 <input type="radio" class="btn-check" name="filter-owner" :id="`filter-owner-${filter.id}`"
@@ -220,7 +220,7 @@ loadTracker();
                     <th>Status</th>
                     <th colspan="2">Last Checked</th>
                     <th>Last Activity</th>
-                    <th colspan="3">Checks</th>
+                    <th>Checks</th>
                     <th>Hints</th>
                 </tr>
             </thead>
@@ -280,13 +280,11 @@ loadTracker();
                             @click="updateLastChecked(game)">Update</button>
                     </td>
                     <td>{{ displayDateTime(game.last_activity) }}</td>
-                    <!--
-                    <td class="text-end pe-0">{{ game.checks_done }}/</td>
-                    <td class="text-start ps-0">{{ game.checks_total }}</td>
-                    <td>{{ Math.floor((game.checks_done / game.checks_total) * 100) }}%</td>
-                    -->
-                    <td colspan="3" class="align-middle">
-                        <div class="progress">
+                    <td class="align-middle">
+                        <div class="progress" style="position: relative;">
+                            <div style="position: absolute; width: 100%; height: 100%; text-align: center">
+                                {{ game.checks_done }} / {{ game.checks_total }}
+                            </div>
                             <div class="progress-bar overflow-visible"
                                 :class="{ 'bg-success': game.checks_done === game.checks_total }"
                                 :style="{ width: `${checksCompletePct(game)}%` }">
