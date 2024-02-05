@@ -5,7 +5,9 @@ import { groupBy, keyBy, orderBy, sumBy, uniq } from 'lodash-es';
 import { load as loadSettings } from '@/settings.js';
 import { now } from '@/time.js';
 
-const API_BASE = 'http://127.0.0.1:3000';
+const api_client = axios.create({
+    baseURL: import.meta.env.DEV ? 'http://127.0.0.1:3000/' : '/',
+});
 
 const props = defineProps(['aptrackerid']);
 
@@ -126,7 +128,7 @@ async function loadTracker() {
     error.value = undefined;
 
     try {
-        const { data } = await axios.get(`${API_BASE}/api/tracker/${props.aptrackerid}`);
+        const { data } = await api_client.get(`api/tracker/${props.aptrackerid}`);
         trackerData.value = data;
 
         hintsByFinder.value = groupBy(trackerData.value.hints, 'finder_game_id');
@@ -144,9 +146,9 @@ async function updateGame(game, mutator) {
     const data = { ...game };
     mutator(data);
 
-    return axios({
+    return api_client.request({
         method: 'put',
-        url: `${API_BASE}/api/tracker/${props.aptrackerid}/game/${game.id}`,
+        url: `api/tracker/${props.aptrackerid}/game/${game.id}`,
         data,
     })
         .then(
