@@ -63,11 +63,11 @@ CREATE TABLE public.ap_game (
     game text NOT NULL,
     checks_done integer NOT NULL,
     checks_total integer NOT NULL,
-    last_activity timestamp without time zone,
+    last_activity timestamp with time zone,
     discord_username text,
     discord_ping boolean DEFAULT false NOT NULL,
     status public.game_status DEFAULT 'unblocked'::public.game_status NOT NULL,
-    last_checked timestamp without time zone,
+    last_checked timestamp with time zone,
     "position" integer NOT NULL,
     tracker_status public.tracker_game_status NOT NULL
 );
@@ -120,7 +120,7 @@ ALTER SEQUENCE public.ap_hint_id_seq OWNED BY public.ap_hint.id;
 CREATE TABLE public.ap_tracker (
     id integer NOT NULL,
     tracker_id text NOT NULL,
-    updated_at timestamp without time zone NOT NULL
+    updated_at timestamp with time zone NOT NULL
 );
 
 

@@ -6,7 +6,7 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use chrono::{NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use db::{
     model::{ApGame, ApGameIden, ApHint, ApTracker, ApTrackerIden, GameStatus},
     DataAccess, DataAccessProvider, Transactable, Transaction,
@@ -113,7 +113,7 @@ impl<D> AppState<D> {
                     .create_ap_trackers([db::model::ApTracker {
                         id: 0,
                         tracker_id,
-                        updated_at: now.naive_utc(),
+                        updated_at: now,
                     }])
                     .try_next()
                     .await?
@@ -141,7 +141,7 @@ impl<D> AppState<D> {
                             tracker_status: game.status,
                             checks_done: checks.completed,
                             checks_total: checks.total,
-                            last_activity: game.last_activity.map(|d| (now - d).naive_utc()),
+                            last_activity: game.last_activity.map(|d| now - d),
                             discord_username: None,
                             discord_ping: false,
                             status: GameStatus::Unblocked,
@@ -200,8 +200,7 @@ impl<D> AppState<D> {
 
                     db_game.tracker_status = tracker_game.status;
                     db_game.checks_done = tracker_checks.completed;
-                    db_game.last_activity =
-                        tracker_game.last_activity.map(|d| (now - d).naive_utc());
+                    db_game.last_activity = tracker_game.last_activity.map(|d| now - d);
 
                     db.update_ap_game(
                         db_game,
@@ -223,7 +222,7 @@ impl<D> AppState<D> {
                 // for now just replace all of the hints in the database.
                 db.delete_ap_hints_by_tracker_id(tracker.id).await?;
 
-                tracker.updated_at = now.naive_utc();
+                tracker.updated_at = now;
                 db.update_ap_tracker(tracker, &[ApTrackerIden::UpdatedAt])
                     .await?;
 
@@ -298,9 +297,7 @@ impl<D> AppState<D> {
                 if tx
                     .get_tracker_by_ap_tracker_id(&tracker_id)
                     .await?
-                    .is_some_and(|r| {
-                        Utc::now().naive_utc() < r.updated_at + this.tracker_update_interval
-                    })
+                    .is_some_and(|r| Utc::now() < r.updated_at + this.tracker_update_interval)
                 {
                     // The tracker was updated within the last
                     // tracker_update_interval, so don't update it now.
@@ -426,7 +423,7 @@ struct UpdateGameRequest {
     pub discord_username: Option<String>,
     pub discord_ping: bool,
     pub status: GameStatus,
-    pub last_checked: Option<NaiveDateTime>,
+    pub last_checked: Option<DateTime<Utc>>,
 }
 
 async fn update_game<D>(

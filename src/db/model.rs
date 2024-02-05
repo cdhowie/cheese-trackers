@@ -3,7 +3,7 @@
 
 use std::{fmt::Debug, hash::Hash};
 
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Utc};
 use sea_query::{Alias, Iden, SimpleExpr};
 use sqlx::{postgres::PgRow, FromRow, Row};
 
@@ -153,7 +153,7 @@ db_struct! {
     pub struct ApTracker {
         pub id: i32,
         pub tracker_id: String,
-        pub updated_at: NaiveDateTime,
+        pub updated_at: DateTime<Utc>,
     }
 }
 
@@ -168,13 +168,13 @@ db_struct! {
         pub checks_done: i32,
         pub checks_total: i32,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub last_activity: Option<NaiveDateTime>,
+        pub last_activity: Option<DateTime<Utc>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub discord_username: Option<String>,
         pub discord_ping: bool,
         pub status: GameStatus,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub last_checked: Option<NaiveDateTime>,
+        pub last_checked: Option<DateTime<Utc>>,
     }
 }
 
