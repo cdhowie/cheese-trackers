@@ -22,4 +22,5 @@ serde = { version = "1.0.196", features = ["derive"] }
 sqlx = { version = "0.7.3", features = ["chrono", "postgres", "runtime-tokio"] }
 thiserror = "1.0.56"
 tokio = { version = "1.36.0", features = ["full"] }
+tower-http = { version = "0.5.1", features = ["cors"] }
 url = "2.5.0"

@@ -16,6 +16,7 @@ use futures::{
     FutureExt, TryFutureExt, TryStreamExt,
 };
 use tokio::{net::TcpListener, signal::unix::SignalKind, sync::RwLock};
+use tower_http::cors::CorsLayer;
 use url::Url;
 
 use crate::logging::UnexpectedResultExt;
@@ -486,9 +487,9 @@ where
     D: DataAccessProvider + Send + Sync + 'static,
 {
     axum::Router::new()
-        .route("/tracker/:tracker_id", axum::routing::get(get_tracker))
+        .route("/api/tracker/:tracker_id", axum::routing::get(get_tracker))
         .route(
-            "/tracker/:tracker_id/game/:game_id",
+            "/api/tracker/:tracker_id/game/:game_id",
             axum::routing::put(update_game),
         )
         .with_state(Arc::new(state))
@@ -509,8 +510,14 @@ async fn create_router_from_config(
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = conf::load()?;
     let listen = config.http_listen;
+    let cors = config.cors_permissive;
 
     let router = create_router_from_config(config).await?;
+    let router = if cors {
+        router.layer(CorsLayer::permissive())
+    } else {
+        router
+    };
 
     axum::serve(TcpListener::bind(listen).await?, router)
         .with_graceful_shutdown(async {
