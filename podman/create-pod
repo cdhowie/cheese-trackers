@@ -1,11 +1,12 @@
 #!/bin/sh
 
-# Creates a podman pod containing the database and pgadmin.
+# Creates a podman pod to run the application for development.
 
 podman pod create \
     --name mwtracker \
     --publish '127.0.0.1::5432' \
-    --publish '127.0.0.1::80' || exit 1
+    --publish '127.0.0.1::80' \
+    --publish '127.0.0.1::81' || exit 1
 
 podman run \
     --pod mwtracker \
@@ -26,3 +27,11 @@ podman run \
     --env PGADMIN_DISABLE_POSTFIX=yes \
     --volume "$(pwd)/servers.json:/pgadmin4/servers.json:ro" \
     docker.io/dpage/pgadmin4:8.2
+
+podman run \
+    --pod mwtracker \
+    --name mwtracker_vite \
+    --detach \
+    --volume "$(pwd)/../../frontend:/app" \
+    --entrypoint /app/podman-entrypoint \
+    docker.io/node:20-bookworm
