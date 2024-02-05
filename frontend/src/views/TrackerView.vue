@@ -329,7 +329,7 @@ loadTracker();
                             <tr>
                                 <td>{{ uniquePlayers }}</td>
                                 <td>{{ uniqueGames }}</td>
-                                <td class="text-end ps-0">{{ totalDoneChecks }}/</td>
+                                <td class="text-end pe-0">{{ totalDoneChecks }}/</td>
                                 <td class="text-start ps-0">{{ totalChecks }}</td>
                                 <td>{{ Math.floor((totalDoneChecks / totalChecks) * 100) }}%</td>
                             </tr>
