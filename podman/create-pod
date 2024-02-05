@@ -12,7 +12,7 @@ podman run \
     --pod mwtracker \
     --name mwtracker_db \
     --detach \
-    --volume "$(pwd)/../mwtracker.schema.sql:/docker-entrypoint-initdb.d/mwtracker.schema.sql:ro" \
+    --volume "$(pwd)/../server/mwtracker.schema.sql:/docker-entrypoint-initdb.d/mwtracker.schema.sql:ro" \
     --env POSTGRES_USER=mwtracker \
     --env POSTGRES_PASSWORD=mwtracker \
     --env POSTGRES_DB=mwtracker \
@@ -32,6 +32,6 @@ podman run \
     --pod mwtracker \
     --name mwtracker_vite \
     --detach \
-    --volume "$(pwd)/../../frontend:/app" \
+    --volume "$(pwd)/../frontend:/app" \
     --entrypoint /app/podman-entrypoint \
     docker.io/node:20-bookworm
