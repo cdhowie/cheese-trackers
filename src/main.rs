@@ -16,7 +16,7 @@ use futures::{
     FutureExt, TryFutureExt, TryStreamExt,
 };
 use tokio::{net::TcpListener, signal::unix::SignalKind, sync::RwLock};
-use tower_http::cors::CorsLayer;
+use tower_http::{cors::CorsLayer, services::ServeDir};
 use url::Url;
 
 use crate::logging::UnexpectedResultExt;
@@ -479,14 +479,14 @@ where
     Ok(StatusCode::NO_CONTENT)
 }
 
-fn create_router<D>(state: AppState<D>) -> axum::Router<()>
+fn create_api_router<D>(state: AppState<D>) -> axum::Router<()>
 where
     D: DataAccessProvider + Send + Sync + 'static,
 {
     axum::Router::new()
-        .route("/api/tracker/:tracker_id", axum::routing::get(get_tracker))
+        .route("/tracker/:tracker_id", axum::routing::get(get_tracker))
         .route(
-            "/api/tracker/:tracker_id/game/:game_id",
+            "/tracker/:tracker_id/game/:game_id",
             axum::routing::put(update_game),
         )
         .with_state(Arc::new(state))
@@ -498,7 +498,7 @@ async fn create_router_from_config(
     Ok(match &config.database {
         conf::Database::Postgres { connection_string } => {
             let data_provider = sqlx::PgPool::connect(connection_string).await?;
-            create_router(AppState::new(config, data_provider))
+            create_api_router(AppState::new(config, data_provider))
         }
     })
 }
@@ -509,12 +509,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listen = config.http_listen;
     let cors = config.cors_permissive;
 
-    let router = create_router_from_config(config).await?;
-    let router = if cors {
-        router.layer(CorsLayer::permissive())
+    let api_router = create_router_from_config(config).await?;
+    let api_router = if cors {
+        api_router.layer(CorsLayer::permissive())
     } else {
-        router
+        api_router
     };
+
+    let router = axum::Router::new()
+        .nest("/api", api_router)
+        .fallback_service(ServeDir::new("dist"));
 
     axum::serve(TcpListener::bind(listen).await?, router)
         .with_graceful_shutdown(async {
