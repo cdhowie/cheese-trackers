@@ -16,7 +16,10 @@ use futures::{
     FutureExt, TryFutureExt, TryStreamExt,
 };
 use tokio::{net::TcpListener, signal::unix::SignalKind, sync::RwLock};
-use tower_http::{cors::CorsLayer, services::ServeDir};
+use tower_http::{
+    cors::CorsLayer,
+    services::{ServeDir, ServeFile},
+};
 use url::Url;
 
 use crate::logging::UnexpectedResultExt;
@@ -518,7 +521,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let router = axum::Router::new()
         .nest("/api", api_router)
-        .fallback_service(ServeDir::new("dist"));
+        .fallback_service(ServeDir::new("dist").fallback(ServeFile::new("dist/index.html")));
 
     axum::serve(TcpListener::bind(listen).await?, router)
         .with_graceful_shutdown(async {
