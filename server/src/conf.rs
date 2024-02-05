@@ -8,6 +8,8 @@ pub struct Config {
     pub http_listen: SocketAddr,
     #[serde(default)]
     pub cors_permissive: bool,
+    #[serde(default)]
+    pub is_staging: bool,
     #[serde(rename = "tracker_update_interval_mins")]
     #[serde(deserialize_with = "de_duration_mins")]
     pub tracker_update_interval: chrono::Duration,

@@ -74,6 +74,7 @@ struct AppState<D> {
     reqwest_client: reqwest::Client,
     data_provider: D,
     tracker_base_url: Url,
+    ui_settings: UiSettings,
 
     inflight_tracker_updates: RwLock<HashMap<String, Shared<InflightTrackerUpdateFuture>>>,
     tracker_update_interval: chrono::Duration,
@@ -85,6 +86,9 @@ impl<D> AppState<D> {
             reqwest_client: reqwest::Client::builder().build().unwrap(),
             data_provider,
             tracker_base_url: "https://archipelago.gg/tracker/".parse().unwrap(),
+            ui_settings: UiSettings {
+                is_staging: config.is_staging,
+            },
             inflight_tracker_updates: RwLock::default(),
             tracker_update_interval: config.tracker_update_interval,
         }
@@ -482,6 +486,15 @@ where
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+struct UiSettings {
+    pub is_staging: bool,
+}
+
+async fn get_settings<D>(State(state): State<Arc<AppState<D>>>) -> Json<UiSettings> {
+    Json(state.ui_settings.clone())
+}
+
 fn create_api_router<D>(state: AppState<D>) -> axum::Router<()>
 where
     D: DataAccessProvider + Send + Sync + 'static,
@@ -492,6 +505,7 @@ where
             "/tracker/:tracker_id/game/:game_id",
             axum::routing::put(update_game),
         )
+        .route("/settings", axum::routing::get(get_settings))
         .with_state(Arc::new(state))
 }
 

@@ -1,5 +1,11 @@
 <script setup>
-import { RouterLink, RouterView } from 'vue-router'
+import { ref } from 'vue';
+import { RouterLink, RouterView } from 'vue-router';
+import { getSettings } from '@/api.js';
+
+const settings = ref({});
+
+getSettings().then(({ data }) => { settings.value = data; })
 </script>
 
 <template>
@@ -16,6 +22,11 @@ import { RouterLink, RouterView } from 'vue-router'
       </ul>
     </div>
   </nav>
+
+  <div v-if="settings.is_staging" class="alert alert-warning text-center">
+    This is the staging server. The staging database will be periodically reset to facilitate testing. <b>Do not use this
+      server as the authoritative tracker for your games.</b>
+  </div>
 
   <RouterView />
 

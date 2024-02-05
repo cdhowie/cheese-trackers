@@ -1,13 +1,9 @@
 <script setup>
 import { computed, ref } from 'vue';
-import axios from 'axios';
 import { groupBy, keyBy, orderBy, sumBy, uniq } from 'lodash-es';
 import { load as loadSettings } from '@/settings.js';
 import { now } from '@/time.js';
-
-const api_client = axios.create({
-    baseURL: import.meta.env.DEV ? 'http://127.0.0.1:3000/' : '/',
-});
+import { getTracker as apiGetTracker, updateGame as apiUpdateGame } from '@/api.js';
 
 const props = defineProps(['aptrackerid']);
 
@@ -128,7 +124,7 @@ async function loadTracker() {
     error.value = undefined;
 
     try {
-        const { data } = await api_client.get(`api/tracker/${props.aptrackerid}`);
+        const { data } = await apiGetTracker(props.aptrackerid);
         trackerData.value = data;
 
         hintsByFinder.value = groupBy(trackerData.value.hints, 'finder_game_id');
@@ -146,11 +142,7 @@ async function updateGame(game, mutator) {
     const data = { ...game };
     mutator(data);
 
-    return api_client.request({
-        method: 'put',
-        url: `api/tracker/${props.aptrackerid}/game/${game.id}`,
-        data,
-    })
+    return apiUpdateGame(props.aptrackerid, data)
         .then(
             ({ status }) => status === 204,
             e => {
