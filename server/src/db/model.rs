@@ -175,6 +175,7 @@ db_struct! {
         pub status: GameStatus,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub last_checked: Option<DateTime<Utc>>,
+        pub notes: String,
     }
 }
 

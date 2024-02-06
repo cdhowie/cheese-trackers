@@ -289,3 +289,5 @@ ALTER TABLE ONLY public.ap_game
 -- PostgreSQL database dump complete
 --
 
+ALTER TABLE ONLY public.ap_game
+    ADD COLUMN notes text NOT NULL DEFAULT '';

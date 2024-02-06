@@ -153,6 +153,7 @@ impl<D> AppState<D> {
                             discord_ping: false,
                             status: GameStatus::Unblocked,
                             last_checked: None,
+                            notes: String::new(),
                         }])
                         .try_next()
                         .await?
@@ -431,6 +432,7 @@ struct UpdateGameRequest {
     pub discord_ping: bool,
     pub status: GameStatus,
     pub last_checked: Option<DateTime<Utc>>,
+    pub notes: String,
 }
 
 async fn update_game<D>(
@@ -468,6 +470,7 @@ where
     game.discord_ping = game_update.discord_ping;
     game.status = game_update.status;
     game.last_checked = game_update.last_checked;
+    game.notes = game_update.notes;
 
     tx.update_ap_game(
         game,
@@ -476,6 +479,7 @@ where
             ApGameIden::DiscordPing,
             ApGameIden::Status,
             ApGameIden::LastChecked,
+            ApGameIden::Notes,
         ],
     )
     .await
