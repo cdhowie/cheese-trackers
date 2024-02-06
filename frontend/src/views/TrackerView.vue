@@ -27,9 +27,11 @@ function hintsClass(game) {
     // so the button won't be gray.
     const unfound = Math.max(unfoundHints(game), game.notes !== '' ? 1 : 0);
 
+    const prefix = gameExpanded.value[game.id] ? 'btn-' : 'btn-outline-';
+
     for (const c of hintsColors) {
         if (c.max === undefined || unfound <= c.max) {
-            return `btn-outline-${c.color}`;
+            return `${prefix}${c.color}`;
         }
     }
 }
@@ -328,7 +330,7 @@ loadTracker();
                                 </div>
                             </div>
                         </td>
-                        <td>
+                        <td :class="{ dropup: gameExpanded[game.id] }">
                             <button class="btn btn-sm dropdown-toggle" :class="[hintsClass(game)]"
                                 @click="gameExpanded[game.id] = !gameExpanded[game.id]">
                                 {{ unfoundHints(game) }}<template v-if="game.notes !== ''">*</template>
