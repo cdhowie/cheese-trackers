@@ -216,7 +216,9 @@ function updateLastChecked(game) {
 }
 
 function updateNotes(game) {
-    updateGame(game, g => { g.notes = g.$newnotes; });
+    if (game.notes !== game.$newnotes) {
+        updateGame(game, g => { g.notes = g.$newnotes; });
+    }
 }
 
 loadTracker();
