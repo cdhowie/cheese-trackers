@@ -15,18 +15,6 @@ const trackerData = ref(undefined);
 const hintsByFinder = ref(undefined);
 const gameById = ref(undefined);
 
-const gameExpanded = ref({});
-
-function setAllExpanded(v) {
-    trackerData.value.games.forEach(game => {
-        gameExpanded.value[game.id] = v;
-    });
-}
-
-const allExpanded = computed(() => {
-    return trackerData.value.games.every(g => gameExpanded.value[g.id]);
-});
-
 const hintsColors = [
     { max: 0, color: 'secondary' },
     { max: 5, color: 'info' },
@@ -121,6 +109,18 @@ const filteredGames = computed(() =>
         ownerFilter.value.predicate(g)
     )
 );
+
+const gameExpanded = ref({});
+
+function setAllExpanded(v) {
+    trackerData.value.games.forEach(game => {
+        gameExpanded.value[game.id] = v;
+    });
+}
+
+const allExpanded = computed(() => {
+    return filteredGames.value.every(g => gameExpanded.value[g.id]);
+});
 
 function displayDateTime(d) {
     if (d) {
