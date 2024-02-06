@@ -329,7 +329,7 @@ loadTracker();
                             </div>
                         </td>
                         <td>
-                            <button class="btn btn-sm" :class="[hintsClass(game)]"
+                            <button class="btn btn-sm dropdown-toggle" :class="[hintsClass(game)]"
                                 @click="gameExpanded[game.id] = !gameExpanded[game.id]">
                                 {{ unfoundHints(game) }}<template v-if="game.notes !== ''">*</template>
                             </button>
