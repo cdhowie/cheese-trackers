@@ -349,13 +349,15 @@ loadTracker();
                                             <table class="table table-responsive">
                                                 <tr v-for="hint in hintsByFinder[game.id].filter(h => !h.found)">
                                                     <td class="text-end pe-0">
-                                                        <span class="text-info p-0">{{ gameById[hint.receiver_game_id].name
+                                                        <span class="text-info bg-transparent p-0">{{
+                                                            gameById[hint.receiver_game_id].name
                                                         }}</span>'s
-                                                        <span class="text-info p-0">{{ hint.item }}</span>
+                                                        <span class="text-info bg-transparent p-0">{{ hint.item }}</span>
                                                     </td>
                                                     <td class="ps-0 pe-0">&nbsp;is at&nbsp;</td>
                                                     <td class="text-start ps-0">
-                                                        <span class="text-info p-0">{{ hint.location }}</span>
+                                                        <span class="text-info bg-transparent p-0">{{ hint.location
+                                                        }}</span>
                                                         <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance
                                                         }})</template>
                                                     </td>
