@@ -195,7 +195,6 @@ impl<D> AppState<D> {
                     // Sanity check that all of the existing information is the
                     // same.  If it's not, something bad probably happened.
                     if tracker_position != db_game.position
-                        || tracker_game.name != db_game.name
                         || tracker_game.game != db_game.game
                         || tracker_checks.total != db_game.checks_total
                     {
@@ -204,8 +203,9 @@ impl<D> AppState<D> {
                         ));
                     }
 
-                    name_to_id.insert(tracker_game.name, db_game.id);
+                    name_to_id.insert(tracker_game.name.clone(), db_game.id);
 
+                    db_game.name = tracker_game.name;
                     db_game.tracker_status = tracker_game.status;
                     db_game.checks_done = tracker_checks.completed;
                     db_game.last_activity = tracker_game.last_activity.map(|d| now - d);
@@ -213,6 +213,7 @@ impl<D> AppState<D> {
                     db.update_ap_game(
                         db_game,
                         &[
+                            ApGameIden::Name,
                             ApGameIden::TrackerStatus,
                             ApGameIden::ChecksDone,
                             ApGameIden::LastActivity,
