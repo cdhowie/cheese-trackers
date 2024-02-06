@@ -338,7 +338,7 @@ loadTracker();
                     <tr v-if="gameExpanded[game.id]">
                         <td colspan="11" class="container-fluid">
                             <div class="row">
-                                <div class="col-6">
+                                <div class="col-12 col-xl-6">
                                     <div class="fw-bold">Unfound hints</div>
                                     <div v-if="(hintsByFinder[game.id] || []).filter(h => !h.found).length === 0"
                                         class="text-muted">
@@ -354,7 +354,7 @@ loadTracker();
                                                         }}</span>'s
                                                         <span class="text-info bg-transparent p-0">{{ hint.item }}</span>
                                                     </td>
-                                                    <td class="ps-0 pe-0">&nbsp;is at&nbsp;</td>
+                                                    <td class="ps-0 pe-0">&nbsp;is&nbsp;at&nbsp;</td>
                                                     <td class="text-start ps-0">
                                                         <span class="text-info bg-transparent p-0">{{ hint.location
                                                         }}</span>
@@ -366,7 +366,7 @@ loadTracker();
                                         </div>
                                     </div>
                                 </div>
-                                <div class="col-6">
+                                <div class="col-12 col-xl-6">
                                     <div class="fw-bold">Notes</div>
                                     <textarea placeholder="Enter any notes about your game here." class="form-control"
                                         rows="5" v-model="game.$newnotes" @blur="updateNotes(game)"
