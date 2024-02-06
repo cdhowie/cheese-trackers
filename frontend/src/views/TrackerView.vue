@@ -339,15 +339,30 @@ loadTracker();
                         <td colspan="11" class="container-fluid">
                             <div class="row">
                                 <div class="col-6">
-                                    <div class="fw-bold">Hints</div>
-                                    <template v-for="hint in hintsByFinder[game.id]">
-                                        <div v-if="!hint.found">
-                                            <span class="text-info">{{ gameById[hint.receiver_game_id].name }}</span>'s
-                                            <span class="text-info">{{ hint.item }}</span> is at
-                                            <span class="text-info">{{ hint.location }}</span>
-                                            <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance }})</template>
+                                    <div class="fw-bold">Unfound hints</div>
+                                    <div v-if="(hintsByFinder[game.id] || []).filter(h => !h.found).length === 0"
+                                        class="text-muted">
+                                        There are no unfound hints right now.
+                                    </div>
+                                    <div v-else class="row justify-content-center">
+                                        <div class="col-auto">
+                                            <table class="table table-responsive">
+                                                <tr v-for="hint in hintsByFinder[game.id].filter(h => !h.found)">
+                                                    <td class="text-end pe-0">
+                                                        <span class="text-info p-0">{{ gameById[hint.receiver_game_id].name
+                                                        }}</span>'s
+                                                        <span class="text-info p-0">{{ hint.item }}</span>
+                                                    </td>
+                                                    <td class="ps-0 pe-0">&nbsp;is at&nbsp;</td>
+                                                    <td class="text-start ps-0">
+                                                        <span class="text-info p-0">{{ hint.location }}</span>
+                                                        <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance
+                                                        }})</template>
+                                                    </td>
+                                                </tr>
+                                            </table>
                                         </div>
-                                    </template>
+                                    </div>
                                 </div>
                                 <div class="col-6">
                                     <div class="fw-bold">Notes</div>
