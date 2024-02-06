@@ -15,14 +15,29 @@ const trackerData = ref(undefined);
 const hintsByFinder = ref(undefined);
 const gameById = ref(undefined);
 
+const gameExpanded = ref({});
+
+function setAllExpanded(v) {
+    trackerData.value.games.forEach(game => {
+        gameExpanded.value[game.id] = v;
+    });
+}
+
+const allExpanded = computed(() => {
+    return trackerData.value.games.every(g => gameExpanded.value[g.id]);
+});
+
 const hintsColors = [
+    { max: 0, color: 'secondary' },
     { max: 5, color: 'info' },
     { max: 10, color: 'warning' },
     { color: 'danger' }
 ];
 
 function hintsClass(game) {
-    const unfound = unfoundHints(game);
+    // If a game has notes, we consider the number of hints to be 1 at a minimum
+    // so the button won't be gray.
+    const unfound = Math.max(unfoundHints(game), game.notes !== '' ? 1 : 0);
 
     for (const c of hintsColors) {
         if (c.max === undefined || unfound <= c.max) {
@@ -120,11 +135,18 @@ function unfoundHints(game) {
 }
 
 async function loadTracker() {
+    if (loading.value) {
+        return;
+    }
+
     loading.value = true;
     error.value = undefined;
 
     try {
         const { data } = await apiGetTracker(props.aptrackerid);
+        data.games.forEach(game => {
+            game.$newnotes = game.notes;
+        });
         trackerData.value = data;
 
         hintsByFinder.value = groupBy(trackerData.value.hints, 'finder_game_id');
@@ -137,7 +159,11 @@ async function loadTracker() {
 }
 
 async function updateGame(game, mutator) {
-    game.$is_updating = true;
+    if (loading.value) {
+        return;
+    }
+
+    loading.value = true;
 
     const data = { ...game };
     mutator(data);
@@ -154,7 +180,7 @@ async function updateGame(game, mutator) {
             if (saved) {
                 mutator(game);
             }
-            delete game.$is_updating;
+            loading.value = false;
         });
 }
 
@@ -187,6 +213,10 @@ function updateLastChecked(game) {
     updateGame(game, g => { g.last_checked = now.toISOString(); });
 }
 
+function updateNotes(game) {
+    updateGame(game, g => { g.notes = g.$newnotes; });
+}
+
 loadTracker();
 </script>
 
@@ -208,7 +238,11 @@ loadTracker();
                                 </label>
                             </template>
                         </div>
-                        <button class="btn btn-sm btn-secondary ms-2" @click="loadTracker()">Refresh</button>
+                        <button class="btn btn-sm btn-secondary ms-2" @click="setAllExpanded(!allExpanded)">
+                            {{ allExpanded ? 'Collapse' : 'Expand' }} all
+                        </button>
+                        <button class="btn btn-sm btn-primary ms-2" @click="loadTracker()"
+                            :disabled="loading">Refresh</button>
                     </td>
                 </tr>
                 <tr>
@@ -225,91 +259,109 @@ loadTracker();
                 </tr>
             </thead>
             <tbody>
-                <tr v-for="game in filteredGames">
-                    <td>{{ game.name }}</td>
-                    <td>
-                        <button v-if="game.discord_ping || game.discord_username?.length" class="btn btn-sm"
-                            :class="{ 'btn-outline-danger': !game.discord_ping, 'btn-outline-success': game.discord_ping }"
-                            :disabled="loading || game.$is_updating" @click="togglePing(game)">
-                            {{ game.discord_ping ? 'Yes' : 'No' }}
-                        </button>
-                    </td>
-                    <td>
-                        <button v-if="settings.discordUsername && !game.discord_username?.length"
-                            class="btn btn-sm btn-outline-secondary" :disabled="loading || game.$is_updating"
-                            @click="claimGame(game)">Claim</button>
+                <template v-for="game in filteredGames">
+                    <tr>
+                        <td>{{ game.name }}</td>
+                        <td>
+                            <button v-if="game.discord_ping || game.discord_username?.length" class="btn btn-sm"
+                                :class="{ 'btn-outline-danger': !game.discord_ping, 'btn-outline-success': game.discord_ping }"
+                                :disabled="loading" @click="togglePing(game)">
+                                {{ game.discord_ping ? 'Yes' : 'No' }}
+                            </button>
+                        </td>
+                        <td>
+                            <button v-if="settings.discordUsername && !game.discord_username?.length"
+                                class="btn btn-sm btn-outline-secondary" :disabled="loading"
+                                @click="claimGame(game)">Claim</button>
 
-                        <template
-                            v-if="settings.discordUsername && game.discord_username?.length && game.discord_username !== settings.discordUsername">
-                            <button class="btn btn-sm btn-outline-secondary" :disabled="loading || game.$is_updating"
-                                data-bs-toggle="dropdown">Claim</button>
-                            <div class="dropdown-menu text-warning p-3">
-                                <span class="text-warning me-2 d-inline-block align-middle">Another user has claimed this
-                                    slot.</span>
-                                <button class="btn btn-sm btn-warning" @click="claimGame(game)">Claim anyway</button>
-                            </div>
-                        </template>
+                            <template
+                                v-if="settings.discordUsername && game.discord_username?.length && game.discord_username !== settings.discordUsername">
+                                <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
+                                    data-bs-toggle="dropdown">Claim</button>
+                                <div class="dropdown-menu text-warning p-3">
+                                    <span class="text-warning me-2 d-inline-block align-middle">Another user has claimed
+                                        this
+                                        slot.</span>
+                                    <button class="btn btn-sm btn-warning" @click="claimGame(game)">Claim anyway</button>
+                                </div>
+                            </template>
 
-                        <button v-if="settings.discordUsername && game.discord_username === settings.discordUsername"
-                            class="btn btn-sm btn-outline-warning" :disabled="loading || game.$is_updating"
-                            @click="unclaimGame(game)">Release</button>
-                    </td>
-                    <td>
-                        <span :class="{ 'text-muted': !game.discord_username?.length }">
-                            {{ game.discord_username?.length ? game.discord_username : '(Unset)' }}
-                        </span>
-                    </td>
-                    <td>{{ game.game }}</td>
-                    <td>
-                        <button class="btn btn-sm dropdown-toggle" :disabled="loading || game.$is_updating"
-                            :class="[`btn-outline-${statusInfo[game.status].color}`]" data-bs-toggle="dropdown">
-                            {{ statusInfo[game.status].name }}
-                        </button>
-                        <ul class="dropdown-menu">
-                            <li v-for="status in statuses">
-                                <button class="dropdown-item" :class="[`text-${statusInfo[status].color}`]"
-                                    :disabled="loading || status === game.status" @click="setGameStatus(game, status)">{{
-                                        statusInfo[status].name }}</button>
-                            </li>
-                        </ul>
-                    </td>
-                    <td :class="[lastCheckedClass(game.last_checked)]">{{ game.last_checked ?
-                        displayDateTime(game.last_checked) : 'Never' }}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-secondary" :disabled="loading || game.$is_updating"
-                            @click="updateLastChecked(game)">Update</button>
-                    </td>
-                    <td>{{ displayDateTime(game.last_activity) }}</td>
-                    <td class="align-middle">
-                        <div class="progress" style="position: relative;">
-                            <div style="position: absolute; width: 100%; height: 100%; text-align: center">
-                                {{ game.checks_done }} / {{ game.checks_total }}
-                            </div>
-                            <div class="progress-bar overflow-visible"
-                                :class="{ 'bg-success': game.checks_done === game.checks_total }"
-                                :style="{ width: `${checksCompletePct(game)}%` }">
-                            </div>
-                        </div>
-                    </td>
-                    <td>
-                        <button v-if="unfoundHints(game)" class="btn btn-sm" :class="[hintsClass(game)]"
-                            data-bs-toggle="dropdown" data-bs-auto-close="outside">
-                            {{ unfoundHints(game) }}
-                        </button>
-                        <div class="dropdown-menu p-3">
-                            <ul class="m-0">
-                                <template v-for="hint in hintsByFinder[game.id]">
-                                    <li v-if="!hint.found">
-                                        <span class="text-info">{{ gameById[hint.receiver_game_id].name }}</span>'s
-                                        <span class="text-info">{{ hint.item }}</span> is at
-                                        <span class="text-info">{{ hint.location }}</span>
-                                        <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance }})</template>
-                                    </li>
-                                </template>
+                            <button v-if="settings.discordUsername && game.discord_username === settings.discordUsername"
+                                class="btn btn-sm btn-outline-warning" :disabled="loading"
+                                @click="unclaimGame(game)">Release</button>
+                        </td>
+                        <td>
+                            <span :class="{ 'text-muted': !game.discord_username?.length }">
+                                {{ game.discord_username?.length ? game.discord_username : '(Unset)' }}
+                            </span>
+                        </td>
+                        <td>{{ game.game }}</td>
+                        <td>
+                            <button class="btn btn-sm dropdown-toggle" :disabled="loading"
+                                :class="[`btn-outline-${statusInfo[game.status].color}`]" data-bs-toggle="dropdown">
+                                {{ statusInfo[game.status].name }}
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li v-for="status in statuses">
+                                    <button class="dropdown-item" :class="[`text-${statusInfo[status].color}`]"
+                                        :disabled="loading || status === game.status"
+                                        @click="setGameStatus(game, status)">{{
+                                            statusInfo[status].name }}</button>
+                                </li>
                             </ul>
-                        </div>
-                    </td>
-                </tr>
+                        </td>
+                        <td :class="[lastCheckedClass(game.last_checked)]">{{ game.last_checked ?
+                            displayDateTime(game.last_checked) : 'Never' }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
+                                @click="updateLastChecked(game)">Update</button>
+                        </td>
+                        <td>{{ displayDateTime(game.last_activity) }}</td>
+                        <td class="align-middle">
+                            <div class="progress" style="position: relative;">
+                                <div style="position: absolute; width: 100%; height: 100%; text-align: center">
+                                    {{ game.checks_done }} / {{ game.checks_total }}
+                                </div>
+                                <div class="progress-bar overflow-visible"
+                                    :class="{ 'bg-success': game.checks_done === game.checks_total }"
+                                    :style="{ width: `${checksCompletePct(game)}%` }">
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm" :class="[hintsClass(game)]"
+                                @click="gameExpanded[game.id] = !gameExpanded[game.id]">
+                                {{ unfoundHints(game) }}<template v-if="game.notes !== ''">*</template>
+                            </button>
+                        </td>
+                    </tr>
+                    <tr v-if="gameExpanded[game.id]">
+                        <td colspan="11" class="container-fluid">
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="fw-bold">Hints</div>
+                                    <template v-for="hint in hintsByFinder[game.id]">
+                                        <div v-if="!hint.found">
+                                            <span class="text-info">{{ gameById[hint.receiver_game_id].name }}</span>'s
+                                            <span class="text-info">{{ hint.item }}</span> is at
+                                            <span class="text-info">{{ hint.location }}</span>
+                                            <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance }})</template>
+                                        </div>
+                                    </template>
+                                </div>
+                                <div class="col-6">
+                                    <div class="fw-bold">Notes</div>
+                                    <textarea placeholder="Enter any notes about your game here." class="form-control"
+                                        rows="5" v-model="game.$newnotes" @blur="updateNotes(game)"
+                                        @keyup.esc="game.$newnotes = game.notes"></textarea>
+                                    <div class="text-muted">
+                                        Saves automatically when you click off of the field. Press ESC to cancel any edits.
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                </template>
             </tbody>
         </table>
         <div class="container-fluid">
