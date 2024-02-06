@@ -221,6 +221,17 @@ function updateNotes(game) {
     }
 }
 
+const copiedHint = ref(false);
+
+function copyHint(hint) {
+    const receiver = gameById.value[hint.receiver_game_id].name;
+    const entrance = hint.entrance === 'Vanilla' ? '' : ` (${hint.entrance})`;
+    navigator.clipboard.writeText(`${receiver}'s ${hint.item} is at ${hint.location}${entrance}`);
+
+    copiedHint.value = true;
+    setTimeout(() => { copiedHint.value = false; }, 3000);
+}
+
 loadTracker();
 </script>
 
@@ -363,7 +374,10 @@ loadTracker();
                                                         <span class="text-info bg-transparent p-0">{{ hint.location
                                                         }}</span>
                                                         <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance
-                                                        }})</template>
+                                                        }})</template> <a v-else href="#"
+                                                            class="bg-transparent p-0 mw-copy-hint"
+                                                            @click.prevent="copyHint(hint)"
+                                                            title="Copy to clipboard">&#x1F4C4;</a>
                                                     </td>
                                                 </tr>
                                             </table>
@@ -412,4 +426,22 @@ loadTracker();
         <div class="text-center">Last updated from Archipelago at {{ displayDateTime(trackerData.updated_at) }}
         </div>
     </template>
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div class="toast text-bg-success" :class="{ show: copiedHint }">
+            <div class="toast-body">
+                Hint copied.
+            </div>
+        </div>
+    </div>
 </template>
+
+<style scoped>
+.mw-copy-hint {
+    visibility: hidden;
+    text-decoration: none;
+}
+
+tr tr:hover .mw-copy-hint {
+    visibility: visible;
+}
+</style>
