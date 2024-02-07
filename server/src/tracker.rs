@@ -123,6 +123,7 @@ pub struct Checks<T> {
 // conflict with std's blanket implementations.
 impl<T> Checks<T> {
     /// Converts the checks values to anonther type.
+    #[allow(unused)]
     pub fn convert<U>(self) -> Checks<U>
     where
         T: Into<U>,
