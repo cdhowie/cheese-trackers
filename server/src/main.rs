@@ -208,7 +208,21 @@ impl<D> AppState<D> {
                     db_game.name = tracker_game.name;
                     db_game.tracker_status = tracker_game.status;
                     db_game.checks_done = tracker_checks.completed;
-                    db_game.last_activity = tracker_game.last_activity.map(|d| now - d);
+
+                    // "Last activity" is parsed as a negative duration in
+                    // seconds from the last time the AP web tracker information
+                    // was updated, and we do not have access to that "epoch."
+                    // This means that the time we generate here can vary.  To
+                    // prevent spurious updates, we only update it if the time
+                    // differs by a minute or more.
+                    let new_last_activity = tracker_game.last_activity.map(|d| now - d);
+
+                    if !matches!(
+                        (db_game.last_activity, new_last_activity),
+                        (Some(a), Some(b)) if (a - b).abs() < chrono::Duration::minutes(1)
+                    ) {
+                        db_game.last_activity = new_last_activity;
+                    }
 
                     db.update_ap_game(
                         db_game,
