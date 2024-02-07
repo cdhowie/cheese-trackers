@@ -51,12 +51,16 @@ const lastCheckedThresholds = [
     { color: 'success' }
 ];
 
-function lastCheckedClass(checked) {
-    if (!checked) {
+function lastCheckedClass(game) {
+    if (game.status === 'done') {
+        return 'text-success';
+    }
+
+    if (!game.last_checked) {
         return 'text-danger';
     }
 
-    const sinceMs = now.value - new Date(checked);
+    const sinceMs = now.value - new Date(game.last_checked);
     const sinceHours = sinceMs / 1000 / 60 / 60;
 
     for (const t of lastCheckedThresholds) {
@@ -274,7 +278,7 @@ loadTracker();
                 </tr>
             </thead>
             <tbody>
-                <template v-for="game in filteredGames">
+                <template v-for="game in  filteredGames ">
                     <tr>
                         <td>{{ game.name }}</td>
                         <td>
@@ -325,11 +329,14 @@ loadTracker();
                                 </li>
                             </ul>
                         </td>
-                        <td :class="[lastCheckedClass(game.last_checked)]">{{ game.last_checked ?
-                            displayDateTime(game.last_checked) : 'Never' }}</td>
+                        <td :class="lastCheckedClass(game)">
+                            <template v-if="game.status !== 'done'">{{
+                                game.last_checked ? displayDateTime(game.last_checked) : 'Never'
+                            }}</template>
+                        </td>
                         <td>
-                            <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
-                                @click="updateLastChecked(game)">Update</button>
+                            <button class=" btn btn-sm btn-outline-secondary" :class="{ invisible: game.status === 'done' }"
+                                :disabled="loading" @click="updateLastChecked(game)">Update</button>
                         </td>
                         <td>{{ displayDateTime(game.last_activity) }}</td>
                         <td class="align-middle">
@@ -364,7 +371,7 @@ loadTracker();
                                     <div v-else class="row justify-content-center">
                                         <div class="col-auto">
                                             <table class="table table-responsive">
-                                                <tr v-for="hint in hintsByFinder[game.id].filter(h => !h.found)">
+                                                <tr v-for=" hint  in  hintsByFinder[game.id].filter(h => !h.found) ">
                                                     <td class="text-end pe-0">
                                                         <span class="text-info bg-transparent p-0">{{
                                                             gameById[hint.receiver_game_id].name
