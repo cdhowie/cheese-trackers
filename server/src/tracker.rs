@@ -144,6 +144,13 @@ impl<T> Checks<T> {
             total: self.total.try_into()?,
         })
     }
+
+    pub fn all_completed(self) -> bool
+    where
+        T: PartialEq,
+    {
+        self.completed == self.total
+    }
 }
 
 impl<T: FromStr> FromStr for Checks<T> {

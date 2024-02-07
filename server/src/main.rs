@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use arrayvec::ArrayVec;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -8,7 +9,7 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use db::{
-    model::{ApGame, ApGameIden, ApHint, ApTracker, ApTrackerIden, GameStatus},
+    model::{ApGame, ApGameIden, ApHint, ApTracker, ApTrackerIden, GameStatus, TrackerGameStatus},
     DataAccess, DataAccessProvider, Transactable, Transaction,
 };
 use futures::{
@@ -209,6 +210,14 @@ impl<D> AppState<D> {
                     db_game.tracker_status = tracker_game.status;
                     db_game.checks_done = tracker_checks.completed;
 
+                    let mut columns: ArrayVec<_, 5> = [
+                        ApGameIden::Name,
+                        ApGameIden::TrackerStatus,
+                        ApGameIden::ChecksDone,
+                    ]
+                    .into_iter()
+                    .collect();
+
                     // "Last activity" is parsed as a negative duration in
                     // seconds from the last time the AP web tracker information
                     // was updated, and we do not have access to that "epoch."
@@ -222,18 +231,20 @@ impl<D> AppState<D> {
                         (Some(a), Some(b)) if (a - b).abs() < chrono::Duration::minutes(1)
                     ) {
                         db_game.last_activity = new_last_activity;
+                        columns.push(ApGameIden::LastActivity);
                     }
 
-                    db.update_ap_game(
-                        db_game,
-                        &[
-                            ApGameIden::Name,
-                            ApGameIden::TrackerStatus,
-                            ApGameIden::ChecksDone,
-                            ApGameIden::LastActivity,
-                        ],
-                    )
-                    .await?;
+                    // Force the game state when all checks are done.
+                    if tracker_game.checks.all_completed() {
+                        db_game.status = match tracker_game.status {
+                            TrackerGameStatus::GoalCompleted => GameStatus::Done,
+                            _ => GameStatus::AllChecks,
+                        };
+
+                        columns.push(ApGameIden::Status);
+                    }
+
+                    db.update_ap_game(db_game, &columns).await?;
                 }
 
                 // Synchronizing hints is a bit tricky because the data we
