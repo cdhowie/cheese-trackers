@@ -343,11 +343,13 @@ loadTracker();
                                 </div>
                             </div>
                         </td>
-                        <td :class="{ dropup: gameExpanded[game.id] }">
-                            <button class="btn btn-sm dropdown-toggle" :class="[hintsClass(game)]"
-                                @click="gameExpanded[game.id] = !gameExpanded[game.id]">
-                                {{ unfoundHints(game) }}<template v-if="game.notes !== ''">*</template>
-                            </button>
+                        <td>
+                            <div :class="{ dropdown: gameExpanded[game.id], dropup: gameExpanded[game.id] }">
+                                <button class="btn btn-sm dropdown-toggle" :class="[hintsClass(game)]"
+                                    @click="gameExpanded[game.id] = !gameExpanded[game.id]">
+                                    {{ unfoundHints(game) }}<template v-if="game.notes !== ''">*</template>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                     <tr v-if="gameExpanded[game.id]">
