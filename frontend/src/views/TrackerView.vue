@@ -17,6 +17,7 @@ const loading = ref(false);
 const error = ref(undefined);
 const trackerData = ref(undefined);
 const hintsByFinder = ref(undefined);
+const hintsByReceiver = ref(undefined);
 const gameById = ref(undefined);
 
 const hintsColors = [
@@ -162,8 +163,14 @@ function displayDateTime(d) {
     }
 }
 
+const sentHints = ref(false);
+
+const hintsByGame = computed(() => {
+    return sentHints.value ? hintsByReceiver.value : hintsByFinder.value;
+})
+
 function unfoundHints(game) {
-    return (hintsByFinder.value[game.id] || []).filter(
+    return (hintsByGame.value[game.id] || []).filter(
         hint => !hint.found
     ).length;
 }
@@ -184,6 +191,7 @@ async function loadTracker() {
         trackerData.value = data;
 
         hintsByFinder.value = groupBy(trackerData.value.hints, 'finder_game_id');
+        hintsByReceiver.value = groupBy(trackerData.value.hints, 'receiver_game_id');
         gameById.value = keyBy(trackerData.value.games, 'id');
     } catch (e) {
         error.value = e;
@@ -430,23 +438,32 @@ loadTracker();
                         <td colspan="11" class="container-fluid">
                             <div class="row">
                                 <div class="col-12 col-xl-6">
-                                    <div class="fw-bold">Unfound hints</div>
-                                    <div v-if="(hintsByFinder[game.id] || []).filter(h => !h.found).length === 0"
+                                    <div class="btn btn-sm btn-outline-light" @click="sentHints = !sentHints">
+                                        {{ sentHints ? 'Sent hints' : 'Received hints' }}
+                                    </div>
+                                    <div v-if="(hintsByGame[game.id] || []).filter(h => !h.found).length === 0"
                                         class="text-muted">
                                         There are no unfound hints right now.
                                     </div>
                                     <div v-else class="row justify-content-center">
                                         <div class="col-auto">
                                             <table class="table table-responsive">
-                                                <tr v-for=" hint  in  hintsByFinder[game.id].filter(h => !h.found) ">
+                                                <tr v-for=" hint in hintsByGame[game.id].filter(h => !h.found) ">
                                                     <td class="text-end pe-0">
-                                                        <span class="text-info bg-transparent p-0">{{
-                                                            gameById[hint.receiver_game_id].name
-                                                        }}</span>'s
+                                                        <template v-if="!sentHints">
+                                                            <span class="text-info bg-transparent p-0">{{
+                                                                gameById[hint.receiver_game_id].name
+                                                            }}</span>'s
+                                                        </template>
                                                         <span class="text-info bg-transparent p-0">{{ hint.item }}</span>
                                                     </td>
                                                     <td class="ps-0 pe-0">&nbsp;is&nbsp;at&nbsp;</td>
                                                     <td class="text-start ps-0">
+                                                        <template v-if="sentHints">
+                                                            <span class="text-info bg-transparent p-0">{{
+                                                                gameById[hint.finder_game_id].name
+                                                            }}</span>'s
+                                                        </template>
                                                         <span class="text-info bg-transparent p-0">{{ hint.location
                                                         }}</span>
                                                         <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance
