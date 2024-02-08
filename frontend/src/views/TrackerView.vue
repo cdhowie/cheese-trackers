@@ -254,14 +254,9 @@ loadTracker();
     <div v-if="error && !trackerData" class="text-center text-danger">Failed to load tracker data ({{ error.message }})
     </div>
     <template v-if="trackerData">
+        <button class="btn btn-primary refresh-button" @click="loadTracker()" :disabled="loading">Refresh</button>
         <table class="table table-sm table-hover text-center">
             <thead style="position: sticky; top: 0; z-index: 100">
-                <tr>
-                    <td colspan="11">
-                        <button class="btn btn-sm btn-primary ms-2" @click="loadTracker()"
-                            :disabled="loading">Refresh</button>
-                    </td>
-                </tr>
                 <tr class="tracker-header">
                     <th>Name</th>
                     <th>Ping</th>
@@ -503,6 +498,13 @@ loadTracker();
 </template>
 
 <style scoped>
+.refresh-button {
+    position: fixed;
+    bottom: 1rem;
+    right: 1.5rem;
+    z-index: 1;
+}
+
 .mw-copy-hint {
     visibility: hidden;
     text-decoration: none;
