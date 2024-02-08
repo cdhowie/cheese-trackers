@@ -272,6 +272,10 @@ loadTracker();
     <div v-if="error && !trackerData" class="text-center text-danger">Failed to load tracker data ({{ error.message }})
     </div>
     <template v-if="trackerData">
+        <div v-if="!settings.discordUsername?.length" class="alert alert-info text-center">
+            You have not set your Discord username in the <router-link to="/settings">settings</router-link>. You will be
+            unable to claim slots until you do this.
+        </div>
         <button class="btn btn-primary refresh-button" @click="loadTracker()" :disabled="loading">Refresh</button>
         <table class="table table-sm table-hover text-center">
             <thead style="position: sticky; top: 0; z-index: 100">
