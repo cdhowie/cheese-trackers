@@ -258,13 +258,6 @@ loadTracker();
             <thead style="position: sticky; top: 0; z-index: 100">
                 <tr>
                     <td colspan="11">
-                        <div class="btn-group ms-2">
-                            <button v-for="status in statuses" class="btn btn-sm"
-                                :class="{ [`btn-${gameStatus.byId[status].color}`]: statusFilter[status], [`btn-outline-${gameStatus.byId[status].color}`]: !statusFilter[status] }"
-                                @click="statusFilter[status] = !statusFilter[status]">
-                                {{ gameStatus.byId[status].label }}
-                            </button>
-                        </div>
                         <button class="btn btn-sm btn-secondary ms-2" @click="setAllExpanded(!allExpanded)">
                             {{ allExpanded ? 'Collapse' : 'Expand' }} all
                         </button>
@@ -318,7 +311,26 @@ loadTracker();
                         </div>
                     </th>
                     <th>Game</th>
-                    <th>Status</th>
+                    <th>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-light dropdown-toggle" data-bs-toggle="dropdown"
+                                data-bs-auto-close="outside">
+                                Status
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li v-for="status in statuses">
+                                    <button class="dropdown-item" :class="{
+                                        active: statusFilter[status],
+                                        'text-black': statusFilter[status],
+                                        [`bg-${gameStatus.byId[status].color}`]: statusFilter[status],
+                                        [`text-${gameStatus.byId[status].color}`]: !statusFilter[status]
+                                    }" @click="statusFilter[status] = !statusFilter[status]">
+                                        {{ gameStatus.byId[status].label }}
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </th>
                     <th colspan="2">Last Checked</th>
                     <th>Last Activity</th>
                     <th>Checks</th>
