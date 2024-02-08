@@ -87,7 +87,7 @@ function gameLastUpdated(game) {
 function gameDaysSinceLastChecked(game) {
     const lastUpdated = gameLastUpdated(game);
 
-    return lastUpdated && moment.duration(moment.utc(now.value).diff(lastUpdated)).asDays();
+    return lastUpdated && Math.max(0, moment.duration(moment.utc(now.value).diff(lastUpdated)).asDays());
 }
 
 function lastCheckedClass(game) {
