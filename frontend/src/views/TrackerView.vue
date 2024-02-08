@@ -94,7 +94,9 @@ function displayLastChecked(game) {
         return 'Never';
     }
 
-    const diff = moment.duration(moment.utc(now.value).diff(moment.utc(game.last_checked)));
+    const diff = moment.duration(
+        Math.max(0, moment.utc(now.value).diff(moment.utc(game.last_checked)))
+    );
     return `${diff.asDays().toFixed(1)} day(s) ago`;
 }
 
