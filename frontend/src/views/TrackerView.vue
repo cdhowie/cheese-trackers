@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter, reduce } from 'lodash-es';
+import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter, reduce, join } from 'lodash-es';
 import moment from 'moment';
 import { load as loadSettings } from '@/settings';
 import { now } from '@/time';
@@ -169,6 +169,10 @@ const hintsByGame = computed(() => {
     return sentHints.value ? hintsByReceiver.value : hintsByFinder.value;
 })
 
+function unfoundHintsByGame(id) {
+    return (hintsByGame.value?.[id] || []).filter(h => !h.found);
+}
+
 function unfoundHints(game) {
     return (hintsByFinder.value[game.id] || []).filter(
         hint => !hint.found
@@ -261,16 +265,24 @@ function updateNotes(game) {
     }
 }
 
-const copiedHint = ref(false);
+const showCopiedToast = ref(false);
 
-function copyHint(hint) {
+function hintToString(hint) {
     const receiver = gameById.value[hint.receiver_game_id].name;
     const finder = gameById.value[hint.finder_game_id].name;
     const entrance = hint.entrance === 'Vanilla' ? '' : ` (${hint.entrance})`;
-    navigator.clipboard.writeText(`${receiver}'s ${hint.item} is at ${finder}'s ${hint.location}${entrance}`);
+    return `${receiver}'s ${hint.item} is at ${finder}'s ${hint.location}${entrance}`;
+}
 
-    copiedHint.value = true;
-    setTimeout(() => { copiedHint.value = false; }, 3000);
+function copyHints(hints) {
+    clipboardCopy(join(map(hints, hintToString), '\n'))
+}
+
+function clipboardCopy(text) {
+    navigator.clipboard.writeText(text);
+
+    showCopiedToast.value = true;
+    setTimeout(() => { showCopiedToast.value = false; }, 3000);
 }
 
 loadTracker();
@@ -438,17 +450,28 @@ loadTracker();
                         <td colspan="11" class="container-fluid">
                             <div class="row">
                                 <div class="col-12 col-xl-6">
-                                    <div class="btn btn-sm btn-outline-light" @click="sentHints = !sentHints">
-                                        {{ sentHints ? 'Sent hints' : 'Received hints' }}
+                                    <div>
+                                        <div class="btn-group">
+                                            <button class="btn btn-sm btn-outline-light" :class="{ active: !sentHints }"
+                                                @click="sentHints = false">
+                                                Received hints
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-light" :class="{ active: sentHints }"
+                                                @click="sentHints = true">
+                                                Sent hints
+                                            </button>
+                                        </div>
+                                        <button class="btn btn-sm btn-outline-light ms-2"
+                                            :disabled="unfoundHintsByGame(game.id).length === 0"
+                                            @click="copyHints(unfoundHintsByGame(game.id))">Copy all</button>
                                     </div>
-                                    <div v-if="(hintsByGame[game.id] || []).filter(h => !h.found).length === 0"
-                                        class="text-muted">
+                                    <div v-if="unfoundHintsByGame(game.id).length === 0" class="text-muted">
                                         There are no unfound hints right now.
                                     </div>
                                     <div v-else class="row justify-content-center">
                                         <div class="col-auto">
                                             <table class="table table-responsive">
-                                                <tr v-for=" hint in hintsByGame[game.id].filter(h => !h.found) ">
+                                                <tr v-for="hint in unfoundHintsByGame(game.id)">
                                                     <td class="text-end pe-0">
                                                         <template v-if="!sentHints">
                                                             <span class="text-info bg-transparent p-0">{{
@@ -469,7 +492,7 @@ loadTracker();
                                                         <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance
                                                         }})</template> <a href="#"
                                                             class="bg-transparent p-0 mw-copy-hint"
-                                                            @click.prevent="copyHint(hint)"
+                                                            @click.prevent="clipboardCopy(hintToString(hint))"
                                                             title="Copy to clipboard">&#x1F4C4;</a>
                                                     </td>
                                                 </tr>
@@ -528,9 +551,9 @@ loadTracker();
         </div>
     </template>
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
-        <div class="toast text-bg-success" :class="{ show: copiedHint }">
+        <div class="toast text-bg-success" :class="{ show: showCopiedToast }">
             <div class="toast-body">
-                Hint copied.
+                Copied to the clipboard.
             </div>
         </div>
     </div>
