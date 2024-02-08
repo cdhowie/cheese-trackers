@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues } from 'lodash-es';
+import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter } from 'lodash-es';
 import { load as loadSettings } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame } from '@/api';
@@ -39,14 +39,25 @@ function hintsClass(game) {
     }
 }
 
-const ownerFilters = [
-    { id: 'all', label: 'All', predicate: () => true },
-    { id: 'mine', label: 'Mine', predicate: g => g.discord_username === settings.discordUsername },
-    { id: 'unowned', label: 'Unowned', predicate: g => !g.discord_username?.length },
-]
-    .filter(f => f.id !== 'mine' || settings.discordUsername?.length);
+const players = computed(() =>
+    orderBy(
+        uniq(
+            filter(
+                map(trackerData.value.games, 'discord_username'),
+                i => i?.length
+            )
+        )
+    )
+);
 
-const ownerFilter = ref(ownerFilters[0]);
+const playersExceptSelf = computed(() =>
+    filter(players.value, p => p !== settings.discordUsername)
+);
+
+const PLAYER_FILTER_ALL = Symbol();
+const PLAYER_FILTER_UNOWNED = Symbol();
+
+const playerFilter = ref(PLAYER_FILTER_ALL);
 
 const lastCheckedThresholds = [
     { hours: 48, color: 'danger' },
@@ -73,14 +84,6 @@ function lastCheckedClass(game) {
     }
 }
 
-function checksCompletePct(game) {
-    return Math.floor((game.checks_done / game.checks_total) * 100);
-}
-
-const uniquePlayers = computed(() =>
-    uniq(trackerData.value.games.map(g => g.discord_username).filter(i => i !== undefined)).length
-);
-
 const uniqueGames = computed(() =>
     uniq(trackerData.value.games.map(g => g.game)).length
 );
@@ -96,11 +99,13 @@ const totalChecks = computed(() =>
 const statuses = gameStatus.map(i => i.id);
 const statusFilter = ref(mapValues(gameStatus.byId, () => true));
 
-console.log(statusFilter.value);
-
 const filteredGames = computed(() =>
     orderBy(trackerData.value.games, g => g.name.toLowerCase()).filter(g =>
-        ownerFilter.value.predicate(g) &&
+        (
+            playerFilter.value === PLAYER_FILTER_ALL ? true :
+                playerFilter.value === PLAYER_FILTER_UNOWNED ? !g.discord_username?.length :
+                    playerFilter.value === g.discord_username
+        ) &&
         statusFilter.value[g.status]
     )
 );
@@ -113,9 +118,9 @@ function setAllExpanded(v) {
     });
 }
 
-const allExpanded = computed(() => {
-    return filteredGames.value.every(g => gameExpanded.value[g.id]);
-});
+const allExpanded = computed(() =>
+    filteredGames.value.every(g => gameExpanded.value[g.id])
+);
 
 function displayDateTime(d) {
     if (d) {
@@ -237,15 +242,6 @@ loadTracker();
             <thead style="position: sticky; top: 0; z-index: 100">
                 <tr>
                     <td colspan="11">
-                        <div class="btn-group">
-                            <template v-for="filter in ownerFilters">
-                                <input type="radio" class="btn-check" name="filter-owner" :id="`filter-owner-${filter.id}`"
-                                    v-model="ownerFilter" :value="filter">
-                                <label class="btn btn-sm btn-outline-secondary" :for="`filter-owner-${filter.id}`">
-                                    {{ filter.label }}
-                                </label>
-                            </template>
-                        </div>
                         <div class="btn-group ms-2">
                             <button v-for="status in statuses" class="btn btn-sm"
                                 :class="{ [`btn-${gameStatus.byId[status].color}`]: statusFilter[status], [`btn-outline-${gameStatus.byId[status].color}`]: !statusFilter[status] }"
@@ -260,11 +256,51 @@ loadTracker();
                             :disabled="loading">Refresh</button>
                     </td>
                 </tr>
-                <tr>
+                <tr class="tracker-header">
                     <th>Name</th>
                     <th>Ping</th>
                     <th></th>
-                    <th>Owner (Discord Username)</th>
+                    <th>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
+                                Owner (Discord Username)
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <button class="dropdown-item" :class="{ active: playerFilter === PLAYER_FILTER_ALL }"
+                                        @click="playerFilter = PLAYER_FILTER_ALL">
+                                        All
+                                    </button>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item"
+                                        :class="{ active: playerFilter === PLAYER_FILTER_UNOWNED }"
+                                        @click="playerFilter = PLAYER_FILTER_UNOWNED">
+                                        Unset
+                                    </button>
+                                </li>
+                                <template v-if="settings.discordUsername?.length">
+                                    <li>
+                                        <hr class="dropdown-divider">
+                                    </li>
+                                    <button class="dropdown-item"
+                                        :class="{ active: playerFilter === settings.discordUsername }"
+                                        @click="playerFilter = settings.discordUsername">
+                                        {{ settings.discordUsername }}
+                                    </button>
+                                </template>
+                                <template v-if="playersExceptSelf.length">
+                                    <li>
+                                        <hr class="dropdown-divider">
+                                    </li>
+                                    <button v-for="player in playersExceptSelf" class="dropdown-item"
+                                        :class="{ active: playerFilter === player }" @click="playerFilter = player">
+                                        {{ player }}
+                                    </button>
+                                </template>
+                            </ul>
+                        </div>
+                    </th>
                     <th>Game</th>
                     <th>Status</th>
                     <th colspan="2">Last Checked</th>
@@ -409,7 +445,7 @@ loadTracker();
                         </thead>
                         <tbody>
                             <tr>
-                                <td>{{ uniquePlayers }}</td>
+                                <td>{{ players.length }}</td>
                                 <td>{{ uniqueGames }}</td>
                                 <td class="text-end pe-0">{{ totalDoneChecks }}/</td>
                                 <td class="text-start ps-0">{{ totalChecks }}</td>
@@ -448,5 +484,9 @@ loadTracker();
 
 tr tr:hover .mw-copy-hint {
     visibility: visible;
+}
+
+.tracker-header th {
+    vertical-align: middle;
 }
 </style>
