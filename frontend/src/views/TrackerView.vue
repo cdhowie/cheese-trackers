@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq } from 'lodash-es';
+import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues } from 'lodash-es';
 import { load as loadSettings } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame } from '@/api';
@@ -94,10 +94,14 @@ const totalChecks = computed(() =>
 );
 
 const statuses = gameStatus.map(i => i.id);
+const statusFilter = ref(mapValues(gameStatus.byId, () => true));
+
+console.log(statusFilter.value);
 
 const filteredGames = computed(() =>
     orderBy(trackerData.value.games, g => g.name.toLowerCase()).filter(g =>
-        ownerFilter.value.predicate(g)
+        ownerFilter.value.predicate(g) &&
+        statusFilter.value[g.status]
     )
 );
 
@@ -241,6 +245,13 @@ loadTracker();
                                     {{ filter.label }}
                                 </label>
                             </template>
+                        </div>
+                        <div class="btn-group ms-2">
+                            <button v-for="status in statuses" class="btn btn-sm"
+                                :class="{ [`btn-${gameStatus.byId[status].color}`]: statusFilter[status], [`btn-outline-${gameStatus.byId[status].color}`]: !statusFilter[status] }"
+                                @click="statusFilter[status] = !statusFilter[status]">
+                                {{ gameStatus.byId[status].label }}
+                            </button>
                         </div>
                         <button class="btn btn-sm btn-secondary ms-2" @click="setAllExpanded(!allExpanded)">
                             {{ allExpanded ? 'Collapse' : 'Expand' }} all
