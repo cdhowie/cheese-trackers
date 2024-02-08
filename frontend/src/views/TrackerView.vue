@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter } from 'lodash-es';
+import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter, reduce } from 'lodash-es';
 import moment from 'moment';
 import { load as loadSettings } from '@/settings';
 import { now } from '@/time';
@@ -66,16 +66,28 @@ const lastCheckedThresholds = [
     { color: 'success' }
 ];
 
+function gameLastUpdated(game) {
+    return reduce(
+        map(
+            filter([game.last_checked, game.last_activity]),
+            d => moment.utc(d)
+        ),
+        (a, b) => moment.max(a, b)
+    );
+}
+
 function lastCheckedClass(game) {
     if (game.status === 'done') {
         return 'text-success';
     }
 
-    if (!game.last_checked) {
+    const lastUpdated = gameLastUpdated(game);
+
+    if (!lastUpdated) {
         return 'text-danger';
     }
 
-    const sinceMs = moment.utc(now.value).diff(moment.utc(game.last_checked));
+    const sinceMs = moment.utc(now.value).diff(lastUpdated);
     const sinceDays = moment.duration(sinceMs).asDays();
 
     for (const t of lastCheckedThresholds) {
@@ -90,14 +102,16 @@ function displayLastChecked(game) {
         return '';
     }
 
-    if (game.last_checked === undefined) {
+    const lastUpdated = gameLastUpdated(game);
+
+    if (!lastUpdated) {
         return 'Never';
     }
 
     const diff = moment.duration(
-        Math.max(0, moment.utc(now.value).diff(moment.utc(game.last_checked)))
+        Math.max(0, moment.utc(now.value).diff(lastUpdated))
     );
-    return `${diff.asDays().toFixed(1)} day(s) ago`;
+    return diff.asDays().toFixed(1);
 }
 
 const uniqueGames = computed(() =>
@@ -139,6 +153,10 @@ const allExpanded = computed(() =>
 );
 
 function displayDateTime(d) {
+    if (moment.isMoment(d)) {
+        return d.toDate().toLocaleString();
+    }
+
     if (d) {
         return new Date(d).toLocaleString();
     }
@@ -323,8 +341,7 @@ loadTracker();
                             </ul>
                         </div>
                     </th>
-                    <th colspan="2">Last Checked</th>
-                    <th>Last Activity</th>
+                    <th colspan="2">Last Activity (Days)</th>
                     <th>Checks</th>
                     <th>
                         <div :class="{ dropdown: !allExpanded, dropup: allExpanded }">
@@ -386,12 +403,12 @@ loadTracker();
                                 </li>
                             </ul>
                         </td>
-                        <td :class="lastCheckedClass(game)">{{ displayLastChecked(game) }}</td>
+                        <td :class="lastCheckedClass(game)" :title="displayDateTime(gameLastUpdated(game))">{{
+                            displayLastChecked(game) }}</td>
                         <td>
                             <button class=" btn btn-sm btn-outline-secondary" :class="{ invisible: game.status === 'done' }"
                                 :disabled="loading" @click="updateLastChecked(game)">Update</button>
                         </td>
-                        <td>{{ displayDateTime(game.last_activity) }}</td>
                         <td class="align-middle">
                             <ChecksBar :done="game.checks_done" :total="game.checks_total"></ChecksBar>
                         </td>
