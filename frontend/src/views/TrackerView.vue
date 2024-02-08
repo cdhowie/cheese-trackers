@@ -525,16 +525,16 @@ loadTracker();
                             <tr>
                                 <th>Unique players</th>
                                 <th>Unique games</th>
-                                <th colspan="3">Total checks</th>
+                                <th>Total checks</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
                                 <td>{{ players.length }}</td>
                                 <td>{{ uniqueGames }}</td>
-                                <td class="text-end pe-0">{{ totalDoneChecks }}/</td>
-                                <td class="text-start ps-0">{{ totalChecks }}</td>
-                                <td>{{ Math.floor((totalDoneChecks / totalChecks) * 100) }}%</td>
+                                <td class="align-middle">
+                                    <ChecksBar :done="totalDoneChecks" :total="totalChecks" show-percent="1"></ChecksBar>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
