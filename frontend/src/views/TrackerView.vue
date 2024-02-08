@@ -258,9 +258,6 @@ loadTracker();
             <thead style="position: sticky; top: 0; z-index: 100">
                 <tr>
                     <td colspan="11">
-                        <button class="btn btn-sm btn-secondary ms-2" @click="setAllExpanded(!allExpanded)">
-                            {{ allExpanded ? 'Collapse' : 'Expand' }} all
-                        </button>
                         <button class="btn btn-sm btn-primary ms-2" @click="loadTracker()"
                             :disabled="loading">Refresh</button>
                     </td>
@@ -334,7 +331,12 @@ loadTracker();
                     <th colspan="2">Last Checked</th>
                     <th>Last Activity</th>
                     <th>Checks</th>
-                    <th>Hints</th>
+                    <th>
+                        <div :class="{ dropdown: !allExpanded, dropup: allExpanded }">
+                            <button class="btn btn-sm btn-outline-light dropdown-toggle"
+                                @click="setAllExpanded(!allExpanded)">Hints</button>
+                        </div>
+                    </th>
                 </tr>
             </thead>
             <tbody>
