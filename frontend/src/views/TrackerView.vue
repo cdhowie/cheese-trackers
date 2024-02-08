@@ -6,6 +6,7 @@ import { load as loadSettings } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame } from '@/api';
 import { gameStatus } from '@/types';
+import { percent } from '@/util';
 import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
 
@@ -19,6 +20,10 @@ const trackerData = ref(undefined);
 const hintsByFinder = ref(undefined);
 const hintsByReceiver = ref(undefined);
 const gameById = ref(undefined);
+
+const gamesByStatus = computed(() => {
+    return groupBy(trackerData.value.games, 'status');
+});
 
 const hintsColors = [
     { max: 0, color: 'secondary' },
@@ -526,6 +531,7 @@ loadTracker();
                                 <th>Unique players</th>
                                 <th>Unique games</th>
                                 <th>Total checks</th>
+                                <th>Status summary</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -534,6 +540,14 @@ loadTracker();
                                 <td>{{ uniqueGames }}</td>
                                 <td class="align-middle">
                                     <ChecksBar :done="totalDoneChecks" :total="totalChecks" show-percent="1"></ChecksBar>
+                                </td>
+                                <td class="align-middle">
+                                    <div class="progress">
+                                        <div v-for="status in statuses" class="progress-bar"
+                                            :class="[`bg-${gameStatus.byId[status].color}`]"
+                                            :style="{ width: `${percent(gamesByStatus[status]?.length || 0, trackerData.games.length)}%` }">
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                         </tbody>

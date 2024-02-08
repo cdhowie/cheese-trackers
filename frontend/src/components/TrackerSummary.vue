@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { includes, filter, groupBy, mapValues, orderBy, sumBy } from 'lodash-es';
 import { gameStatus } from '@/types';
+import { percent } from '@/util';
 import ChecksBar from './ChecksBar.vue';
 
 const props = defineProps(['trackerData', 'summarizeBy']);
@@ -30,16 +31,6 @@ const summaryData = computed(() => {
     );
 });
 
-function percent(num, den) {
-    num ||= 0;
-    den ||= 0;
-    if (den === 0) {
-        return '0%';
-    }
-
-    return `${(num / den) * 100}%`;
-}
-
 const sumKeys = computed(() => {
     return orderBy(Object.keys(summaryData.value));
 });
@@ -63,7 +54,7 @@ const sumKeys = computed(() => {
                     <div class="progress">
                         <div v-for="status in STATUSES" class="progress-bar"
                             :class="[`bg-${gameStatus.byId[status].color}`]"
-                            :style="{ width: percent(summaryData[key].byStatus[status]?.length, summaryData[key].count) }">
+                            :style="{ width: `${percent(summaryData[key].byStatus[status]?.length, summaryData[key].count)}%` }">
                         </div>
                     </div>
                 </td>
