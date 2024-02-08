@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter } from 'lodash-es';
+import moment from 'moment';
 import { load as loadSettings } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame } from '@/api';
@@ -60,8 +61,8 @@ const PLAYER_FILTER_UNOWNED = Symbol();
 const playerFilter = ref(PLAYER_FILTER_ALL);
 
 const lastCheckedThresholds = [
-    { hours: 48, color: 'danger' },
-    { hours: 24, color: 'warning' },
+    { days: 2, color: 'danger' },
+    { days: 1, color: 'warning' },
     { color: 'success' }
 ];
 
@@ -74,14 +75,27 @@ function lastCheckedClass(game) {
         return 'text-danger';
     }
 
-    const sinceMs = now.value - new Date(game.last_checked);
-    const sinceHours = sinceMs / 1000 / 60 / 60;
+    const sinceMs = moment.utc(now.value).diff(moment.utc(game.last_checked));
+    const sinceDays = moment.duration(sinceMs).asDays();
 
     for (const t of lastCheckedThresholds) {
-        if (t.hours === undefined || sinceHours >= t.hours) {
+        if (t.days === undefined || sinceDays >= t.days) {
             return `text-${t.color}`;
         }
     }
+}
+
+function displayLastChecked(game) {
+    if (game.status === 'done') {
+        return '';
+    }
+
+    if (game.last_checked === undefined) {
+        return 'Never';
+    }
+
+    const diff = moment.duration(moment.utc(now.value).diff(moment.utc(game.last_checked)));
+    return `${diff.asDays().toFixed(1)} day(s) ago`;
 }
 
 const uniqueGames = computed(() =>
@@ -361,11 +375,7 @@ loadTracker();
                                 </li>
                             </ul>
                         </td>
-                        <td :class="lastCheckedClass(game)">
-                            <template v-if="game.status !== 'done'">{{
-                                game.last_checked ? displayDateTime(game.last_checked) : 'Never'
-                            }}</template>
-                        </td>
+                        <td :class="lastCheckedClass(game)">{{ displayLastChecked(game) }}</td>
                         <td>
                             <button class=" btn btn-sm btn-outline-secondary" :class="{ invisible: game.status === 'done' }"
                                 :disabled="loading" @click="updateLastChecked(game)">Update</button>
