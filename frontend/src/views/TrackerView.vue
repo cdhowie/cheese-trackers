@@ -467,7 +467,7 @@ loadTracker();
                                                         <span class="text-info bg-transparent p-0">{{ hint.location
                                                         }}</span>
                                                         <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance
-                                                        }})</template> <a v-else href="#"
+                                                        }})</template> <a href="#"
                                                             class="bg-transparent p-0 mw-copy-hint"
                                                             @click.prevent="copyHint(hint)"
                                                             title="Copy to clipboard">&#x1F4C4;</a>
