@@ -257,8 +257,9 @@ const copiedHint = ref(false);
 
 function copyHint(hint) {
     const receiver = gameById.value[hint.receiver_game_id].name;
+    const finder = gameById.value[hint.finder_game_id].name;
     const entrance = hint.entrance === 'Vanilla' ? '' : ` (${hint.entrance})`;
-    navigator.clipboard.writeText(`${receiver}'s ${hint.item} is at ${hint.location}${entrance}`);
+    navigator.clipboard.writeText(`${receiver}'s ${hint.item} is at ${finder}'s ${hint.location}${entrance}`);
 
     copiedHint.value = true;
     setTimeout(() => { copiedHint.value = false; }, 3000);
