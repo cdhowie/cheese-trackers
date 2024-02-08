@@ -298,9 +298,9 @@ loadTracker();
             unable to claim slots until you do this.
         </div>
         <button class="btn btn-primary refresh-button" @click="loadTracker()" :disabled="loading">Refresh</button>
-        <table class="table table-sm table-hover text-center">
+        <table class="table table-sm table-hover text-center tracker-table">
             <thead style="position: sticky; top: 0; z-index: 100">
-                <tr class="tracker-header">
+                <tr>
                     <th>Name</th>
                     <th>Ping</th>
                     <th></th>
@@ -428,13 +428,15 @@ loadTracker();
                                 </li>
                             </ul>
                         </td>
-                        <td :class="lastCheckedClass(game)" :title="displayDateTime(gameLastUpdated(game))">{{
-                            displayLastChecked(game) }}</td>
-                        <td>
+                        <td class="text-end" :class="lastCheckedClass(game)">
+                            <span :title="game.status === 'done' ? '' : displayDateTime(gameLastUpdated(game))">{{
+                                displayLastChecked(game) }}</span>
+                        </td>
+                        <td class="text-start">
                             <button class=" btn btn-sm btn-outline-secondary" :class="{ invisible: game.status === 'done' }"
                                 :disabled="loading" @click="updateLastChecked(game)">Update</button>
                         </td>
-                        <td class="align-middle">
+                        <td>
                             <ChecksBar :done="game.checks_done" :total="game.checks_total"></ChecksBar>
                         </td>
                         <td>
@@ -576,7 +578,8 @@ tr tr:hover .mw-copy-hint {
     visibility: visible;
 }
 
-.tracker-header th {
+.tracker-table th,
+.tracker-table td {
     vertical-align: middle;
 }
 </style>
