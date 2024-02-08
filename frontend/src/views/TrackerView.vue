@@ -66,6 +66,8 @@ const PLAYER_FILTER_UNOWNED = Symbol();
 
 const playerFilter = ref(PLAYER_FILTER_ALL);
 
+const activityFilter = ref(0);
+
 const lastCheckedThresholds = [
     { days: 2, color: 'danger' },
     { days: 1, color: 'warning' },
@@ -82,19 +84,22 @@ function gameLastUpdated(game) {
     );
 }
 
+function gameDaysSinceLastChecked(game) {
+    const lastUpdated = gameLastUpdated(game);
+
+    return lastUpdated && moment.duration(moment.utc(now.value).diff(lastUpdated)).asDays();
+}
+
 function lastCheckedClass(game) {
     if (game.status === 'done') {
         return 'text-success';
     }
 
-    const lastUpdated = gameLastUpdated(game);
+    const sinceDays = gameDaysSinceLastChecked(game);
 
-    if (!lastUpdated) {
+    if (sinceDays === undefined) {
         return 'text-danger';
     }
-
-    const sinceMs = moment.utc(now.value).diff(lastUpdated);
-    const sinceDays = moment.duration(sinceMs).asDays();
 
     for (const t of lastCheckedThresholds) {
         if (t.days === undefined || sinceDays >= t.days) {
@@ -108,16 +113,9 @@ function displayLastChecked(game) {
         return '';
     }
 
-    const lastUpdated = gameLastUpdated(game);
+    const days = gameDaysSinceLastChecked(game);
 
-    if (!lastUpdated) {
-        return 'Never';
-    }
-
-    const diff = moment.duration(
-        Math.max(0, moment.utc(now.value).diff(lastUpdated))
-    );
-    return diff.asDays().toFixed(1);
+    return days === undefined ? 'Never' : days.toFixed(1);
 }
 
 const uniqueGames = computed(() =>
@@ -142,7 +140,17 @@ const filteredGames = computed(() =>
                 playerFilter.value === PLAYER_FILTER_UNOWNED ? !g.discord_username?.length :
                     playerFilter.value === g.discord_username
         ) &&
-        statusFilter.value[g.status]
+        statusFilter.value[g.status] &&
+        (() => {
+            /// Fast-succeed in the 0 case so we don't have to waste time
+            /// computing for a check that's going to succeed anyway.
+            if (activityFilter.value === 0) {
+                return true;
+            }
+
+            const days = gameDaysSinceLastChecked(g);
+            return days === undefined || days >= activityFilter.value;
+        })()
     )
 );
 
@@ -371,7 +379,22 @@ loadTracker();
                             </ul>
                         </div>
                     </th>
-                    <th colspan="2">Last Activity (Days)</th>
+                    <th colspan="2">
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
+                                Last Activity (Days)
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li v-for="i in [0, 1, 2, 3, 4, 5, 6, 7]">
+                                    <button class="dropdown-item" :class="{ active: activityFilter === i }"
+                                        @click="activityFilter = i">
+                                        <template v-if="i === 0">All</template>
+                                        <template v-else>&ge;{{ i }}</template>
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </th>
                     <th>Checks</th>
                     <th>
                         <div :class="{ dropdown: !allExpanded, dropup: allExpanded }">
