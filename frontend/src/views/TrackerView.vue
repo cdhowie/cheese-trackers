@@ -6,6 +6,7 @@ import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame } from '@/api';
 import { gameStatus } from '@/types';
 import TrackerSummary from '@/components/TrackerSummary.vue';
+import ChecksBar from '@/components/ChecksBar.vue';
 
 const props = defineProps(['aptrackerid']);
 
@@ -324,15 +325,7 @@ loadTracker();
                         </td>
                         <td>{{ displayDateTime(game.last_activity) }}</td>
                         <td class="align-middle">
-                            <div class="progress" style="position: relative;">
-                                <div style="position: absolute; width: 100%; height: 100%; text-align: center">
-                                    {{ game.checks_done }} / {{ game.checks_total }}
-                                </div>
-                                <div class="progress-bar overflow-visible"
-                                    :class="{ 'bg-success': game.checks_done === game.checks_total }"
-                                    :style="{ width: `${checksCompletePct(game)}%` }">
-                                </div>
-                            </div>
+                            <ChecksBar :done="game.checks_done" :total="game.checks_total"></ChecksBar>
                         </td>
                         <td>
                             <div :class="{ dropdown: gameExpanded[game.id], dropup: gameExpanded[game.id] }">
