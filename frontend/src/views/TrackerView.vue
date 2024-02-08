@@ -170,7 +170,7 @@ const hintsByGame = computed(() => {
 })
 
 function unfoundHints(game) {
-    return (hintsByGame.value[game.id] || []).filter(
+    return (hintsByFinder.value[game.id] || []).filter(
         hint => !hint.found
     ).length;
 }
