@@ -148,6 +148,12 @@ const filteredGames = computed(() =>
                 return true;
             }
 
+            /// Implicitly exclude games that are done as their recent activity
+            /// is irrelevant.
+            if (g.status === 'done') {
+                return false;
+            }
+
             const days = gameDaysSinceLastChecked(g);
             return days === undefined || days >= activityFilter.value;
         })()
