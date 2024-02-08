@@ -1,9 +1,11 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { groupBy, keyBy, orderBy, sumBy, uniq } from 'lodash-es';
-import { load as loadSettings } from '@/settings.js';
-import { now } from '@/time.js';
-import { getTracker as apiGetTracker, updateGame as apiUpdateGame } from '@/api.js';
+import { load as loadSettings } from '@/settings';
+import { now } from '@/time';
+import { getTracker as apiGetTracker, updateGame as apiUpdateGame } from '@/api';
+import { gameStatus } from '@/types';
+import TrackerSummary from '@/components/TrackerSummary.vue';
 
 const props = defineProps(['aptrackerid']);
 
@@ -90,25 +92,7 @@ const totalChecks = computed(() =>
     sumBy(trackerData.value.games, 'checks_total')
 );
 
-const statuses = [
-    'unblocked',
-    'bk',
-    'all_checks',
-    'done',
-    'open',
-    'released',
-    'glitched',
-];
-
-const statusInfo = {
-    unblocked: { name: 'Unblocked', color: 'light' },
-    bk: { name: 'BK', color: 'danger' },
-    all_checks: { name: 'All checks', color: 'warning' },
-    done: { name: 'Done', color: 'success' },
-    open: { name: 'Open', color: 'info' },
-    released: { name: 'Released', color: 'secondary' },
-    glitched: { name: 'Glitched', color: 'secondary' },
-};
+const statuses = gameStatus.map(i => i.id);
 
 const filteredGames = computed(() =>
     orderBy(trackerData.value.games, g => g.name.toLowerCase()).filter(g =>
@@ -317,15 +301,15 @@ loadTracker();
                         <td>{{ game.game }}</td>
                         <td>
                             <button class="btn btn-sm dropdown-toggle" :disabled="loading"
-                                :class="[`btn-outline-${statusInfo[game.status].color}`]" data-bs-toggle="dropdown">
-                                {{ statusInfo[game.status].name }}
+                                :class="[`btn-outline-${gameStatus.byId[game.status].color}`]" data-bs-toggle="dropdown">
+                                {{ gameStatus.byId[game.status].label }}
                             </button>
                             <ul class="dropdown-menu">
                                 <li v-for="status in statuses">
-                                    <button class="dropdown-item" :class="[`text-${statusInfo[status].color}`]"
+                                    <button class="dropdown-item" :class="[`text-${gameStatus.byId[status].color}`]"
                                         :disabled="loading || status === game.status"
                                         @click="setGameStatus(game, status)">{{
-                                            statusInfo[status].name }}</button>
+                                            gameStatus.byId[status].label }}</button>
                                 </li>
                             </ul>
                         </td>
@@ -430,6 +414,14 @@ loadTracker();
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12 col-lg-6">
+                <TrackerSummary :tracker-data="trackerData" summarize-by="discord_username"></TrackerSummary>
+            </div>
+            <div class="col-12 col-lg-6">
+                <TrackerSummary :tracker-data="trackerData" summarize-by="game"></TrackerSummary>
             </div>
         </div>
         <div class="text-center">Last updated from Archipelago at {{ displayDateTime(trackerData.updated_at) }}
