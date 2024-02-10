@@ -14,7 +14,7 @@ FROM docker.io/node:20-bullseye AS frontendbuilder
 
 WORKDIR /app
 COPY frontend/ /app
-RUN npm ci && npm run build
+RUN npm ci && npm run build && rm -fr node_modules ~/.npm
 
 FROM docker.io/alpine:3.19
 
