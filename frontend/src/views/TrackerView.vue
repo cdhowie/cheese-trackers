@@ -21,10 +21,6 @@ const hintsByFinder = ref(undefined);
 const hintsByReceiver = ref(undefined);
 const gameById = ref(undefined);
 
-const gamesByStatus = computed(() => {
-    return groupBy(trackerData.value.games, 'status');
-});
-
 const hintsColors = [
     { max: 0, color: 'secondary' },
     { max: 5, color: 'info' },
@@ -122,16 +118,25 @@ function displayLastChecked(game) {
     return days === undefined ? 'Never' : days.toFixed(1);
 }
 
-const uniqueGames = computed(() =>
-    uniq(trackerData.value.games.map(g => g.game)).length
+const statGames = computed((() => {
+    const excludedStatuses = ['released', 'glitched'];
+    return () => filter(trackerData.value?.games, g => !includes(excludedStatuses, g.status));
+})());
+
+const statUniqueGames = computed(() =>
+    uniq(statGames.value.map(g => g.game)).length
 );
 
-const totalDoneChecks = computed(() =>
-    sumBy(trackerData.value.games, 'checks_done')
+const statTotalDoneChecks = computed(() =>
+    sumBy(statGames.value, 'checks_done')
 );
 
-const totalChecks = computed(() =>
-    sumBy(trackerData.value.games, 'checks_total')
+const statTotalChecks = computed(() =>
+    sumBy(statGames.value, 'checks_total')
+);
+
+const statGamesByStatus = computed(() =>
+    groupBy(statGames.value, 'status')
 );
 
 const statuses = gameStatus.map(i => i.id);
@@ -570,15 +575,16 @@ loadTracker();
                         <tbody>
                             <tr>
                                 <td>{{ players.length }}</td>
-                                <td>{{ uniqueGames }}</td>
+                                <td>{{ statUniqueGames }}</td>
                                 <td class="align-middle">
-                                    <ChecksBar :done="totalDoneChecks" :total="totalChecks" show-percent="1"></ChecksBar>
+                                    <ChecksBar :done="statTotalDoneChecks" :total="statTotalChecks" show-percent="1">
+                                    </ChecksBar>
                                 </td>
                                 <td class="align-middle">
                                     <div class="progress">
                                         <div v-for="status in statuses" class="progress-bar"
                                             :class="[`bg-${gameStatus.byId[status].color}`]"
-                                            :style="{ width: `${percent(gamesByStatus[status]?.length || 0, trackerData.games.length)}%` }">
+                                            :style="{ width: `${percent(statGamesByStatus[status]?.length || 0, statGames.length)}%` }">
                                         </div>
                                     </div>
                                 </td>
