@@ -234,8 +234,11 @@ impl<D> AppState<D> {
                         columns.push(ApGameIden::LastActivity);
                     }
 
-                    // Force the game state when all checks are done.
-                    if tracker_game.checks.all_completed() {
+                    // Force the game state when all checks are done, but only
+                    // if the game isn't marked released or glitched.
+                    if tracker_game.checks.all_completed()
+                        && !matches!(db_game.status, GameStatus::Released | GameStatus::Glitched)
+                    {
                         db_game.status = match tracker_game.status {
                             TrackerGameStatus::GoalCompleted => GameStatus::Done,
                             _ => GameStatus::AllChecks,
