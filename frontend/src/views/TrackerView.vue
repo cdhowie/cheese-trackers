@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter, reduce, join } from 'lodash-es';
+import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter, reduce, join, includes } from 'lodash-es';
 import moment from 'moment';
 import { load as loadSettings } from '@/settings';
 import { now } from '@/time';
@@ -90,8 +90,12 @@ function gameDaysSinceLastChecked(game) {
     return lastUpdated && Math.max(0, moment.duration(moment.utc(now.value).diff(lastUpdated)).asDays());
 }
 
+function isGameCompleted(game) {
+    return includes(['done', 'released', 'glitched'], game.status);
+}
+
 function lastCheckedClass(game) {
-    if (game.status === 'done') {
+    if (isGameCompleted(game)) {
         return 'text-success';
     }
 
@@ -109,7 +113,7 @@ function lastCheckedClass(game) {
 }
 
 function displayLastChecked(game) {
-    if (game.status === 'done') {
+    if (isGameCompleted(game)) {
         return '';
     }
 
@@ -150,7 +154,7 @@ const filteredGames = computed(() =>
 
             /// Implicitly exclude games that are done as their recent activity
             /// is irrelevant.
-            if (g.status === 'done') {
+            if (isGameCompleted(g)) {
                 return false;
             }
 
@@ -463,11 +467,11 @@ loadTracker();
                             </ul>
                         </td>
                         <td class="text-end" :class="lastCheckedClass(game)">
-                            <span :title="game.status === 'done' ? '' : displayDateTime(gameLastUpdated(game))">{{
+                            <span :title="isGameCompleted(game) ? '' : displayDateTime(gameLastUpdated(game))">{{
                                 displayLastChecked(game) }}</span>
                         </td>
                         <td class="text-start">
-                            <button class=" btn btn-sm btn-outline-secondary" :class="{ invisible: game.status === 'done' }"
+                            <button class=" btn btn-sm btn-outline-secondary" :class="{ invisible: isGameCompleted(game) }"
                                 :disabled="loading" @click="updateLastChecked(game)">Update</button>
                         </td>
                         <td>
