@@ -384,8 +384,8 @@ loadTracker();
                                 <li v-for="status in statuses">
                                     <button class="dropdown-item" :class="{
                                         active: statusFilter[status],
-                                        'text-black': statusFilter[status],
                                         [`bg-${gameStatus.byId[status].color}`]: statusFilter[status],
+                                        [`text-bg-${gameStatus.byId[status].color}`]: statusFilter[status],
                                         [`text-${gameStatus.byId[status].color}`]: !statusFilter[status]
                                     }" @click="statusFilter[status] = !statusFilter[status]">
                                         {{ gameStatus.byId[status].label }}
