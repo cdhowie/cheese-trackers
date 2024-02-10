@@ -139,6 +139,14 @@ const statGamesByStatus = computed(() =>
     groupBy(statGames.value, 'status')
 );
 
+function statChecksByStatusProgression(status) {
+    if (status === 'done') {
+        return sumBy(statGames.value, 'checks_done');
+    }
+
+    return sumBy(statGamesByStatus.value[status], g => g.checks_total - g.checks_done);
+}
+
 const statuses = gameStatus.map(i => i.id);
 const statusFilter = ref(mapValues(gameStatus.byId, () => true));
 
@@ -569,7 +577,6 @@ loadTracker();
                                 <th>Unique players</th>
                                 <th>Unique games</th>
                                 <th>Total checks</th>
-                                <th>Status summary</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -580,6 +587,42 @@ loadTracker();
                                     <ChecksBar :done="statTotalDoneChecks" :total="statTotalChecks" show-percent="1">
                                     </ChecksBar>
                                 </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th class="text-center" colspan="2">Status summary</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th class="text-end shrink-column">Progression</th>
+                                <td class="align-middle">
+                                    <div class="progress">
+                                        <div v-for="status in statuses" class="progress-bar"
+                                            :class="[`bg-${gameStatus.byId[status].color}`]"
+                                            :style="{ width: `${percent(statChecksByStatusProgression(status), statTotalChecks)}%` }">
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <!--
+                            <tr>
+                                <th class="text-end shrink-column">By total checks</th>
+                                <td class="align-middle">
+                                    <div class="progress">
+                                        <div v-for="status in statuses" class="progress-bar"
+                                            :class="[`bg-${gameStatus.byId[status].color}`]"
+                                            :style="{ width: `${percent(sumBy(statGamesByStatus[status], 'checks_total'), statTotalChecks)}%` }">
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            -->
+                            <tr>
+                                <th class="text-end shrink-column">By game</th>
                                 <td class="align-middle">
                                     <div class="progress">
                                         <div v-for="status in statuses" class="progress-bar"
@@ -634,5 +677,10 @@ tr tr:hover .mw-copy-hint {
 .tracker-table th,
 .tracker-table td {
     vertical-align: middle;
+}
+
+.shrink-column {
+    width: 1px;
+    white-space: nowrap;
 }
 </style>
