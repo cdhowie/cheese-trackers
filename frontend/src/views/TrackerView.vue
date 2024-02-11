@@ -396,8 +396,8 @@ loadTracker();
             :class="{ 'text-muted': !trackerData.title.length, 'fst-italic': !trackerData.title.length }">{{
                 trackerData.title.length ?
                 trackerData.title : 'Untitled tracker' }}</h2>
-        <input v-if="editingTitle" ref="editTitleInput" class="form-control" placeholder="Title" v-model="editedTitle"
-            @blur="saveTitle" @keyup.enter="saveTitle" @keyup.esc="cancelEditTitle">
+        <input v-if="editingTitle" ref="editTitleInput" class="form-control text-center" placeholder="Title"
+            v-model="editedTitle" @blur="saveTitle" @keyup.enter="saveTitle" @keyup.esc="cancelEditTitle">
         <button class="btn btn-primary refresh-button" @click="loadTracker()" :disabled="loading">Refresh</button>
         <table class="table table-sm table-hover text-center tracker-table">
             <thead style="position: sticky; top: 0; z-index: 100">
