@@ -252,7 +252,7 @@ async function updateGame(game, mutator) {
 
     return apiUpdateGame(props.aptrackerid, data)
         .then(
-            ({ status }) => status === 204,
+            ({ status }) => status >= 200 && status < 300,
             e => {
                 console.error(`Failed to update game: ${e}`);
                 return false;
