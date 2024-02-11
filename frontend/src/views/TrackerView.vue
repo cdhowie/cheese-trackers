@@ -549,8 +549,8 @@ loadTracker();
                                 displayLastChecked(game) }}</span>
                         </td>
                         <td class="text-start">
-                            <button class=" btn btn-sm btn-outline-secondary" :class="{ invisible: isGameCompleted(game) }"
-                                :disabled="loading" @click="updateLastChecked(game)">Update</button>
+                            <button class=" btn btn-sm btn-outline-secondary" :class="{ invisible: game.status !== 'bk' }"
+                                :disabled="loading" @click="updateLastChecked(game)">Still BK</button>
                         </td>
                         <td>
                             <ChecksBar :done="game.checks_done" :total="game.checks_total"></ChecksBar>

@@ -89,7 +89,7 @@
                     elapsed since the last activity occurred in this slot. This
                     will be automatically updated when a check is sent out from
                     this slot. If the slot is BK and no progress can be made,
-                    the "update" button can be used to reset this counter to
+                    the "Still BK" button can be used to reset this counter to
                     signal that you are paying attention to your slot, but you
                     cannot currently progress it.
                 </p>
