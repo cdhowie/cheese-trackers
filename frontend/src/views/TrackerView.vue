@@ -1,10 +1,10 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter, reduce, join, includes } from 'lodash-es';
 import moment from 'moment';
 import { load as loadSettings } from '@/settings';
 import { now } from '@/time';
-import { getTracker as apiGetTracker, updateGame as apiUpdateGame } from '@/api';
+import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker } from '@/api';
 import { gameStatus } from '@/types';
 import { percent } from '@/util';
 import TrackerSummary from '@/components/TrackerSummary.vue';
@@ -20,6 +20,21 @@ const trackerData = ref(undefined);
 const hintsByFinder = ref(undefined);
 const hintsByReceiver = ref(undefined);
 const gameById = ref(undefined);
+
+watch(
+    () => trackerData.value?.title,
+    title => {
+        if (title) {
+            document.title = `${title} | Async Multiworld Tracker`;
+        } else {
+            document.title = 'Async Multiworld Tracker';
+        }
+    }
+);
+
+onUnmounted(() => {
+    document.title = 'Async Multiworld Tracker';
+});
 
 const hintsColors = [
     { max: 0, color: 'secondary' },
@@ -321,6 +336,50 @@ function clipboardCopy(text) {
     setTimeout(() => { showCopiedToast.value = false; }, 3000);
 }
 
+const editedTitle = ref('');
+const editingTitle = ref(false);
+const editTitleInput = ref(undefined);
+
+function editTitle() {
+    editedTitle.value = trackerData.value.title || '';
+    editingTitle.value = true;
+    setTimeout(() => { editTitleInput.value?.focus(); });
+}
+
+function saveTitle() {
+    editingTitle.value = false;
+
+    if ((trackerData.value.title || '') !== editedTitle.value) {
+        if (loading.value) {
+            return;
+        }
+
+        loading.value = true;
+
+        const newTitle = editedTitle.value;
+        apiUpdateTracker({
+            tracker_id: trackerData.value.tracker_id,
+            title: newTitle,
+        })
+            .then(({ status }) => status >= 200 && status < 300,
+                e => {
+                    console.error(`Failed to update tracker: ${e}`);
+                    return false;
+                })
+            .then(saved => {
+                loading.value = false;
+                if (saved) {
+                    trackerData.value.title = newTitle;
+                }
+            })
+    }
+}
+
+function cancelEditTitle() {
+    editedTitle.value = trackerData.value.title;
+    editingTitle.value = false;
+}
+
 loadTracker();
 </script>
 
@@ -333,6 +392,12 @@ loadTracker();
             You have not set your Discord username in the <router-link to="/settings">settings</router-link>. You will be
             unable to claim slots until you do this.
         </div>
+        <h2 v-if="!editingTitle" @click="editTitle" class="text-center mb-4"
+            :class="{ 'text-muted': !trackerData.title.length, 'fst-italic': !trackerData.title.length }">{{
+                trackerData.title.length ?
+                trackerData.title : 'Untitled tracker' }}</h2>
+        <input v-if="editingTitle" ref="editTitleInput" class="form-control" placeholder="Title" v-model="editedTitle"
+            @blur="saveTitle" @keyup.enter="saveTitle" @keyup.esc="cancelEditTitle">
         <button class="btn btn-primary refresh-button" @click="loadTracker()" :disabled="loading">Refresh</button>
         <table class="table table-sm table-hover text-center tracker-table">
             <thead style="position: sticky; top: 0; z-index: 100">

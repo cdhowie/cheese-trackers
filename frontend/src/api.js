@@ -16,6 +16,14 @@ export async function updateGame(tracker_id, game) {
     });
 }
 
+export async function updateTracker(tracker) {
+    return api_http.request({
+        method: 'put',
+        url: `tracker/${tracker.tracker_id}`,
+        data: tracker,
+    });
+}
+
 export async function getSettings() {
     return api_http.get('settings');
 }
