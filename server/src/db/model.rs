@@ -154,6 +154,7 @@ db_struct! {
         pub id: i32,
         pub tracker_id: String,
         pub updated_at: DateTime<Utc>,
+        pub title: String,
     }
 }
 

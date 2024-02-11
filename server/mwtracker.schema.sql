@@ -291,3 +291,6 @@ ALTER TABLE ONLY public.ap_game
 
 ALTER TABLE ONLY public.ap_game
     ADD COLUMN notes text NOT NULL DEFAULT '';
+
+ALTER TABLE public.ap_tracker
+    ADD COLUMN title text DEFAULT '';

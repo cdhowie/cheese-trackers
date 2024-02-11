@@ -122,6 +122,7 @@ impl<D> AppState<D> {
                         id: 0,
                         tracker_id,
                         updated_at: now,
+                        title: "".to_owned(),
                     }])
                     .try_next()
                     .await?
@@ -456,6 +457,43 @@ where
 }
 
 #[derive(Debug, serde::Deserialize)]
+struct UpdateTrackerRequest {
+    pub title: String,
+}
+
+async fn update_tracker<D>(
+    State(state): State<Arc<AppState<D>>>,
+    Path(tracker_id): Path<String>,
+    Json(tracker_update): Json<UpdateTrackerRequest>,
+) -> Result<impl IntoResponse, StatusCode>
+where
+    D: DataAccessProvider + Send + Sync + 'static,
+{
+    let mut db = state
+        .data_provider
+        .create_data_access()
+        .await
+        .unexpected()?;
+    let mut tx = db.begin().await.unexpected()?;
+
+    let mut tracker = tx
+        .get_tracker_by_ap_tracker_id(&tracker_id)
+        .await
+        .unexpected()?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    tracker.title = tracker_update.title;
+
+    tx.update_ap_tracker(tracker, &[ApTrackerIden::Title])
+        .await
+        .unexpected()?;
+
+    tx.commit().await.unexpected()?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, serde::Deserialize)]
 struct UpdateGameRequest {
     pub discord_username: Option<String>,
     pub discord_ping: bool,
@@ -534,6 +572,7 @@ where
 {
     axum::Router::new()
         .route("/tracker/:tracker_id", axum::routing::get(get_tracker))
+        .route("/tracker/:tracker_id", axum::routing::put(update_tracker))
         .route(
             "/tracker/:tracker_id/game/:game_id",
             axum::routing::put(update_game),
