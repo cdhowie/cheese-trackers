@@ -687,7 +687,7 @@ loadTracker();
                             </tr>
                             -->
                             <tr>
-                                <th class="text-end shrink-column">By game</th>
+                                <th class="text-end shrink-column">By slot</th>
                                 <td class="align-middle">
                                     <div class="progress">
                                         <div v-for="status in statuses" class="progress-bar"

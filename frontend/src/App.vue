@@ -19,6 +19,9 @@ getSettings().then(({ data }) => { settings.value = data; })
         <li class="nav-item">
           <RouterLink class="nav-link" active-class="active" to="/settings">Settings</RouterLink>
         </li>
+        <li class="nav-item">
+          <RouterLink class="nav-link" active-class="active" to="/help">Help</RouterLink>
+        </li>
       </ul>
     </div>
   </nav>
