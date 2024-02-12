@@ -207,6 +207,8 @@ impl<D> AppState<D> {
 
                     name_to_id.insert(tracker_game.name.clone(), db_game.id);
 
+                    let new_checks = tracker_checks.completed > db_game.checks_done;
+
                     db_game.name = tracker_game.name;
                     db_game.tracker_status = tracker_game.status;
                     db_game.checks_done = tracker_checks.completed;
@@ -244,6 +246,12 @@ impl<D> AppState<D> {
                             TrackerGameStatus::GoalCompleted => GameStatus::Done,
                             _ => GameStatus::AllChecks,
                         };
+
+                        columns.push(ApGameIden::Status);
+                    } else if new_checks && db_game.status == GameStatus::Bk {
+                        // If new checks have been completed and the game is
+                        // marked BK, it's clearly not, so mark it unblocked.
+                        db_game.status = GameStatus::Unblocked;
 
                         columns.push(ApGameIden::Status);
                     }
