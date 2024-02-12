@@ -492,10 +492,8 @@ loadTracker();
                     </th>
                     <th>Checks</th>
                     <th>
-                        <div :class="{ dropdown: !allExpanded, dropup: allExpanded }">
-                            <button class="btn btn-sm btn-outline-light dropdown-toggle"
-                                @click="setAllExpanded(!allExpanded)">Hints</button>
-                        </div>
+                        <button class="btn btn-sm btn-outline-light" @click="setAllExpanded(!allExpanded)">Hints <i
+                                :class="{ 'bi-arrows-angle-expand': !allExpanded, 'bi-arrows-angle-contract': allExpanded }"></i></button>
                     </th>
                 </tr>
             </thead>
@@ -563,12 +561,11 @@ loadTracker();
                             <ChecksBar :done="game.checks_done" :total="game.checks_total"></ChecksBar>
                         </td>
                         <td>
-                            <div :class="{ dropdown: gameExpanded[game.id], dropup: gameExpanded[game.id] }">
-                                <button class="btn btn-sm dropdown-toggle" :class="[hintsClass(game)]"
-                                    @click="gameExpanded[game.id] = !gameExpanded[game.id]">
-                                    {{ unfoundHints(game) }}<template v-if="game.notes !== ''">*</template>
-                                </button>
-                            </div>
+                            <button class="btn btn-sm" :class="[hintsClass(game)]"
+                                @click="gameExpanded[game.id] = !gameExpanded[game.id]">
+                                {{ unfoundHints(game) }}<template v-if="game.notes !== ''">*</template> <i
+                                    :class="{ 'bi-arrows-angle-expand': !gameExpanded[game.id], 'bi-arrows-angle-contract': gameExpanded[game.id] }"></i>
+                            </button>
                         </td>
                     </tr>
                     <tr v-if="gameExpanded[game.id]">
