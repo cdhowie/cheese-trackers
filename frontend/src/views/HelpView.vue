@@ -57,14 +57,14 @@
                     yourself. If this is your slot, a "release" button will
                     appear instead, allowing you to release the slot for someone
                     else to claim. It goes without saying that you should not
-                    claim a slot owned by another player without consuling them
+                    claim a slot owned by another player without consulting them
                     or the organizer of the multiworld first. (An additional
                     popup confirmation will appear when you attempt to claim
                     someone else's slot to help prevent accidents.)
                 </p>
                 <p>
                     Clicking the title of this column will allow you to filter
-                    slots by a specific owner. THis is a good way to show only
+                    slots by a specific owner. This is a good way to show only
                     your own slots, particularly if you own a large number of
                     slots.
                 </p>
