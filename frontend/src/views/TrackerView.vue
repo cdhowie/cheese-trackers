@@ -165,6 +165,10 @@ function statChecksByStatusProgression(status) {
 const statuses = gameStatus.map(i => i.id);
 const statusFilter = ref(mapValues(gameStatus.byId, () => true));
 
+const statusFilterActive = computed(() =>
+    !statuses.every(s => statusFilter.value[s])
+);
+
 const filteredGames = computed(() =>
     orderBy(trackerData.value.games, g => g.name.toLowerCase()).filter(g =>
         (
@@ -407,8 +411,9 @@ loadTracker();
                     <th></th>
                     <th>
                         <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
-                                Owner (Discord Username)
+                            <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown">
+                                Owner (Discord Username) <i
+                                    :class="{ 'bi-funnel': playerFilter === PLAYER_FILTER_ALL, 'bi-funnel-fill': playerFilter !== PLAYER_FILTER_ALL }"></i>
                             </button>
                             <ul class="dropdown-menu">
                                 <li>
@@ -449,9 +454,10 @@ loadTracker();
                     <th>Game</th>
                     <th>
                         <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-light dropdown-toggle" data-bs-toggle="dropdown"
+                            <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown"
                                 data-bs-auto-close="outside">
-                                Status
+                                Status <i
+                                    :class="{ 'bi-funnel': !statusFilterActive, 'bi-funnel-fill': statusFilterActive }"></i>
                             </button>
                             <ul class="dropdown-menu">
                                 <li v-for="status in statuses">
@@ -469,8 +475,9 @@ loadTracker();
                     </th>
                     <th colspan="2">
                         <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-light dropdown-toggle" data-bs-toggle="dropdown">
-                                Last Activity (Days)
+                            <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown">
+                                Last Activity (Days) <i
+                                    :class="{ 'bi-funnel': activityFilter === 0, 'bi-funnel-fill': activityFilter !== 0 }"></i>
                             </button>
                             <ul class="dropdown-menu">
                                 <li v-for="i in [0, 1, 2, 3, 4, 5, 6, 7]">
