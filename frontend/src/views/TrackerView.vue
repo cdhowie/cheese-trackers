@@ -77,8 +77,6 @@ const PLAYER_FILTER_UNOWNED = Symbol();
 
 const playerFilter = ref(PLAYER_FILTER_ALL);
 
-const activityFilter = ref(0);
-
 const lastCheckedThresholds = [
     { days: 2, color: 'danger' },
     { days: 1, color: 'warning' },
@@ -170,30 +168,37 @@ const statusFilterActive = computed(() =>
 );
 
 const filteredGames = computed(() =>
-    orderBy(trackerData.value.games, g => g.name.toLowerCase()).filter(g =>
+    filter(trackerData.value?.games, g =>
         (
             playerFilter.value === PLAYER_FILTER_ALL ? true :
                 playerFilter.value === PLAYER_FILTER_UNOWNED ? !g.discord_username?.length :
                     playerFilter.value === g.discord_username
         ) &&
-        statusFilter.value[g.status] &&
-        (() => {
-            /// Fast-succeed in the 0 case so we don't have to waste time
-            /// computing for a check that's going to succeed anyway.
-            if (activityFilter.value === 0) {
-                return true;
-            }
-
-            /// Implicitly exclude games that are done as their recent activity
-            /// is irrelevant.
-            if (isGameCompleted(g)) {
-                return false;
-            }
-
-            const days = gameDaysSinceLastChecked(g);
-            return days === undefined || days >= activityFilter.value;
-        })()
+        statusFilter.value[g.status]
     )
+);
+
+function sortByName(g) {
+    return g.name.toLowerCase();
+}
+
+function sortByActivity(g) {
+    const days = gameDaysSinceLastChecked(g);
+    return days === undefined ? Number.POSITIVE_INFINITY : days;
+}
+
+const activeSort = ref([sortByName, false]);
+
+function setSort(sorter, defOrder) {
+    if (activeSort.value[0] === sorter) {
+        activeSort.value[1] = !activeSort.value[1];
+    } else {
+        activeSort.value = [sorter, defOrder];
+    }
+}
+
+const sortedAndFilteredGames = computed(() =>
+    orderBy(filteredGames.value, activeSort.value[0], activeSort.value[1] ? 'desc' : 'asc')
 );
 
 const gameExpanded = ref({});
@@ -406,7 +411,11 @@ loadTracker();
         <table class="table table-sm table-hover text-center tracker-table">
             <thead style="position: sticky; top: 0; z-index: 100">
                 <tr>
-                    <th>Name</th>
+                    <th class="sortable-column" @click="setSort(sortByName, false)">
+                        Name
+                        <i v-if="activeSort[0] === sortByName"
+                            :class="{ 'bi-sort-alpha-down': !activeSort[1], 'bi-sort-alpha-up': activeSort[1] }"></i>
+                    </th>
                     <th>Ping</th>
                     <th></th>
                     <th>
@@ -473,22 +482,10 @@ loadTracker();
                             </ul>
                         </div>
                     </th>
-                    <th colspan="2">
-                        <div class="dropdown">
-                            <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown">
-                                Last Activity (Days) <i
-                                    :class="{ 'bi-funnel': activityFilter === 0, 'bi-funnel-fill': activityFilter !== 0 }"></i>
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li v-for="i in [0, 1, 2, 3, 4, 5, 6, 7]">
-                                    <button class="dropdown-item" :class="{ active: activityFilter === i }"
-                                        @click="activityFilter = i">
-                                        <template v-if="i === 0">All</template>
-                                        <template v-else>&ge;{{ i }}</template>
-                                    </button>
-                                </li>
-                            </ul>
-                        </div>
+                    <th colspan="2" class="sortable-column" @click="setSort(sortByActivity, true)">
+                        Last Activity (Days)
+                        <i v-if="activeSort[0] === sortByActivity"
+                            :class="{ 'bi-sort-numeric-down': !activeSort[1], 'bi-sort-numeric-up': activeSort[1] }"></i>
                     </th>
                     <th>Checks</th>
                     <th>
@@ -498,7 +495,7 @@ loadTracker();
                 </tr>
             </thead>
             <tbody>
-                <template v-for="game in  filteredGames ">
+                <template v-for="game in sortedAndFilteredGames">
                     <tr>
                         <td>{{ game.name }}</td>
                         <td>
@@ -751,5 +748,9 @@ tr tr:hover .mw-copy-hint {
 .shrink-column {
     width: 1px;
     white-space: nowrap;
+}
+
+.sortable-column {
+    cursor: pointer;
 }
 </style>

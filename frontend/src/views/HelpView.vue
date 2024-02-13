@@ -40,8 +40,14 @@
         </p>
         <ul>
             <li>
-                <b>Name</b>: This is the name of the slot on Archipelago. If you
-                alias your slot, it will be reflected here.
+                <p>
+                    <b>Name</b>: This is the name of the slot on Archipelago. If
+                    you alias your slot, it will be reflected here.
+                </p>
+                <p>
+                    Clicking the title of this column will allow you to sort on
+                    this column.
+                </p>
             </li>
             <li>
                 <b>Ping</b>: Whether the owner of this slot wants to be pinged
@@ -104,9 +110,8 @@
                     per tracker.
                 </p>
                 <p>
-                    Clicking the title of this column will allow you to filter
-                    slots to those whose last activity was more than a certain
-                    number of days in the past.
+                    Clicking the title of this column will allow you to sort on
+                    this column.
                 </p>
             </li>
             <li>
