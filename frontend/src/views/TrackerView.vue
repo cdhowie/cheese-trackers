@@ -499,7 +499,8 @@ loadTracker();
                     <tr>
                         <td>{{ game.name }}</td>
                         <td>
-                            <button v-if="game.discord_username" class="btn btn-sm dropdown-toggle" :disabled="loading"
+                            <span v-if="game.discord_username && game.status === 'done'" class="text-danger">Never</span>
+                            <button v-else-if="game.discord_username" class="btn btn-sm dropdown-toggle" :disabled="loading"
                                 :class="[`btn-outline-${pingPreference.byId[game.discord_ping].color}`]"
                                 data-bs-toggle="dropdown">
                                 {{ pingPreference.byId[game.discord_ping].label }}
