@@ -5,7 +5,7 @@ import moment from 'moment';
 import { load as loadSettings } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker } from '@/api';
-import { gameStatus } from '@/types';
+import { gameStatus, pingPreference } from '@/types';
 import { percent } from '@/util';
 import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
@@ -299,7 +299,7 @@ function claimGame(game) {
 function unclaimGame(game) {
     updateGame(game, g => {
         delete g.discord_username;
-        g.discord_ping = false;
+        g.discord_ping = 'never';
     });
 }
 
@@ -310,8 +310,8 @@ function setGameStatus(game, status) {
     setTimeout(() => updateGame(game, g => { g.status = status; }));
 }
 
-function togglePing(game) {
-    updateGame(game, g => { g.discord_ping = !g.discord_ping; });
+function setPing(game, preference) {
+    setTimeout(() => updateGame(game, g => { g.discord_ping = preference; }));
 }
 
 function updateLastChecked(game) {
@@ -499,11 +499,18 @@ loadTracker();
                     <tr>
                         <td>{{ game.name }}</td>
                         <td>
-                            <button v-if="game.discord_ping || game.discord_username?.length" class="btn btn-sm"
-                                :class="{ 'btn-outline-danger': !game.discord_ping, 'btn-outline-success': game.discord_ping }"
-                                :disabled="loading" @click="togglePing(game)">
-                                {{ game.discord_ping ? 'Yes' : 'No' }}
+                            <button v-if="game.discord_username" class="btn btn-sm dropdown-toggle" :disabled="loading"
+                                :class="[`btn-outline-${pingPreference.byId[game.discord_ping].color}`]"
+                                data-bs-toggle="dropdown">
+                                {{ pingPreference.byId[game.discord_ping].label }}
                             </button>
+                            <ul class="dropdown-menu">
+                                <li v-for="pref in pingPreference">
+                                    <button class="dropdown-item" :class="[`text-${pref.color}`]"
+                                        :disabled="loading || pref.id === game.discord_ping"
+                                        @click="setPing(game, pref.id)">{{ pref.label }}</button>
+                                </li>
+                            </ul>
                         </td>
                         <td>
                             <button v-if="settings.discordUsername && !game.discord_username?.length"

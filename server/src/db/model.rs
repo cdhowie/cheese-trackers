@@ -155,6 +155,27 @@ implement_into_simpleexpr! {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize)]
+#[sqlx(type_name = "ping_preference", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum PingPreference {
+    Liberally,
+    Sparingly,
+    Hints,
+    SeeNotes,
+    Never,
+}
+
+implement_into_simpleexpr! {
+    PingPreference {
+        Liberally,
+        Sparingly,
+        Hints,
+        SeeNotes,
+        Never,
+    }
+}
+
 db_struct! {
     pub struct ApTracker {
         pub id: i32,
@@ -178,7 +199,7 @@ db_struct! {
         pub last_activity: Option<DateTime<Utc>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub discord_username: Option<String>,
-        pub discord_ping: bool,
+        pub discord_ping: PingPreference,
         pub status: GameStatus,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub last_checked: Option<DateTime<Utc>>,
