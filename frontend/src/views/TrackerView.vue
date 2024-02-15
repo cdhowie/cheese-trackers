@@ -2,7 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue';
 import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter, reduce, join, includes } from 'lodash-es';
 import moment from 'moment';
-import { load as loadSettings } from '@/settings';
+import { settings } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker } from '@/api';
 import { gameStatus, pingPreference } from '@/types';
@@ -11,8 +11,6 @@ import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
 
 const props = defineProps(['aptrackerid']);
-
-const settings = loadSettings();
 
 const loading = ref(false);
 const error = ref(undefined);
@@ -69,7 +67,7 @@ const players = computed(() =>
 );
 
 const playersExceptSelf = computed(() =>
-    filter(players.value, p => p !== settings.discordUsername)
+    filter(players.value, p => p !== settings.value.discordUsername)
 );
 
 const PLAYER_FILTER_ALL = Symbol();
@@ -292,7 +290,8 @@ async function updateGame(game, mutator) {
 
 function claimGame(game) {
     updateGame(game, g => {
-        g.discord_username = settings.discordUsername;
+        g.discord_username = settings.value.discordUsername;
+        g.discord_ping = settings.value.defaultPingPreference;
     });
 }
 
