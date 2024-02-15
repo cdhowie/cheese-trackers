@@ -506,7 +506,11 @@ loadTracker();
             <tbody>
                 <template v-for="game in sortedAndFilteredGames">
                     <tr>
-                        <td>{{ game.name }}</td>
+                        <td>
+                            <a :href="`https://archipelago.gg/tracker/${trackerData.tracker_id}/0/${game.position}`"
+                                target="_blank" class="text-reset mw-underline-hover">{{
+                                    game.name }}</a>
+                        </td>
                         <td>
                             <button v-if="game.discord_ping || game.discord_username?.length" class="btn btn-sm"
                                 :class="{ 'btn-outline-danger': !game.discord_ping, 'btn-outline-success': game.discord_ping }"
@@ -761,5 +765,13 @@ tr tr:hover .mw-copy-hint {
 
 .sortable-column {
     cursor: pointer;
+}
+
+.mw-underline-hover {
+    text-decoration: none;
+}
+
+.mw-underline-hover:hover {
+    text-decoration: underline;
 }
 </style>
