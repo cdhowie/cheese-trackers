@@ -304,10 +304,19 @@ function unclaimGame(game) {
 }
 
 function setGameStatus(game, status) {
+    const nowStr = (new Date()).toISOString();
+
     // HACK: We use setTimeout here because otherwise the dropdown becomes
     // disabled before Bootstrap closes the dropdown.  When it tries to do so,
     // it finds it disabled and won't close it.
-    setTimeout(() => updateGame(game, g => { g.status = status; }));
+    setTimeout(() => updateGame(game, g => {
+        g.status = status;
+
+        // If setting to BK then also update "last checked."
+        if (status === 'bk') {
+            g.last_checked = nowStr;
+        }
+    }));
 }
 
 function togglePing(game) {

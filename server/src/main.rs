@@ -248,9 +248,19 @@ impl<D> AppState<D> {
                         };
 
                         columns.push(ApGameIden::Status);
-                    } else if new_checks && db_game.status == GameStatus::Bk {
+                    } else if new_checks
+                        && db_game.status == GameStatus::Bk
+                        && new_last_activity.zip(db_game.last_checked).is_some_and(
+                            |(activity, checked)| activity - checked > chrono::Duration::minutes(5),
+                        )
+                    {
                         // If new checks have been completed and the game is
                         // marked BK, it's clearly not, so mark it unblocked.
+                        // But only do this if "last activity" is more than a
+                        // few minutes after "last checked" because otherwise
+                        // the player probably set their slot BK before
+                        // refreshing, and the checks coming in were completed
+                        // before they marked the slot BK.
                         db_game.status = GameStatus::Unblocked;
 
                         columns.push(ApGameIden::Status);
