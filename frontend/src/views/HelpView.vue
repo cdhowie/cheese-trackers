@@ -220,21 +220,11 @@
             </li>
         </ul>
         <p>
-            There are a few status changes that are automatically made when
-            certain conditions are met:
+            If a slot has completed all of its checks and is not currently
+            marked "released" or "glitched," then its status will be changed to
+            "done" if the slot's goal has been completed, or "all checks" if the
+            slot's goal has not been completed.
         </p>
-        <ul>
-            <li>
-                If a slot has completed all of its checks and is not currently
-                marked "released" or "glitched," then its status will be changed
-                to "done" if the slot's goal has been completed, or "all checks"
-                if the slot's goal has not been completed.
-            </li>
-            <li>
-                If a slot is marked "BK" and its number of completed checks
-                increases, its status will be changed to "Unblocked."
-            </li>
-        </ul>
         <h2>Hints and Notes</h2>
         <p>
             The tracker captures information about what hints have been issued
