@@ -45,6 +45,12 @@
                     you alias your slot, it will be reflected here.
                 </p>
                 <p>
+                    You can click a slot's name to open a new tab/window
+                    containing the AP slot-specific tracker. This can help you
+                    quickly determine if a slot has available progression
+                    without needing to open the game or the AP text client.
+                </p>
+                <p>
                     Clicking the title of this column will allow you to sort on
                     this column.
                 </p>
