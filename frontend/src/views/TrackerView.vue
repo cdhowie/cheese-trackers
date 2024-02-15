@@ -25,15 +25,15 @@ watch(
     () => trackerData.value?.title,
     title => {
         if (title) {
-            document.title = `${title} | Async Multiworld Tracker`;
+            document.title = `${title} | Cheese Trackers`;
         } else {
-            document.title = 'Async Multiworld Tracker';
+            document.title = 'Cheese Trackers';
         }
     }
 );
 
 onUnmounted(() => {
-    document.title = 'Async Multiworld Tracker';
+    document.title = 'Cheese Trackers';
 });
 
 const hintsColors = [
