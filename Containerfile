@@ -1,6 +1,11 @@
+ARG GIT_COMMIT
+
 FROM docker.io/rust:1.75.0-alpine3.19 AS serverbuilder
 
-RUN apk add --no-cache musl-dev openssl-dev
+ARG GIT_COMMIT
+ENV GIT_COMMIT=$GIT_COMMIT
+
+RUN test -n "$GIT_COMMIT" && apk add --no-cache musl-dev openssl-dev
 
 WORKDIR /app
 COPY server/ /app
@@ -12,9 +17,12 @@ RUN --mount=type=cache,target=/app/target \
 
 FROM docker.io/node:20-bullseye AS frontendbuilder
 
+ARG GIT_COMMIT
+ENV GIT_COMMIT=$GIT_COMMIT
+
 WORKDIR /app
 COPY frontend/ /app
-RUN npm ci && npm run build && rm -fr node_modules ~/.npm
+RUN test -n "$GIT_COMMIT" && npm ci && npm run build && rm -fr node_modules ~/.npm
 
 FROM docker.io/alpine:3.19
 

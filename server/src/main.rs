@@ -92,6 +92,9 @@ impl<D> AppState<D> {
             tracker_base_url: "https://archipelago.gg/tracker/".parse().unwrap(),
             ui_settings: UiSettings {
                 is_staging: config.is_staging,
+                build_version: option_env!("GIT_COMMIT")
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or("dev"),
             },
             inflight_tracker_updates: RwLock::default(),
             tracker_update_interval: config.tracker_update_interval,
@@ -563,6 +566,7 @@ where
 #[derive(Debug, Clone, serde::Serialize)]
 struct UiSettings {
     pub is_staging: bool,
+    pub build_version: &'static str,
 }
 
 async fn get_settings<D>(State(state): State<Arc<AppState<D>>>) -> Json<UiSettings> {

@@ -1,11 +1,31 @@
 <script setup>
-import { ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { RouterLink, RouterView } from 'vue-router';
 import { getSettings } from '@/api.js';
+import { BUILD_VERSION } from './build';
 
 const settings = ref({});
 
-getSettings().then(({ data }) => { settings.value = data; })
+const newVersionAvailable = computed(() =>
+  settings.value.build_version && settings.value.build_version !== BUILD_VERSION
+);
+
+async function updateSettings() {
+  try {
+    const { data } = await getSettings();
+    settings.value = data;
+  } catch (e) {
+    console.log(`Failed to update settings: ${e}`);
+  }
+}
+
+const interval = setInterval(updateSettings, 60 * 1000);
+
+updateSettings();
+
+onBeforeUnmount(() => {
+  clearInterval(interval);
+});
 </script>
 
 <template>
@@ -37,6 +57,14 @@ getSettings().then(({ data }) => { settings.value = data; })
     <p>Built by The Incredible Wheel of Cheese for the Archipelago community. &#x1F9C0;</p>
     <p class="m-0">Inspired by radzprower's tracking spreadsheet.</p>
   </footer>
+
+  <div class="toast-container position-fixed top-0 end-0 p-3">
+    <div class="toast text-bg-info" :class="{ show: newVersionAvailable }">
+      <div class="toast-body">
+        A new build is available. Please refresh the page to load the new version.
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped></style>
