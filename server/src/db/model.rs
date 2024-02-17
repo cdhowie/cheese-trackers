@@ -93,6 +93,24 @@ macro_rules! db_struct {
     };
 }
 
+macro_rules! implement_into_simpleexpr {
+    ( $ty:ident { $( $variant:ident ),* $(,)? } ) => {
+        paste::paste! {
+            impl From<$ty> for SimpleExpr {
+                fn from(value: $ty) -> Self {
+                    SimpleExpr::Value(
+                        match value {
+                            $( $ty::$variant => stringify!([< $variant:snake >]) ),*
+                        }
+                        .into(),
+                    )
+                    .cast_as(Alias::new(stringify!([< $ty:snake >])))
+                }
+            }
+        }
+    };
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize)]
 #[sqlx(type_name = "game_status", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
@@ -106,21 +124,15 @@ pub enum GameStatus {
     Glitched,
 }
 
-impl From<GameStatus> for SimpleExpr {
-    fn from(value: GameStatus) -> Self {
-        SimpleExpr::Value(
-            match value {
-                GameStatus::Unblocked => "unblocked",
-                GameStatus::Bk => "bk",
-                GameStatus::AllChecks => "all_checks",
-                GameStatus::Done => "done",
-                GameStatus::Open => "open",
-                GameStatus::Released => "released",
-                GameStatus::Glitched => "glitched",
-            }
-            .into(),
-        )
-        .cast_as(Alias::new("game_status"))
+implement_into_simpleexpr! {
+    GameStatus {
+        Unblocked,
+        Bk,
+        AllChecks,
+        Done,
+        Open,
+        Released,
+        Glitched,
     }
 }
 
@@ -134,18 +146,33 @@ pub enum TrackerGameStatus {
     GoalCompleted,
 }
 
-impl From<TrackerGameStatus> for SimpleExpr {
-    fn from(value: TrackerGameStatus) -> Self {
-        SimpleExpr::Value(
-            match value {
-                TrackerGameStatus::Disconnected => "disconnected",
-                TrackerGameStatus::Connected => "connected",
-                TrackerGameStatus::Playing => "playing",
-                TrackerGameStatus::GoalCompleted => "goal_completed",
-            }
-            .into(),
-        )
-        .cast_as(Alias::new("tracker_game_status"))
+implement_into_simpleexpr! {
+    TrackerGameStatus {
+        Disconnected,
+        Connected,
+        Playing,
+        GoalCompleted,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize)]
+#[sqlx(type_name = "ping_preference", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum PingPreference {
+    Liberally,
+    Sparingly,
+    Hints,
+    SeeNotes,
+    Never,
+}
+
+implement_into_simpleexpr! {
+    PingPreference {
+        Liberally,
+        Sparingly,
+        Hints,
+        SeeNotes,
+        Never,
     }
 }
 
@@ -172,7 +199,7 @@ db_struct! {
         pub last_activity: Option<DateTime<Utc>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub discord_username: Option<String>,
-        pub discord_ping: bool,
+        pub discord_ping: PingPreference,
         pub status: GameStatus,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub last_checked: Option<DateTime<Utc>>,

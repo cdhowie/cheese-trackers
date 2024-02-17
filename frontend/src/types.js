@@ -11,3 +11,13 @@ export const gameStatus = [
 ];
 
 gameStatus.byId = keyBy(gameStatus, 'id');
+
+export const pingPreference = [
+    { id: 'liberally', label: 'Liberally', color: 'success' },
+    { id: 'sparingly', label: 'Sparingly', color: 'warning' },
+    { id: 'hints', label: 'Hints', color: 'warning' },
+    { id: 'see_notes', label: 'See notes', color: 'info' },
+    { id: 'never', label: 'Never', color: 'danger' },
+];
+
+pingPreference.byId = keyBy(pingPreference, 'id');

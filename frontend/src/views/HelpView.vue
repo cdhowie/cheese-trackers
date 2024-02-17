@@ -1,4 +1,5 @@
 <script setup>
+import ShouldPing from '@/components/ShouldPing.vue';
 </script>
 
 <template>
@@ -56,10 +57,10 @@
                 </p>
             </li>
             <li>
-                <b>Ping</b>: Whether the owner of this slot wants to be pinged
-                on Discord regarding this slot. See the "pinging" section below
-                for more information about what this means and when it is
-                appropriate to ping someone.
+                <b>Ping</b>: Indicates under what circumstances the owner of
+                this slot wants to be pinged on Discord regarding this slot. See
+                the "pinging" section below for more information about what this
+                means and when it is appropriate to ping someone.
             </li>
             <li>
                 <p>
@@ -261,42 +262,76 @@
         </p>
         <h2>Pinging</h2>
         <p>
-            When an important item is sent to a slot, the owner of that slot may
-            want to be informed on Discord. Check the "ping" column for a slot
-            first to see if the owner wants to receive pings.
+            There are mulitple scenarios where the owner of a slot may want to
+            be notified on Discord with a ping. The table below describes these
+            scenarios and whether it is appropriate to ping someone based on the
+            ping preference set on their slot.
         </p>
-        <p>
-            <span class="text-warning">
-                If the column says "no" or the button is missing then you should
-                never ping the slot's owner about items you've sent to them.
-            </span>
-            (The button is hidden for completed, released, or glitched slots.
-            There is no reason to ping in those cases.)
-        </p>
-        <p>
-            If the column says "yes," then it <i>might</i> be appropriate to
-            ping them. You should follow these rules for pinging (adapted from
-            Dragorrod's rules to fit the terminology of this tracker):
-        </p>
-        <ul>
-            <li>
-                You hint something on someone else,
-                <span class="text-success">you ping</span>.
-            </li>
-            <li>
-                You are getting impatient not receiving a hinted item,
-                <span class="text-danger">you do not ping</span>.
-            </li>
-            <li>
-                You get a progression item you are not 100% sure is critical,
-                <span class="text-danger">you do not ping</span>.
-            </li>
-            <li>
-                You get a progression item you are 100% sure is critical,
-                <span class="text-success">you can ping</span>, but you do not
-                have to.
-            </li>
-        </ul>
+        <table class="table text-center">
+            <thead>
+                <tr>
+                    <th>Scenario</th>
+                    <th>Liberally</th>
+                    <th>Sparingly</th>
+                    <th>Hints</th>
+                    <th>See notes</th>
+                    <th>Never</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>You hint an item found by the slot.</td>
+                    <td><should-ping value="yes"></should-ping></td>
+                    <td><should-ping value="yes"></should-ping></td>
+                    <td><should-ping value="yes"></should-ping></td>
+                    <td><should-ping value="notes"></should-ping></td>
+                    <td><should-ping value="no"></should-ping></td>
+                </tr>
+                <tr>
+                    <td>You find an item that was hinted by the slot.</td>
+                    <td><should-ping value="yes"></should-ping></td>
+                    <td><should-ping value="yes"></should-ping></td>
+                    <td><should-ping value="yes"></should-ping></td>
+                    <td><should-ping value="notes"></should-ping></td>
+                    <td><should-ping value="no"></should-ping></td>
+                </tr>
+                <tr>
+                    <td>You get a progression item you are 100% sure is critical.</td>
+                    <td><should-ping value="yes"></should-ping></td>
+                    <td><should-ping value="yes"></should-ping></td>
+                    <td><should-ping value="no"></should-ping></td>
+                    <td><should-ping value="notes"></should-ping></td>
+                    <td><should-ping value="no"></should-ping></td>
+                </tr>
+                <tr>
+                    <td>You get a progression item you are not 100% sure is critical.</td>
+                    <td><should-ping value="yes"></should-ping></td>
+                    <td><should-ping value="no"></should-ping></td>
+                    <td><should-ping value="no"></should-ping></td>
+                    <td><should-ping value="notes"></should-ping></td>
+                    <td><should-ping value="no"></should-ping></td>
+                </tr>
+                <tr>
+                    <td>You are getting impatient not receiving a hinted item.</td>
+                    <td><should-ping value="no"></should-ping></td>
+                    <td><should-ping value="no"></should-ping></td>
+                    <td><should-ping value="no"></should-ping></td>
+                    <td><should-ping value="no"></should-ping></td>
+                    <td><should-ping value="no"></should-ping></td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="row text-center">
+            <div class="col-4">
+                <should-ping value="yes"></should-ping> You can ping
+            </div>
+            <div class="col-4">
+                <should-ping value="notes"></should-ping> Check the slot's notes to see if you can ping
+            </div>
+            <div class="col-4">
+                <should-ping value="no"></should-ping> Do not ping
+            </div>
+        </div>
         <h2>Reports</h2>
         <p>
             At the bottom of the tracker, there are a few reports to help the

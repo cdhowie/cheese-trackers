@@ -9,7 +9,10 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use db::{
-    model::{ApGame, ApGameIden, ApHint, ApTracker, ApTrackerIden, GameStatus, TrackerGameStatus},
+    model::{
+        ApGame, ApGameIden, ApHint, ApTracker, ApTrackerIden, GameStatus, PingPreference,
+        TrackerGameStatus,
+    },
     DataAccess, DataAccessProvider, Transactable, Transaction,
 };
 use futures::{
@@ -152,7 +155,7 @@ impl<D> AppState<D> {
                             checks_total: checks.total,
                             last_activity: game.last_activity.map(|d| now - d),
                             discord_username: None,
-                            discord_ping: false,
+                            discord_ping: PingPreference::Never,
                             status: GameStatus::Unblocked,
                             last_checked: None,
                             notes: String::new(),
@@ -496,7 +499,7 @@ where
 #[derive(Debug, serde::Deserialize)]
 struct UpdateGameRequest {
     pub discord_username: Option<String>,
-    pub discord_ping: bool,
+    pub discord_ping: PingPreference,
     pub status: GameStatus,
     pub last_checked: Option<DateTime<Utc>>,
     pub notes: String,
