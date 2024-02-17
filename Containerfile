@@ -18,11 +18,11 @@ RUN --mount=type=cache,target=/app/target \
 FROM docker.io/node:20-bullseye AS frontendbuilder
 
 ARG GIT_COMMIT
-ENV GIT_COMMIT=$GIT_COMMIT
+ENV VITE_GIT_COMMIT=$GIT_COMMIT
 
 WORKDIR /app
 COPY frontend/ /app
-RUN test -n "$GIT_COMMIT" && npm ci && npm run build && rm -fr node_modules ~/.npm
+RUN test -n "$VITE_GIT_COMMIT" && npm ci && npm run build && rm -fr node_modules ~/.npm
 
 FROM docker.io/alpine:3.19
 
