@@ -296,9 +296,9 @@ ALTER TABLE public.ap_tracker
     ADD COLUMN title text DEFAULT '';
 
 CREATE TYPE public.ping_preference AS ENUM
-    ('liberally', 'sparingly', 'hints', 'see_notes', 'none');
+    ('liberally', 'sparingly', 'hints', 'see_notes', 'never');
 
 ALTER TABLE public.ap_game
 	ALTER COLUMN discord_ping DROP DEFAULT,
-	ALTER COLUMN discord_ping TYPE ping_preference USING 'never'::ping_preference,
-	ALTER COLUMN discord_ping SET DEFAULT 'never'::ping_preference;
+	ALTER COLUMN discord_ping TYPE public.ping_preference USING 'never'::public.ping_preference,
+	ALTER COLUMN discord_ping SET DEFAULT 'never'::public.ping_preference;
