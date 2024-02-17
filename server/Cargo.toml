@@ -1,5 +1,5 @@
 [package]
-name = "mw-async-tracker-server"
+name = "cheese-trackers-server"
 version = "0.1.0"
 edition = "2021"
 

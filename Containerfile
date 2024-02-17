@@ -7,7 +7,7 @@ COPY server/ /app
 RUN --mount=type=cache,target=/app/target \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
     RUSTFLAGS=-Ctarget-feature=-crt-static cargo build --release && \
-    cp target/release/mw-async-tracker-server .
+    cp target/release/cheese-trackers-server .
 
 
 FROM docker.io/node:20-bullseye AS frontendbuilder
@@ -21,7 +21,7 @@ FROM docker.io/alpine:3.19
 RUN apk add --no-cache ca-certificates libssl3 libgcc
 
 WORKDIR /app
-COPY --from=serverbuilder /app/mw-async-tracker-server /app/
+COPY --from=serverbuilder /app/cheese-trackers-server /app/
 COPY --from=frontendbuilder /app/dist /app/dist
 USER nobody
-ENTRYPOINT [ "./mw-async-tracker-server" ]
+ENTRYPOINT [ "./cheese-trackers-server" ]

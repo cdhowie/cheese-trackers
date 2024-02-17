@@ -11,7 +11,7 @@ getSettings().then(({ data }) => { settings.value = data; })
 <template>
   <nav class="navbar navbar-expand bg-body-tertiary mb-3">
     <div class="container-fluid">
-      <span class="navbar-brand">Async Multiworld Tracker</span>
+      <span class="navbar-brand">Cheese Trackers</span>
       <ul class="navbar-nav me-auto">
         <li class="nav-item">
           <RouterLink class="nav-link" active-class="active" to="/">Open tracker</RouterLink>
