@@ -62,7 +62,8 @@ const players = computed(() =>
                 map(trackerData.value.games, 'discord_username'),
                 i => i?.length
             )
-        )
+        ),
+        i => i.toLowerCase()
     )
 );
 
