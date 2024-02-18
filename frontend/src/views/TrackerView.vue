@@ -255,7 +255,7 @@ async function loadTracker() {
         trackerData.value = data;
 
         hintsByFinder.value = groupBy(trackerData.value.hints, 'finder_game_id');
-        hintsByReceiver.value = groupBy(trackerData.value.hints, 'receiver_game_id');
+        hintsByReceiver.value = groupBy(filter(trackerData.value.hints, h => h.receiver_game_id !== undefined), 'receiver_game_id');
         gameById.value = keyBy(trackerData.value.games, 'id');
     } catch (e) {
         error.value = e;
@@ -339,7 +339,7 @@ function updateNotes(game) {
 const showCopiedToast = ref(false);
 
 function hintToString(hint) {
-    const receiver = gameById.value[hint.receiver_game_id].name;
+    const receiver = gameById.value[hint.receiver_game_id]?.name || '(Item link)';
     const finder = gameById.value[hint.finder_game_id].name;
     const entrance = hint.entrance === 'Vanilla' ? '' : ` (${hint.entrance})`;
     return `${receiver}'s ${hint.item} is at ${finder}'s ${hint.location}${entrance}`;
@@ -616,9 +616,10 @@ loadTracker();
                                                 <tr v-for="hint in unfoundHintsByGame(game.id)">
                                                     <td class="text-end pe-0">
                                                         <template v-if="!sentHints">
-                                                            <span class="text-info bg-transparent p-0">{{
-                                                                gameById[hint.receiver_game_id].name
-                                                            }}</span>'s
+                                                            <span class="bg-transparent p-0"
+                                                                :class="{ 'text-info': !!gameById[hint.receiver_game_id], 'text-primary': !gameById[hint.receiver_game_id] }">{{
+                                                                    gameById[hint.receiver_game_id]?.name || '(Item link)'
+                                                                }}</span>'s
                                                         </template>
                                                         <span class="text-info bg-transparent p-0">{{ hint.item }}</span>
                                                     </td>

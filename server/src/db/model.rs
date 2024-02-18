@@ -214,7 +214,7 @@ db_struct! {
     pub struct ApHint {
         pub id: i32,
         pub finder_game_id: i32,
-        pub receiver_game_id: i32,
+        pub receiver_game_id: Option<i32>,
         pub item: String,
         pub location: String,
         pub entrance: String,

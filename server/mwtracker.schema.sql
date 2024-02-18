@@ -302,3 +302,6 @@ ALTER TABLE public.ap_game
 	ALTER COLUMN discord_ping DROP DEFAULT,
 	ALTER COLUMN discord_ping TYPE public.ping_preference USING 'never'::public.ping_preference,
 	ALTER COLUMN discord_ping SET DEFAULT 'never'::public.ping_preference;
+
+ALTER TABLE public.ap_hint
+    ALTER COLUMN receiver_game_id DROP NOT NULL;

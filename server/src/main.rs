@@ -295,9 +295,11 @@ impl<D> AppState<D> {
                         finder_game_id: *name_to_id
                             .get(&hint.finder)
                             .ok_or_else(|| TrackerUpdateError::HintGameMissing(hint.finder))?,
-                        receiver_game_id: *name_to_id
-                            .get(&hint.receiver)
-                            .ok_or_else(|| TrackerUpdateError::HintGameMissing(hint.receiver))?,
+                        // If the receiving game can't be found, it's most
+                        // likely an item link check, which means the receiver
+                        // would be multiple games.  We record this as null in
+                        // the database.
+                        receiver_game_id: name_to_id.get(&hint.receiver).copied(),
                         item: hint.item,
                         location: hint.location,
                         entrance: hint.entrance,
