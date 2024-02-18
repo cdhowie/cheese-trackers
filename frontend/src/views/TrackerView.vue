@@ -44,7 +44,7 @@ const hintsColors = [
 function hintsClass(game) {
     // If a game has notes, we consider the number of hints to be 1 at a minimum
     // so the button won't be gray.
-    const unfound = Math.max(unfoundHints(game), game.notes !== '' ? 1 : 0);
+    const unfound = Math.max(countUnfoundReceivedHints(game), game.notes !== '' ? 1 : 0);
 
     const prefix = gameExpanded.value[game.id] ? 'btn-' : 'btn-outline-';
 
@@ -224,14 +224,22 @@ const hintsByGame = computed(() => {
     return sentHints.value ? hintsByReceiver.value : hintsByFinder.value;
 })
 
-function unfoundHintsByGame(id) {
-    return (hintsByGame.value?.[id] || []).filter(h => !h.found);
+function hintIsFound(hint) {
+    return hint.found || (
+        // Also consider a hint "found" (no longer relevant) if the game that
+        // would receive the item is done (all checks + goal), as this slot no
+        // longer has a use for any items.
+        hint.receiver_game_id !== undefined &&
+        gameById.value[hint.receiver_game_id].status === 'done'
+    );
 }
 
-function unfoundHints(game) {
-    return (hintsByFinder.value[game.id] || []).filter(
-        hint => !hint.found
-    ).length;
+function unfoundHintsByGame(id) {
+    return (hintsByGame.value?.[id] || []).filter(h => !hintIsFound(h));
+}
+
+function countUnfoundReceivedHints(game) {
+    return (hintsByFinder.value[game.id] || []).filter(h => !hintIsFound(h)).length;
 }
 
 function patchGame(game) {
@@ -580,7 +588,7 @@ loadTracker();
                         <td>
                             <button class="btn btn-sm" :class="[hintsClass(game)]"
                                 @click="gameExpanded[game.id] = !gameExpanded[game.id]">
-                                {{ unfoundHints(game) }}<template v-if="game.notes !== ''">*</template> <i
+                                {{ countUnfoundReceivedHints(game) }}<template v-if="game.notes !== ''">*</template> <i
                                     :class="{ 'bi-arrows-angle-expand': !gameExpanded[game.id], 'bi-arrows-angle-contract': gameExpanded[game.id] }"></i>
                             </button>
                         </td>
