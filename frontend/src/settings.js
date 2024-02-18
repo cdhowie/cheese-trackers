@@ -10,13 +10,17 @@ const SETTINGS_SCHEMA = Joi.object().keys({
 
 export const settings = ref(load());
 
+function fallback() {
+    return SETTINGS_SCHEMA.validate({}).value;
+}
+
 function load() {
     try {
         return SETTINGS_SCHEMA.validate(
             JSON.parse(localStorage.getItem(SETTINGS_KEY))
-        ).value || {};
+        ).value || fallback();
     } catch (e) {
-        return {};
+        return fallback();
     }
 }
 
