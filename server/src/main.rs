@@ -84,6 +84,22 @@ struct AppState<D> {
     tracker_update_interval: chrono::Duration,
 }
 
+fn update_game_status(game: &mut ApGame) -> bool {
+    // Force the game state when all checks are done, but only if the game isn't
+    // marked released or glitched.
+    if game.checks_done == game.checks_total
+        && !matches!(game.status, GameStatus::Released | GameStatus::Glitched)
+    {
+        game.status = match game.tracker_status {
+            TrackerGameStatus::GoalCompleted => GameStatus::Done,
+            _ => GameStatus::AllChecks,
+        };
+        true
+    } else {
+        false
+    }
+}
+
 impl<D> AppState<D> {
     fn new(config: conf::Config, data_provider: D) -> Self {
         Self {
@@ -144,25 +160,30 @@ impl<D> AppState<D> {
                         .try_convert()
                         .map_err(|_| TrackerUpdateError::NumericConversion(game.position))?;
 
+                    let mut game = ApGame {
+                        id: 0,
+                        tracker_id: tracker.id,
+                        position: game
+                            .position
+                            .try_into()
+                            .map_err(|_| TrackerUpdateError::NumericConversion(game.position))?,
+                        name: game.name,
+                        game: game.game,
+                        tracker_status: game.status,
+                        checks_done: checks.completed,
+                        checks_total: checks.total,
+                        last_activity: game.last_activity.map(|d| now - d),
+                        discord_username: None,
+                        discord_ping: PingPreference::Never,
+                        status: GameStatus::Unblocked,
+                        last_checked: None,
+                        notes: String::new(),
+                    };
+
+                    update_game_status(&mut game);
+
                     let game = db
-                        .create_ap_games([ApGame {
-                            id: 0,
-                            tracker_id: tracker.id,
-                            position: game.position.try_into().map_err(|_| {
-                                TrackerUpdateError::NumericConversion(game.position)
-                            })?,
-                            name: game.name,
-                            game: game.game,
-                            tracker_status: game.status,
-                            checks_done: checks.completed,
-                            checks_total: checks.total,
-                            last_activity: game.last_activity.map(|d| now - d),
-                            discord_username: None,
-                            discord_ping: PingPreference::Never,
-                            status: GameStatus::Unblocked,
-                            last_checked: None,
-                            notes: String::new(),
-                        }])
+                        .create_ap_games([game])
                         .try_next()
                         .await?
                         .ok_or(TrackerUpdateError::Database(sqlx::Error::RowNotFound))?;
@@ -241,16 +262,7 @@ impl<D> AppState<D> {
                         columns.push(ApGameIden::LastActivity);
                     }
 
-                    // Force the game state when all checks are done, but only
-                    // if the game isn't marked released or glitched.
-                    if tracker_game.checks.all_completed()
-                        && !matches!(db_game.status, GameStatus::Released | GameStatus::Glitched)
-                    {
-                        db_game.status = match tracker_game.status {
-                            TrackerGameStatus::GoalCompleted => GameStatus::Done,
-                            _ => GameStatus::AllChecks,
-                        };
-
+                    if update_game_status(&mut db_game) {
                         columns.push(ApGameIden::Status);
                     }
 
