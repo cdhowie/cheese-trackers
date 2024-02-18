@@ -237,6 +237,10 @@ function unfoundHints(game) {
     ).length;
 }
 
+function patchGame(game) {
+    game.$newnotes = game.notes;
+}
+
 async function loadTracker() {
     if (loading.value) {
         return;
@@ -247,9 +251,7 @@ async function loadTracker() {
 
     try {
         const { data } = await apiGetTracker(props.aptrackerid);
-        data.games.forEach(game => {
-            game.$newnotes = game.notes;
-        });
+        data.games.forEach(patchGame);
         trackerData.value = data;
 
         hintsByFinder.value = groupBy(trackerData.value.hints, 'finder_game_id');
@@ -274,15 +276,16 @@ async function updateGame(game, mutator) {
 
     return apiUpdateGame(props.aptrackerid, data)
         .then(
-            ({ status }) => status >= 200 && status < 300,
+            ({ status, data }) => status >= 200 && status < 300 ? data : undefined,
             e => {
                 console.error(`Failed to update game: ${e}`);
-                return false;
+                return undefined;
             }
         )
-        .then(saved => {
-            if (saved) {
-                mutator(game);
+        .then(savedGame => {
+            if (savedGame) {
+                Object.assign(game, savedGame);
+                patchGame(game);
             }
             loading.value = false;
         });

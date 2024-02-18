@@ -177,6 +177,7 @@ implement_into_simpleexpr! {
 }
 
 db_struct! {
+    #[derive(Clone)]
     pub struct ApTracker {
         pub id: i32,
         pub tracker_id: String,
@@ -186,6 +187,7 @@ db_struct! {
 }
 
 db_struct! {
+    #[derive(Clone)]
     pub struct ApGame {
         pub id: i32,
         pub tracker_id: i32,
@@ -208,6 +210,7 @@ db_struct! {
 }
 
 db_struct! {
+    #[derive(Clone)]
     pub struct ApHint {
         pub id: i32,
         pub finder_game_id: i32,

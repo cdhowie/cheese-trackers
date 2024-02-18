@@ -557,8 +557,10 @@ where
     game.last_checked = game_update.last_checked;
     game.notes = game_update.notes;
 
+    update_game_status(&mut game);
+
     tx.update_ap_game(
-        game,
+        game.clone(),
         &[
             ApGameIden::DiscordUsername,
             ApGameIden::DiscordPing,
@@ -572,7 +574,7 @@ where
 
     tx.commit().await.unexpected()?;
 
-    Ok(StatusCode::NO_CONTENT)
+    Ok(Json(game))
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
