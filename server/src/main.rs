@@ -85,18 +85,18 @@ struct AppState<D> {
 }
 
 fn update_game_status(game: &mut ApGame) -> bool {
-    // Force the game state when all checks are done, but only if the game isn't
-    // marked released or glitched.
-    if game.checks_done == game.checks_total
-        && !matches!(game.status, GameStatus::Released | GameStatus::Glitched)
-    {
-        game.status = match game.tracker_status {
-            TrackerGameStatus::GoalCompleted => GameStatus::Done,
-            _ => GameStatus::AllChecks,
-        };
-        true
-    } else {
+    if matches!(game.status, GameStatus::Released | GameStatus::Glitched) {
+        // Released and glitched are special cases that take priority over all others.
         false
+    } else {
+        game.status = match (game.checks_done == game.checks_total, game.tracker_status) {
+            (true, TrackerGameStatus::GoalCompleted) => GameStatus::Done,
+            (true, _) => GameStatus::AllChecks,
+            (false, TrackerGameStatus::GoalCompleted) => GameStatus::Goal,
+            _ => return false,
+        };
+
+        true
     }
 }
 
@@ -175,7 +175,7 @@ impl<D> AppState<D> {
                         last_activity: game.last_activity.map(|d| now - d),
                         discord_username: None,
                         discord_ping: PingPreference::Never,
-                        status: GameStatus::Unblocked,
+                        status: GameStatus::Unknown,
                         last_checked: None,
                         notes: String::new(),
                     };

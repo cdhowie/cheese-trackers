@@ -122,6 +122,8 @@ pub enum GameStatus {
     Open,
     Released,
     Glitched,
+    Unknown,
+    Goal,
 }
 
 implement_into_simpleexpr! {
@@ -133,6 +135,8 @@ implement_into_simpleexpr! {
         Open,
         Released,
         Glitched,
+        Unknown,
+        Goal,
     }
 }
 

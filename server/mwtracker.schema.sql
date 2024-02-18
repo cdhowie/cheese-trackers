@@ -305,3 +305,8 @@ ALTER TABLE public.ap_game
 
 ALTER TABLE public.ap_hint
     ALTER COLUMN receiver_game_id DROP NOT NULL;
+
+ALTER TYPE public.game_status
+    ADD VALUE 'unknown' AFTER 'glitched';
+ALTER TYPE public.game_status
+    ADD VALUE 'goal' AFTER 'unknown';

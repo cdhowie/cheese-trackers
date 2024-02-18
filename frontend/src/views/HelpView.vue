@@ -191,6 +191,10 @@ import ShouldPing from '@/components/ShouldPing.vue';
                 has sent all of its checks but its goal is not yet complete.
             </li>
             <li>
+                <span class="fw-bold text-warning">Goal</span>: This slot's goal
+                is complete but it has not sent all of its checks.
+            </li>
+            <li>
                 <span class="fw-bold text-success">Done</span>: This slot
                 has sent all of its checks and its goal is complete.
             </li>
@@ -219,12 +223,20 @@ import ShouldPing from '@/components/ShouldPing.vue';
                 because a generation issue is preventing progress or completion
                 of the slot.
             </li>
+            <li>
+                <span class="fw-bold text-muted">Unknown</span>: The slot's
+                status is not known. This is the default status for slots when
+                one of the automatically-set statuses does not apply. Typically,
+                this status will be used by slots where the slot owner is not
+                updating the tracker.
+            </li>
         </ul>
         <p>
-            If a slot has completed all of its checks and is not currently
-            marked "released" or "glitched," then its status will be changed to
-            "done" if the slot's goal has been completed, or "all checks" if the
-            slot's goal has not been completed.
+            If a slot is not currently marked "released" or "glitched," then its
+            status may be automatically changed to "all checks," "goal," or
+            "done" when the Archipelago tracker indicates that the slot meets
+            the relevant criteria. You should never have to manually set these
+            statuses.
         </p>
         <h2>Hints and Notes</h2>
         <p>
