@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import router from '../router';
 
-const trackerLinkRegexp = /^https:\/\/archipelago\.gg\/tracker\/(.+)$/;
+const trackerLinkRegexp = /^https:\/\/archipelago\.gg\/tracker\/([^/]+)/;
 
 const trackerLink = ref('');
 
