@@ -120,10 +120,6 @@ function lastCheckedClass(game) {
 }
 
 function displayLastChecked(game) {
-    if (isGameCompleted(game)) {
-        return '';
-    }
-
     const days = gameDaysSinceLastChecked(game);
 
     return days === undefined ? 'Never' : days.toFixed(1);
@@ -570,7 +566,7 @@ loadTracker();
                             </ul>
                         </td>
                         <td class="text-end" :class="lastCheckedClass(game)">
-                            <span :title="isGameCompleted(game) ? '' : displayDateTime(gameLastUpdated(game))">{{
+                            <span :title="displayDateTime(gameLastUpdated(game))">{{
                                 displayLastChecked(game) }}</span>
                         </td>
                         <td class="text-start">
