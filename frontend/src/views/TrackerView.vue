@@ -219,27 +219,45 @@ function displayDateTime(d) {
 }
 
 const sentHints = ref(false);
+const showFoundHints = ref(false);
 
 const hintsByGame = computed(() => {
     return sentHints.value ? hintsByReceiver.value : hintsByFinder.value;
 })
 
-function hintIsFound(hint) {
-    return hint.found || (
-        // Also consider a hint "found" (no longer relevant) if the game that
-        // would receive the item is done (all checks + goal), as this slot no
-        // longer has a use for any items.
-        hint.receiver_game_id !== undefined &&
-        gameById.value[hint.receiver_game_id].status === 'done'
-    );
+function hintStatus(hint) {
+    return hint.found ? 'found' :
+        (
+            hint.receiver_game_id !== undefined &&
+            gameById.value[hint.receiver_game_id].status === 'done'
+        ) ? 'useless' :
+            'notfound';
 }
 
-function unfoundHintsByGame(id) {
-    return (hintsByGame.value?.[id] || []).filter(h => !hintIsFound(h));
+const HINT_STATUS_UI = {
+    found: {
+        iconclasses: ['bi-check-circle-fill', 'text-success'],
+        icontooltip: 'Found',
+        rowclasses: ['bg-success-subtle'],
+    },
+    notfound: {
+        iconclasses: ['bi-x-circle-fill', 'text-danger'],
+        icontooltip: 'Not found',
+        rowclasses: ['bg-danger-subtle'],
+    },
+    useless: {
+        iconclasses: ['bi-x-circle-fill', 'text-info'],
+        icontooltip: 'Not found, receiving slot is done',
+        rowclasses: ['bg-info-subtle'],
+    },
+}
+
+function displayHintsByGame(id) {
+    return (hintsByGame.value?.[id] || []).filter(h => showFoundHints.value || hintStatus(h) === 'notfound');
 }
 
 function countUnfoundReceivedHints(game) {
-    return (hintsByFinder.value[game.id] || []).filter(h => !hintIsFound(h)).length;
+    return (hintsByFinder.value[game.id] || []).filter(h => hintStatus(h) === 'notfound').length;
 }
 
 function patchGame(game) {
@@ -608,17 +626,21 @@ loadTracker();
                                                 Sent hints
                                             </button>
                                         </div>
-                                        <button class="btn btn-sm btn-outline-light ms-2"
-                                            :disabled="unfoundHintsByGame(game.id).length === 0"
-                                            @click="copyHints(unfoundHintsByGame(game.id))">Copy all</button>
+                                        <button class="btn btn-sm ms-2 btn-outline-light"
+                                            :class="{ active: showFoundHints }" @click="showFoundHints = !showFoundHints">
+                                            Include found and useless hints
+                                        </button>
+                                        <button class=" btn btn-sm btn-outline-light ms-2"
+                                            :disabled="displayHintsByGame(game.id).length === 0"
+                                            @click="copyHints(displayHintsByGame(game.id))">Copy all</button>
                                     </div>
-                                    <div v-if="unfoundHintsByGame(game.id).length === 0" class="text-muted">
+                                    <div v-if="displayHintsByGame(game.id).length === 0" class="text-muted">
                                         There are no unfound hints right now.
                                     </div>
                                     <div v-else class="row justify-content-center">
                                         <div class="col-auto">
                                             <table class="table table-responsive">
-                                                <tr v-for="hint in unfoundHintsByGame(game.id)">
+                                                <tr v-for="hint in displayHintsByGame(game.id)">
                                                     <td class="text-end pe-0">
                                                         <template v-if="!sentHints">
                                                             <span class="bg-transparent p-0"
@@ -638,8 +660,10 @@ loadTracker();
                                                         <span class="text-info bg-transparent p-0">{{ hint.location
                                                         }}</span>
                                                         <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance
-                                                        }})</template> <a href="#"
-                                                            class="bg-transparent p-0 mw-copy-hint"
+                                                        }})</template> <i v-if="showFoundHints" class="bg-transparent"
+                                                            :class="HINT_STATUS_UI[hintStatus(hint)].iconclasses"
+                                                            :title="HINT_STATUS_UI[hintStatus(hint)].icontooltip"></i> <a
+                                                            href="#" class="bg-transparent p-0 mw-copy-hint"
                                                             @click.prevent="clipboardCopy(hintToString(hint))"
                                                             title="Copy to clipboard">&#x1F4C4;</a>
                                                     </td>
