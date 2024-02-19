@@ -9,3 +9,11 @@ export function percent(num, den) {
 
     return 0;
 }
+
+export function synchronize(target, source) {
+    for (const key of Object.keys(target)) {
+        delete target[key];
+    }
+
+    Object.assign(target, source);
+}

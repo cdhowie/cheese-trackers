@@ -6,7 +6,7 @@ import { settings } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker } from '@/api';
 import { gameStatus, pingPreference } from '@/types';
-import { percent } from '@/util';
+import { percent, synchronize } from '@/util';
 import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
 
@@ -289,7 +289,7 @@ async function updateGame(game, mutator) {
         )
         .then(savedGame => {
             if (savedGame) {
-                Object.assign(game, savedGame);
+                synchronize(game, savedGame);
                 patchGame(game);
             }
             loading.value = false;
