@@ -177,6 +177,10 @@ function sortByName(g) {
     return g.name.toLowerCase();
 }
 
+function sortByGame(g) {
+    return g.game.toLowerCase();
+}
+
 function sortByActivity(g) {
     const days = gameDaysSinceLastChecked(g);
     return days === undefined ? Number.POSITIVE_INFINITY : days;
@@ -494,7 +498,11 @@ loadTracker();
                             </ul>
                         </div>
                     </th>
-                    <th>Game</th>
+                    <th class="sortable-column" @click="setSort(sortByGame, false)">
+                        Game
+                        <i v-if="activeSort[0] === sortByGame"
+                            :class="{ 'bi-sort-alpha-down': !activeSort[1], 'bi-sort-alpha-up': activeSort[1] }"></i>
+                    </th>
                     <th>
                         <div class="dropdown">
                             <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown"
