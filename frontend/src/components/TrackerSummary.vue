@@ -11,7 +11,7 @@ const summaryLabels = {
     discord_username: 'Player',
     game: 'Game',
 }
-const STATUSES = ['unblocked', 'bk', 'all_checks', 'done', 'open'];
+const STATUSES = ['unknown', 'unblocked', 'bk', 'open', 'all_checks', 'goal', 'done'];
 
 const summaryData = computed(() => {
     return mapValues(
