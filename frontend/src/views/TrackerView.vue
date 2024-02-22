@@ -495,7 +495,7 @@ loadTracker();
                                     <button class="dropdown-item"
                                         :class="{ active: playerFilter === PLAYER_FILTER_UNOWNED }"
                                         @click="playerFilter = PLAYER_FILTER_UNOWNED">
-                                        Unset
+                                        Unclaimed
                                     </button>
                                 </li>
                                 <template v-if="settings.auth?.discordUsername">
@@ -611,7 +611,7 @@ loadTracker();
                         <td>
                             <UsernameDisplay v-if="game.discord_username?.length" :user="getClaimingUser(game)">
                             </UsernameDisplay>
-                            <span v-else class="text-muted">(Unset)</span>
+                            <span v-else class="text-muted">(Unclaimed)</span>
                         </td>
                         <td>{{ game.game }}</td>
                         <td>
