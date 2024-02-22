@@ -411,9 +411,12 @@ const editingTitle = ref(false);
 const editTitleInput = ref(undefined);
 
 function editTitle() {
-    editedTitle.value = trackerData.value.title || '';
-    editingTitle.value = true;
-    setTimeout(() => { editTitleInput.value?.focus(); });
+    // Editing the title requires authentication.
+    if (settings.value.auth?.token) {
+        editedTitle.value = trackerData.value.title || '';
+        editingTitle.value = true;
+        setTimeout(() => { editTitleInput.value?.focus(); });
+    }
 }
 
 function saveTitle() {
