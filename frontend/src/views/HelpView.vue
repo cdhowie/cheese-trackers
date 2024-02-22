@@ -380,10 +380,10 @@ import ShouldPing from '@/components/ShouldPing.vue';
                 BK slots.
             </li>
             <li>
-                <b>By game</b> is far simpler and shows how many slots are in
+                <b>By slot</b> is far simpler and shows how many slots are in
                 which status. While this is interesting data, note that
                 interpreting this in terms of "how much is left to do in the
-                multiworld" can cause games with very few checks (such as
+                multiworld" can cause slots with very few checks (such as
                 Clique) to skew your interpretation. (This is why the
                 "progression" bar exists.)
             </li>
