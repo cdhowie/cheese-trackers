@@ -3,6 +3,7 @@ import OpenTrackerView from '@/views/OpenTrackerView.vue';
 import TrackerView from '@/views/TrackerView.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import HelpView from '@/views/HelpView.vue';
+import AuthComplete from '@/views/AuthComplete.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -27,6 +28,12 @@ const router = createRouter({
       path: '/help',
       name: 'help',
       component: HelpView,
+    },
+
+    {
+      path: '/auth/complete',
+      name: 'authcomplete',
+      component: AuthComplete,
     },
   ]
 });

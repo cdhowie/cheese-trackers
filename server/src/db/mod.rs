@@ -154,6 +154,27 @@ pub trait DataAccess {
     where
         's: 'f,
         'v: 'f;
+
+    /// Gets a [`CtUser`] by its id.
+    fn get_ct_user_by_id(&mut self, id: i32) -> BoxFuture<'_, sqlx::Result<Option<CtUser>>>;
+
+    /// Gets a [`CtUser`] by its `discord_user_id` field.
+    fn get_ct_user_by_discord_user_id(
+        &mut self,
+        discord_user_id: i64,
+    ) -> BoxFuture<'_, sqlx::Result<Option<CtUser>>>;
+
+    /// Creates one or more new [`CtUser`]s in the database.
+    ///
+    /// The `id` field of the value is ignored.  It will be populated with the
+    /// real IDs in the returned values.
+    fn create_ct_users<'s, 'v, 'f>(
+        &'s mut self,
+        users: impl IntoIterator<Item = CtUser> + Send + 'v,
+    ) -> BoxStream<'f, sqlx::Result<CtUser>>
+    where
+        's: 'f,
+        'v: 'f;
 }
 
 impl DataAccessProvider for PgPool {
@@ -453,6 +474,32 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         'v: 'f,
     {
         pg_insert(self.0.as_mut(), hints).boxed()
+    }
+
+    fn get_ct_user_by_id(&mut self, id: i32) -> BoxFuture<'_, sqlx::Result<Option<CtUser>>> {
+        pg_select_one(self.0.as_mut(), Expr::col(CtUserIden::Id).eq(id)).boxed()
+    }
+
+    fn get_ct_user_by_discord_user_id(
+        &mut self,
+        discord_user_id: i64,
+    ) -> BoxFuture<'_, sqlx::Result<Option<CtUser>>> {
+        pg_select_one(
+            self.0.as_mut(),
+            Expr::col(CtUserIden::DiscordUserId).eq(discord_user_id),
+        )
+        .boxed()
+    }
+
+    fn create_ct_users<'s, 'v, 'f>(
+        &'s mut self,
+        users: impl IntoIterator<Item = CtUser> + Send + 'v,
+    ) -> BoxStream<'f, sqlx::Result<CtUser>>
+    where
+        's: 'f,
+        'v: 'f,
+    {
+        pg_insert(self.0.as_mut(), users).boxed()
     }
 }
 

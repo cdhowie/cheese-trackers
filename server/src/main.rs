@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use arrayvec::ArrayVec;
+use auth::token::AuthenticatedUser;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -10,7 +11,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use db::{
     model::{
-        ApGame, ApGameIden, ApHint, ApTracker, ApTrackerIden, GameStatus, PingPreference,
+        ApGame, ApGameIden, ApHint, ApTracker, ApTrackerIden, CtUser, GameStatus, PingPreference,
         TrackerGameStatus,
     },
     DataAccess, DataAccessProvider, Transactable, Transaction,
@@ -19,6 +20,9 @@ use futures::{
     future::{BoxFuture, Shared},
     FutureExt, TryFutureExt, TryStreamExt,
 };
+use jsonwebtoken::Header;
+use oauth2::TokenResponse;
+use state::{GetDataAccessProvider, GetTokenProcessor};
 use tokio::{net::TcpListener, signal::unix::SignalKind, sync::RwLock};
 use tower_http::{
     cors::CorsLayer,
@@ -28,10 +32,12 @@ use url::Url;
 
 use crate::logging::UnexpectedResultExt;
 
+mod auth;
 mod conf;
 mod db;
 mod logging;
 mod signal;
+mod state;
 mod tracker;
 
 #[derive(Debug, thiserror::Error)]
@@ -82,6 +88,23 @@ struct AppState<D> {
 
     inflight_tracker_updates: RwLock<HashMap<String, Shared<InflightTrackerUpdateFuture>>>,
     tracker_update_interval: chrono::Duration,
+
+    auth_client: auth::discord::AuthClient,
+    token_processor: auth::token::TokenProcessor,
+}
+
+impl<D> GetTokenProcessor for AppState<D> {
+    fn get_token_processor(&self) -> &auth::token::TokenProcessor {
+        &self.token_processor
+    }
+}
+
+impl<D: DataAccessProvider> GetDataAccessProvider for AppState<D> {
+    type DataProvider = D;
+
+    fn get_data_provider(&self) -> &Self::DataProvider {
+        &self.data_provider
+    }
 }
 
 fn update_game_status(game: &mut ApGame) -> bool {
@@ -114,6 +137,18 @@ impl<D> AppState<D> {
             },
             inflight_tracker_updates: RwLock::default(),
             tracker_update_interval: config.tracker_update_interval,
+            auth_client: auth::discord::AuthClient::new(
+                config.discord.client_id,
+                config.discord.client_secret,
+                &config.public_url,
+                config.discord.token_cipher,
+            ),
+            token_processor: auth::token::TokenProcessor::new(
+                Header::new(config.token.algorithm),
+                &config.token.secret,
+                config.token.issuer,
+                config.token.validity_duration,
+            ),
         }
     }
 
@@ -178,6 +213,7 @@ impl<D> AppState<D> {
                         status: GameStatus::Unknown,
                         last_checked: None,
                         notes: String::new(),
+                        claimed_by_ct_user_id: None,
                     };
 
                     update_game_status(&mut game);
@@ -483,6 +519,11 @@ struct UpdateTrackerRequest {
 
 async fn update_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
+
+    // Not used for now but requires that the user at least be logged in.  Will
+    // be used later for an audit trail.
+    AuthenticatedUser(_): AuthenticatedUser,
+
     Path(tracker_id): Path<String>,
     Json(tracker_update): Json<UpdateTrackerRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
@@ -515,6 +556,7 @@ where
 
 #[derive(Debug, serde::Deserialize)]
 struct UpdateGameRequest {
+    pub claimed_by_ct_user_id: Option<i32>,
     pub discord_username: Option<String>,
     pub discord_ping: PingPreference,
     pub status: GameStatus,
@@ -524,6 +566,7 @@ struct UpdateGameRequest {
 
 async fn update_game<D>(
     State(state): State<Arc<AppState<D>>>,
+    AuthenticatedUser(user): AuthenticatedUser,
     Path((tracker_id, game_id)): Path<(String, i32)>,
     Json(game_update): Json<UpdateGameRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
@@ -553,7 +596,35 @@ where
         return Err(StatusCode::NOT_FOUND);
     }
 
-    game.discord_username = game_update.discord_username;
+    // Reject new unauthenticated claims.
+    if game.discord_username.is_none()
+        && game_update.claimed_by_ct_user_id.is_none()
+        && game_update.discord_username.is_some()
+    {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    // Reject new authenticated claims for a different user ID.
+    if game.claimed_by_ct_user_id.is_none()
+        && game_update
+            .claimed_by_ct_user_id
+            .is_some_and(|id| id != user.id)
+    {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    // Update the username.
+    game.discord_username = match game_update.claimed_by_ct_user_id {
+        // If already claimed by the same user, this should be a no-op.
+        // Otherwise, sets the display name.
+        Some(id) if id == user.id => Some(user.discord_username),
+        // No-op.
+        Some(_) => game.discord_username,
+        // Clear, which should only be a change when disclaiming a slot.
+        None => None,
+    };
+
+    game.claimed_by_ct_user_id = game_update.claimed_by_ct_user_id;
     game.discord_ping = game_update.discord_ping;
     game.status = game_update.status;
     game.last_checked = game_update.last_checked;
@@ -564,6 +635,7 @@ where
     tx.update_ap_game(
         game.clone(),
         &[
+            ApGameIden::ClaimedByCtUserId,
             ApGameIden::DiscordUsername,
             ApGameIden::DiscordPing,
             ApGameIden::Status,
@@ -577,6 +649,117 @@ where
     tx.commit().await.unexpected()?;
 
     Ok(Json(game))
+}
+
+async fn begin_discord_auth<D>(
+    State(state): State<Arc<AppState<D>>>,
+) -> Result<impl IntoResponse, StatusCode> {
+    state.auth_client.begin().unexpected().map(Json)
+}
+
+#[derive(serde::Deserialize)]
+struct CompleteAuthRequest {
+    pub code: String,
+    pub state: String,
+    pub continuation_token: String,
+}
+
+async fn complete_discord_auth<D>(
+    State(state): State<Arc<AppState<D>>>,
+    Json(request): Json<CompleteAuthRequest>,
+) -> Result<impl IntoResponse, StatusCode>
+where
+    D: DataAccessProvider + Send + Sync + 'static,
+{
+    #[derive(Debug, thiserror::Error)]
+    #[error("missing refresh token")]
+    struct MissingRefreshTokenError;
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("failed to insert Discord user {0} but user doesn't exist")]
+    struct MissingUserError(u64);
+
+    #[derive(serde::Serialize)]
+    struct Response {
+        token: String,
+        user_id: i32,
+        discord_username: String,
+    }
+
+    let token = state
+        .auth_client
+        .complete(request.code, &request.state, &request.continuation_token)
+        .await
+        .unexpected()?;
+
+    let expires_at = Utc::now()
+        + token
+            .expires_in()
+            .and_then(|d| chrono::Duration::from_std(d).ok())
+            .unwrap_or_else(|| chrono::Duration::days(1));
+
+    let user_info = serenity::http::Http::new(&format!("Bearer {}", token.access_token().secret()))
+        .get_current_user()
+        .await
+        .unexpected()?;
+
+    // This may overflow, which is fine.  PostgreSQL doesn't support unsigned
+    // types; the alternative is NUMERIC or TEXT.
+    //
+    // The domains of i64 and u64 are the same size, and the cast is reversible,
+    // so we can cast back to u64 later to retrieve the true user ID.
+    let discord_user_id = user_info.id.get() as i64;
+
+    let mut db = state
+        .data_provider
+        .create_data_access()
+        .await
+        .unexpected()?;
+
+    // Try to insert the user.  If the user already exists, we'll fetch it
+    // below.
+    let ct_user = match db
+        .create_ct_users([CtUser {
+            id: 0,
+            discord_access_token: token.access_token().secret().to_owned(),
+            discord_access_token_expires_at: expires_at,
+            discord_refresh_token: token
+                .refresh_token()
+                .ok_or(MissingRefreshTokenError)
+                .unexpected()?
+                .secret()
+                .to_owned(),
+            discord_user_id,
+            discord_username: user_info.name.clone(),
+        }])
+        .try_next()
+        .await
+    {
+        Err(e)
+            if e.as_database_error()
+                .is_some_and(|dbe| dbe.is_unique_violation()) =>
+        {
+            Ok(None)
+        }
+        v => v,
+    }
+    .unexpected()?;
+
+    let ct_user = match ct_user {
+        Some(u) => u,
+        None => db
+            .get_ct_user_by_discord_user_id(discord_user_id)
+            .await
+            .unexpected()?
+            .ok_or(MissingUserError(user_info.id.get()))
+            .unexpected()?,
+    };
+
+    Ok(Json(Response {
+        token: state.token_processor.encode(ct_user.id).unexpected()?,
+        user_id: ct_user.id,
+        discord_username: ct_user.discord_username,
+    }))
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -594,6 +777,8 @@ where
     D: DataAccessProvider + Send + Sync + 'static,
 {
     axum::Router::new()
+        .route("/auth/begin", axum::routing::get(begin_discord_auth))
+        .route("/auth/complete", axum::routing::post(complete_discord_auth))
         .route("/tracker/:tracker_id", axum::routing::get(get_tracker))
         .route("/tracker/:tracker_id", axum::routing::put(update_tracker))
         .route(

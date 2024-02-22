@@ -19,9 +19,9 @@ import ShouldPing from '@/components/ShouldPing.vue';
             Sheets in particular.
         </p>
         <p>
-            The very first thing you should do is head over to the
-            <router-link to="/settings">settings</router-link> and put in your
-            Discord username. You must do this before you can claim any slots.
+            The very first thing you should do is log in with Discord using the
+            button in the top right. You must do this before you can claim any
+            slots.
         </p>
         <h2>Tracker Title</h2>
         <p>

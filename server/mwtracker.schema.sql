@@ -310,3 +310,27 @@ ALTER TYPE public.game_status
     ADD VALUE 'unknown' AFTER 'glitched';
 ALTER TYPE public.game_status
     ADD VALUE 'goal' AFTER 'unknown';
+
+CREATE TABLE public.ct_user
+(
+    id serial NOT NULL,
+    discord_access_token text NOT NULL,
+    discord_access_token_expires_at timestamp with time zone NOT NULL,
+    discord_refresh_token text NOT NULL,
+    discord_username text NOT NULL,
+    discord_user_id bigint NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT ct_user_discord_user_id_idx UNIQUE (discord_user_id)
+);
+
+ALTER TABLE public.ap_game
+    ADD COLUMN claimed_by_ct_user_id integer;
+
+ALTER TABLE public.ap_game
+    ADD CONSTRAINT ap_game_claimed_by_ct_user_id_fkey FOREIGN KEY (claimed_by_ct_user_id)
+    REFERENCES public.ct_user (id) MATCH SIMPLE
+    ON UPDATE CASCADE
+    ON DELETE SET NULL;
+
+CREATE INDEX fki_ap_game_claimed_by_ct_user_id_fkey
+    ON public.ap_game(claimed_by_ct_user_id);

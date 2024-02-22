@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter, reduce, join, includes } from 'lodash-es';
+import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter, reduce, join, includes, pick, uniqBy, isEqual } from 'lodash-es';
 import moment from 'moment';
 import { settings } from '@/settings';
 import { now } from '@/time';
@@ -9,6 +9,7 @@ import { gameStatus, pingPreference } from '@/types';
 import { percent, synchronize } from '@/util';
 import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
+import UsernameDisplay from '@/components/UsernameDisplay.vue';
 
 const props = defineProps(['aptrackerid']);
 
@@ -55,26 +56,44 @@ function hintsClass(game) {
     }
 }
 
+function getClaimingUser(game) {
+    if (game.claimed_by_ct_user_id !== undefined || game.discord_username?.length) {
+        return {
+            id: game.claimed_by_ct_user_id,
+            discordUsername: game.discord_username,
+        };
+    }
+
+    return undefined;
+}
+
 const players = computed(() =>
     orderBy(
-        uniq(
-            filter(
-                map(trackerData.value.games, 'discord_username'),
-                i => i?.length
-            )
+        uniqBy(
+            filter(map(trackerData.value.games, getClaimingUser)),
+            u => u.id !== undefined ? u.id : u.discordUsername
         ),
-        i => i.toLowerCase()
+        i => i.discordUsername.toLowerCase()
     )
 );
 
 const playersExceptSelf = computed(() =>
-    filter(players.value, p => p !== settings.value.discordUsername)
+    settings.value.auth?.token ?
+        filter(players.value, p => p.id !== settings.value.auth.userId) :
+        players.value
 );
 
 const PLAYER_FILTER_ALL = Symbol();
 const PLAYER_FILTER_UNOWNED = Symbol();
+const PLAYER_FILTER_MINE = Symbol();
 
 const playerFilter = ref(PLAYER_FILTER_ALL);
+
+watch(settings, () => {
+    if (!settings.auth?.discordUsername && playerFilter.value === PLAYER_FILTER_MINE) {
+        playerFilter.value = PLAYER_FILTER_ALL;
+    }
+});
 
 const lastCheckedThresholds = [
     { days: 2, color: 'danger' },
@@ -163,14 +182,17 @@ const statusFilterActive = computed(() =>
 );
 
 const filteredGames = computed(() =>
-    filter(trackerData.value?.games, g =>
-        (
+    filter(trackerData.value?.games, g => {
+        const user = getClaimingUser(g);
+
+        return (
             playerFilter.value === PLAYER_FILTER_ALL ? true :
-                playerFilter.value === PLAYER_FILTER_UNOWNED ? !g.discord_username?.length :
-                    playerFilter.value === g.discord_username
+                playerFilter.value === PLAYER_FILTER_UNOWNED ? !user :
+                    playerFilter.value === PLAYER_FILTER_MINE ? user?.id === settings.value.auth?.userId :
+                        isEqual(playerFilter.value, user)
         ) &&
-        statusFilter.value[g.status]
-    )
+            statusFilter.value[g.status]
+    })
 );
 
 function sortByName(g) {
@@ -320,13 +342,14 @@ async function updateGame(game, mutator) {
 
 function claimGame(game) {
     updateGame(game, g => {
-        g.discord_username = settings.value.discordUsername;
+        g.claimed_by_ct_user_id = settings.value.auth.userId;
         g.discord_ping = settings.value.defaultPingPreference;
     });
 }
 
 function unclaimGame(game) {
     updateGame(game, g => {
+        delete g.claimed_by_ct_user_id;
         delete g.discord_username;
         g.discord_ping = 'never';
     });
@@ -435,9 +458,8 @@ loadTracker();
     <div v-if="error && !trackerData" class="text-center text-danger">Failed to load tracker data ({{ error.message }})
     </div>
     <template v-if="trackerData">
-        <div v-if="!settings.discordUsername?.length" class="alert alert-info text-center">
-            You have not set your Discord username in the <router-link to="/settings">settings</router-link>. You will be
-            unable to claim slots until you do this.
+        <div v-if="!settings.auth?.token" class="alert alert-info text-center">
+            You will be unable to claim slots until you sign in.
         </div>
         <h2 v-if="!editingTitle" @click="editTitle" class="text-center mb-4"
             :class="{ 'text-muted': !trackerData.title.length, 'fst-italic': !trackerData.title.length }">{{
@@ -476,14 +498,13 @@ loadTracker();
                                         Unset
                                     </button>
                                 </li>
-                                <template v-if="settings.discordUsername?.length">
+                                <template v-if="settings.auth?.discordUsername">
                                     <li>
                                         <hr class="dropdown-divider">
                                     </li>
-                                    <button class="dropdown-item"
-                                        :class="{ active: playerFilter === settings.discordUsername }"
-                                        @click="playerFilter = settings.discordUsername">
-                                        {{ settings.discordUsername }}
+                                    <button class="dropdown-item" :class="{ active: playerFilter === PLAYER_FILTER_MINE }"
+                                        @click="playerFilter = PLAYER_FILTER_MINE">
+                                        {{ settings.auth.discordUsername }}
                                     </button>
                                 </template>
                                 <template v-if="playersExceptSelf.length">
@@ -492,7 +513,7 @@ loadTracker();
                                     </li>
                                     <button v-for="player in playersExceptSelf" class="dropdown-item"
                                         :class="{ active: playerFilter === player }" @click="playerFilter = player">
-                                        {{ player }}
+                                        <UsernameDisplay :user="player"></UsernameDisplay>
                                     </button>
                                 </template>
                             </ul>
@@ -537,6 +558,11 @@ loadTracker();
                 </tr>
             </thead>
             <tbody>
+                <tr v-if="sortedAndFilteredGames.length === 0">
+                    <td colspan="10" class="text-center text-muted">
+                        No slots match the selected filters.
+                    </td>
+                </tr>
                 <template v-for="game in sortedAndFilteredGames">
                     <tr>
                         <td>
@@ -560,30 +586,32 @@ loadTracker();
                             </ul>
                         </td>
                         <td>
-                            <button v-if="settings.discordUsername && !game.discord_username?.length"
-                                class="btn btn-sm btn-outline-secondary" :disabled="loading"
-                                @click="claimGame(game)">Claim</button>
+                            <template v-if="settings.auth?.token">
+                                <button v-if="!game.discord_username?.length" class="btn btn-sm btn-outline-secondary"
+                                    :disabled="loading" @click="claimGame(game)">Claim</button>
 
-                            <template
-                                v-if="settings.discordUsername && game.discord_username?.length && game.discord_username !== settings.discordUsername">
-                                <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
-                                    data-bs-toggle="dropdown">Claim</button>
-                                <div class="dropdown-menu text-warning p-3">
-                                    <span class="text-warning me-2 d-inline-block align-middle">Another user has claimed
-                                        this
-                                        slot.</span>
-                                    <button class="btn btn-sm btn-warning" @click="claimGame(game)">Claim anyway</button>
-                                </div>
+                                <template
+                                    v-if="game.discord_username?.length && game.claimed_by_ct_user_id !== settings.auth.userId">
+                                    <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
+                                        data-bs-toggle="dropdown">Claim</button>
+                                    <div class="dropdown-menu text-warning p-3">
+                                        <span class="text-warning me-2 d-inline-block align-middle">Another user has claimed
+                                            this
+                                            slot.</span>
+                                        <button class="btn btn-sm btn-warning" @click="claimGame(game)">Claim
+                                            anyway</button>
+                                    </div>
+                                </template>
+
+                                <button v-if="game.claimed_by_ct_user_id === settings.auth.userId"
+                                    class="btn btn-sm btn-outline-warning" :disabled="loading"
+                                    @click="unclaimGame(game)">Release</button>
                             </template>
-
-                            <button v-if="settings.discordUsername && game.discord_username === settings.discordUsername"
-                                class="btn btn-sm btn-outline-warning" :disabled="loading"
-                                @click="unclaimGame(game)">Release</button>
                         </td>
                         <td>
-                            <span :class="{ 'text-muted': !game.discord_username?.length }">
-                                {{ game.discord_username?.length ? game.discord_username : '(Unset)' }}
-                            </span>
+                            <UsernameDisplay v-if="game.discord_username?.length" :user="getClaimingUser(game)">
+                            </UsernameDisplay>
+                            <span v-else class="text-muted">(Unset)</span>
                         </td>
                         <td>{{ game.game }}</td>
                         <td>

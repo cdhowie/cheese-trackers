@@ -4,9 +4,17 @@ import Joi from 'joi';
 const SETTINGS_KEY = 'settings';
 
 const SETTINGS_SCHEMA = Joi.object().keys({
-    discordUsername: Joi.string().empty(""),
     defaultPingPreference: Joi.string().default("never"),
-});
+
+    auth: Joi.object().keys({
+        token: Joi.string(),
+        userId: Joi.number(),
+        discordUsername: Joi.string(),
+        discordSigninContinuationToken: Joi.string(),
+    })
+        .default({})
+        .and('token', 'userId', 'discordUsername'),
+}).prefs({ stripUnknown: true });
 
 export const settings = ref(load());
 
@@ -14,7 +22,7 @@ function fallback() {
     return SETTINGS_SCHEMA.validate({}).value;
 }
 
-function load() {
+export function load() {
     try {
         return SETTINGS_SCHEMA.validate(
             JSON.parse(localStorage.getItem(SETTINGS_KEY))

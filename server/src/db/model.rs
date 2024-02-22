@@ -210,6 +210,8 @@ db_struct! {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub last_checked: Option<DateTime<Utc>>,
         pub notes: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub claimed_by_ct_user_id: Option<i32>,
     }
 }
 
@@ -224,5 +226,17 @@ db_struct! {
         pub location: String,
         pub entrance: String,
         pub found: bool,
+    }
+}
+
+db_struct! {
+    #[derive(Clone)]
+    pub struct CtUser {
+        pub id: i32,
+        pub discord_access_token: String,
+        pub discord_access_token_expires_at: DateTime<Utc>,
+        pub discord_refresh_token: String,
+        pub discord_username: String,
+        pub discord_user_id: i64,
     }
 }
