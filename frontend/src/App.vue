@@ -1,9 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, ref } from 'vue';
-import { RouterLink, RouterView } from 'vue-router';
+import { RouterLink, RouterView, useRoute } from 'vue-router';
 import { getSettings, authBegin } from '@/api.js';
 import { BUILD_VERSION } from './build';
 import * as settings from '@/settings';
+
+const route = useRoute();
 
 const localSettings = settings.settings;
 const serverSettings = ref({});
@@ -33,7 +35,10 @@ async function login() {
     const { data } = await authBegin();
 
     const s = settings.load();
-    s.auth = { discordSigninContinuationToken: data.continuation_token };
+    s.auth = {
+        discordSigninContinuationToken: data.continuation_token,
+        returnTo: route.path,
+    };
     settings.save(s);
 
     document.location = data.auth_url;

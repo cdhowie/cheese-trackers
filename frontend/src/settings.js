@@ -11,6 +11,7 @@ const SETTINGS_SCHEMA = Joi.object().keys({
         userId: Joi.number(),
         discordUsername: Joi.string(),
         discordSigninContinuationToken: Joi.string(),
+        returnTo: Joi.string(),
     })
         .default({})
         .and('token', 'userId', 'discordUsername'),

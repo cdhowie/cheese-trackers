@@ -29,6 +29,8 @@ onMounted(async () => {
     try {
         const { data } = await authComplete({ code, state, continuation_token });
 
+        const returnTo = ls.auth?.returnTo;
+
         const s = settings.load();
         s.auth = {
             token: data.token,
@@ -37,7 +39,7 @@ onMounted(async () => {
         };
         settings.save(s);
 
-        router.push('/');
+        router.push(returnTo || '/');
     } catch (e) {
         error.value = `${e}`;
     }
