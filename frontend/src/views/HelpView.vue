@@ -67,13 +67,13 @@ import ShouldPing from '@/components/ShouldPing.vue';
                     <b>Owner</b>: The Discord username of the player who has
                     claimed this slot. If this is not your slot, a "claim"
                     button will appear, which can be used to claim the slot for
-                    yourself. If this is your slot, a "release" button will
-                    appear instead, allowing you to release the slot for someone
-                    else to claim. It goes without saying that you should not
-                    claim a slot owned by another player without consulting them
-                    or the organizer of the multiworld first. (An additional
-                    popup confirmation will appear when you attempt to claim
-                    someone else's slot to help prevent accidents.)
+                    yourself. If this is your slot, a "disclaim" button will
+                    appear instead, allowing you to release your claim on the
+                    slot. It goes without saying that you should not claim a
+                    slot owned by another player without consulting them or the
+                    organizer of the multiworld first. (An additional popup
+                    confirmation will appear when you attempt to claim someone
+                    else's slot to help prevent accidents.)
                 </p>
                 <p>
                     Clicking the title of this column will allow you to filter

@@ -605,7 +605,7 @@ loadTracker();
 
                                 <button v-if="game.claimed_by_ct_user_id === settings.auth.userId"
                                     class="btn btn-sm btn-outline-warning" :disabled="loading"
-                                    @click="unclaimGame(game)">Release</button>
+                                    @click="unclaimGame(game)">Disclaim</button>
                             </template>
                         </td>
                         <td>
