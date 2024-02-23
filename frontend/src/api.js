@@ -23,7 +23,7 @@ api_http.interceptors.response.use(
             settings.save(s);
         }
 
-        return r;
+        throw r;
     }
 );
 
