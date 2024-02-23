@@ -175,6 +175,18 @@ pub trait DataAccess {
     where
         's: 'f,
         'v: 'f;
+
+    /// Creates one or more new [`JsError`]s in the database.
+    ///
+    /// The `id` field of the value is ignored.  It will be populated with the
+    /// real IDs in the returned values.
+    fn create_js_errors<'s, 'v, 'f>(
+        &'s mut self,
+        errors: impl IntoIterator<Item = JsError> + Send + 'v,
+    ) -> BoxStream<'f, sqlx::Result<JsError>>
+    where
+        's: 'f,
+        'v: 'f;
 }
 
 impl DataAccessProvider for PgPool {
@@ -500,6 +512,17 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         'v: 'f,
     {
         pg_insert(self.0.as_mut(), users).boxed()
+    }
+
+    fn create_js_errors<'s, 'v, 'f>(
+        &'s mut self,
+        errors: impl IntoIterator<Item = JsError> + Send + 'v,
+    ) -> BoxStream<'f, sqlx::Result<JsError>>
+    where
+        's: 'f,
+        'v: 'f,
+    {
+        pg_insert(self.0.as_mut(), errors).boxed()
     }
 }
 

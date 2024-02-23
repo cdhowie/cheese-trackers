@@ -240,3 +240,13 @@ db_struct! {
         pub discord_user_id: i64,
     }
 }
+
+db_struct! {
+    #[derive(Clone)]
+    pub struct JsError {
+        pub id: i32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub ct_user_id: Option<i32>,
+        pub error: String,
+    }
+}

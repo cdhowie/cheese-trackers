@@ -62,3 +62,11 @@ export async function authComplete(data) {
         data,
     });
 }
+
+export async function createJsError(data) {
+    return api_http.request({
+        method: 'post',
+        url: 'jserror',
+        data,
+    });
+}

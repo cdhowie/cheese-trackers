@@ -334,3 +334,15 @@ ALTER TABLE public.ap_game
 
 CREATE INDEX fki_ap_game_claimed_by_ct_user_id_fkey
     ON public.ap_game(claimed_by_ct_user_id);
+
+CREATE TABLE public.js_error
+(
+    id serial NOT NULL,
+    ct_user_id integer,
+    error text NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT js_error_ct_user_id_fkey FOREIGN KEY (ct_user_id)
+        REFERENCES public.ct_user (id) MATCH SIMPLE
+        ON UPDATE CASCADE
+        ON DELETE SET NULL
+);

@@ -11,8 +11,8 @@ use axum::{
 use chrono::{DateTime, Utc};
 use db::{
     model::{
-        ApGame, ApGameIden, ApHint, ApTracker, ApTrackerIden, CtUser, GameStatus, PingPreference,
-        TrackerGameStatus,
+        ApGame, ApGameIden, ApHint, ApTracker, ApTrackerIden, CtUser, GameStatus, JsError,
+        PingPreference, TrackerGameStatus,
     },
     DataAccess, DataAccessProvider, Transactable, Transaction,
 };
@@ -772,20 +772,55 @@ async fn get_settings<D>(State(state): State<Arc<AppState<D>>>) -> Json<UiSettin
     Json(state.ui_settings.clone())
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+struct CreateJsErrorRequest {
+    pub ct_user_id: Option<i32>,
+    pub error: String,
+}
+
+async fn create_js_error<D>(
+    State(state): State<Arc<AppState<D>>>,
+    Json(request): Json<CreateJsErrorRequest>,
+) -> StatusCode
+where
+    D: DataAccessProvider + Send + Sync + 'static,
+{
+    // We don't need to inform the client if this fails, so perform the
+    // insertion in the background and respond immediately.
+    tokio::spawn(async move {
+        let mut db = state
+            .data_provider
+            .create_data_access()
+            .await
+            .unexpected()?;
+
+        db.create_js_errors([JsError {
+            id: 0,
+            ct_user_id: request.ct_user_id,
+            error: request.error,
+        }])
+        .try_for_each(|_| std::future::ready(Ok(())))
+        .await
+        .unexpected()
+    });
+
+    StatusCode::ACCEPTED
+}
+
 fn create_api_router<D>(state: AppState<D>) -> axum::Router<()>
 where
     D: DataAccessProvider + Send + Sync + 'static,
 {
+    use axum::routing::*;
+
     axum::Router::new()
-        .route("/auth/begin", axum::routing::get(begin_discord_auth))
-        .route("/auth/complete", axum::routing::post(complete_discord_auth))
-        .route("/tracker/:tracker_id", axum::routing::get(get_tracker))
-        .route("/tracker/:tracker_id", axum::routing::put(update_tracker))
-        .route(
-            "/tracker/:tracker_id/game/:game_id",
-            axum::routing::put(update_game),
-        )
-        .route("/settings", axum::routing::get(get_settings))
+        .route("/auth/begin", get(begin_discord_auth))
+        .route("/auth/complete", post(complete_discord_auth))
+        .route("/tracker/:tracker_id", get(get_tracker))
+        .route("/tracker/:tracker_id", put(update_tracker))
+        .route("/tracker/:tracker_id/game/:game_id", put(update_game))
+        .route("/settings", get(get_settings))
+        .route("/jserror", post(create_js_error))
         .with_state(Arc::new(state))
 }
 
