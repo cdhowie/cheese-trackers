@@ -575,18 +575,24 @@ loadTracker();
                         </td>
                         <td>
                             <span v-if="game.discord_username && game.status === 'done'" class="text-danger">Never</span>
-                            <button v-else-if="game.discord_username" class="btn btn-sm dropdown-toggle" :disabled="loading"
-                                :class="[`btn-outline-${pingPreference.byId[game.discord_ping].color}`]"
-                                data-bs-toggle="dropdown">
-                                {{ pingPreference.byId[game.discord_ping].label }}
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li v-for="pref in pingPreference">
-                                    <button class="dropdown-item" :class="[`text-${pref.color}`]"
-                                        :disabled="loading || pref.id === game.discord_ping"
-                                        @click="setPing(game, pref.id)">{{ pref.label }}</button>
-                                </li>
-                            </ul>
+                            <template v-else-if="game.discord_username">
+                                <template v-if="settings.auth?.token">
+                                    <button class="btn btn-sm dropdown-toggle" :disabled="loading"
+                                        :class="[`btn-outline-${pingPreference.byId[game.discord_ping].color}`]"
+                                        data-bs-toggle="dropdown">
+                                        {{ pingPreference.byId[game.discord_ping].label }}
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li v-for="pref in pingPreference">
+                                            <button class="dropdown-item" :class="[`text-${pref.color}`]"
+                                                :disabled="loading || pref.id === game.discord_ping"
+                                                @click="setPing(game, pref.id)">{{ pref.label }}</button>
+                                        </li>
+                                    </ul>
+                                </template>
+                                <span v-else :class="[`text-${pingPreference.byId[game.discord_ping].color}`]">{{
+                                    pingPreference.byId[game.discord_ping].label }}</span>
+                            </template>
                         </td>
                         <td>
                             <template v-if="settings.auth?.token">
@@ -618,26 +624,32 @@ loadTracker();
                         </td>
                         <td>{{ game.game }}</td>
                         <td>
-                            <button class="btn btn-sm dropdown-toggle" :disabled="loading"
-                                :class="[`btn-outline-${gameStatus.byId[game.status].color}`]" data-bs-toggle="dropdown">
-                                {{ gameStatus.byId[game.status].label }}
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li v-for="status in statuses">
-                                    <button class="dropdown-item" :class="[`text-${gameStatus.byId[status].color}`]"
-                                        :disabled="loading || status === game.status"
-                                        @click="setGameStatus(game, status)">{{
-                                            gameStatus.byId[status].label }}</button>
-                                </li>
-                            </ul>
+                            <template v-if="settings.auth?.token">
+                                <button class="btn btn-sm dropdown-toggle" :disabled="loading"
+                                    :class="[`btn-outline-${gameStatus.byId[game.status].color}`]"
+                                    data-bs-toggle="dropdown">
+                                    {{ gameStatus.byId[game.status].label }}
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li v-for="status in statuses">
+                                        <button class="dropdown-item" :class="[`text-${gameStatus.byId[status].color}`]"
+                                            :disabled="loading || status === game.status"
+                                            @click="setGameStatus(game, status)">{{
+                                                gameStatus.byId[status].label }}</button>
+                                    </li>
+                                </ul>
+                            </template>
+                            <span v-else :class="[`text-${gameStatus.byId[game.status].color}`]">{{
+                                gameStatus.byId[game.status].label }}</span>
                         </td>
-                        <td class="text-end" :class="lastCheckedClass(game)">
+                        <td :class="{ [lastCheckedClass(game)]: true, 'text-end': settings.auth?.token }">
                             <span :title="displayDateTime(gameLastUpdated(game))">{{
                                 displayLastChecked(game) }}</span>
                         </td>
-                        <td class="text-start">
-                            <button class=" btn btn-sm btn-outline-secondary" :class="{ invisible: game.status !== 'bk' }"
-                                :disabled="loading" @click="updateLastChecked(game)">Still BK</button>
+                        <td class="text-start" :class="{ 'p-0': !settings.auth?.token }">
+                            <button v-if="settings.auth?.token" class=" btn btn-sm btn-outline-secondary"
+                                :class="{ invisible: game.status !== 'bk' }" :disabled="loading"
+                                @click="updateLastChecked(game)">Still BK</button>
                         </td>
                         <td>
                             <ChecksBar :done="game.checks_done" :total="game.checks_total"></ChecksBar>
@@ -715,7 +727,8 @@ loadTracker();
                                     <div class="fw-bold">Notes</div>
                                     <textarea placeholder="Enter any notes about your game here." class="form-control"
                                         rows="5" v-model="game.$newnotes" @blur="updateNotes(game)"
-                                        @keyup.esc="game.$newnotes = game.notes"></textarea>
+                                        @keyup.esc="game.$newnotes = game.notes"
+                                        :readonly="!settings.auth?.token"></textarea>
                                     <div class="text-muted">
                                         Saves automatically when you click off of the field. Press ESC to cancel any edits.
                                     </div>
