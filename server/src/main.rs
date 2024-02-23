@@ -458,7 +458,7 @@ async fn get_tracker<D>(
 where
     D: DataAccessProvider + Send + Sync + 'static,
 {
-    #[derive(Debug, serde::Serialize)]
+    #[derive(serde::Serialize)]
     struct GetTrackerResponse {
         #[serde(flatten)]
         pub tracker: ApTracker,

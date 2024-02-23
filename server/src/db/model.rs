@@ -48,7 +48,7 @@ macro_rules! db_struct {
     ) => {
         paste::paste! {
             #[sea_query::enum_def]
-            #[derive(Debug, serde::Serialize, serde::Deserialize)]
+            #[derive(serde::Serialize, serde::Deserialize)]
             $( #[ $nm ] )*
             $nv struct $n {
                 $(
@@ -181,7 +181,7 @@ implement_into_simpleexpr! {
 }
 
 db_struct! {
-    #[derive(Clone)]
+    #[derive(Debug, Clone)]
     pub struct ApTracker {
         pub id: i32,
         pub tracker_id: String,
@@ -191,7 +191,7 @@ db_struct! {
 }
 
 db_struct! {
-    #[derive(Clone)]
+    #[derive(Debug, Clone)]
     pub struct ApGame {
         pub id: i32,
         pub tracker_id: i32,
@@ -216,7 +216,7 @@ db_struct! {
 }
 
 db_struct! {
-    #[derive(Clone)]
+    #[derive(Debug, Clone)]
     pub struct ApHint {
         pub id: i32,
         pub finder_game_id: i32,
@@ -241,8 +241,19 @@ db_struct! {
     }
 }
 
+// Manual implementation to omit tokens.
+impl Debug for CtUser {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CtUser")
+            .field("id", &self.id)
+            .field("discord_username", &self.discord_username)
+            .field("discord_user_id", &self.discord_user_id)
+            .finish_non_exhaustive()
+    }
+}
+
 db_struct! {
-    #[derive(Clone)]
+    #[derive(Debug, Clone)]
     pub struct JsError {
         pub id: i32,
         #[serde(skip_serializing_if = "Option::is_none")]
