@@ -32,6 +32,8 @@ const summaryTypes = {
     },
 };
 
+const summaryType = computed(() => summaryTypes[props.summarizeBy]);
+
 const STATUSES = ['unknown', 'unblocked', 'bk', 'open', 'all_checks', 'goal', 'done'];
 
 const summaryData = computed(() => {
@@ -41,7 +43,7 @@ const summaryData = computed(() => {
                 (props.trackerData || {}).games,
                 g => includes(STATUSES, g.status)
             ),
-            summaryTypes[props.summarizeBy].key
+            summaryType.value.key
         ),
         games => ({
             count: games.length,
@@ -53,7 +55,7 @@ const summaryData = computed(() => {
 });
 
 const sumKeys = computed(() => {
-    return orderBy(Object.keys(summaryData.value), summaryTypes[props.summarizeBy].sortKey);
+    return orderBy(Object.keys(summaryData.value), summaryType.value.sortKey);
 });
 </script>
 
@@ -61,7 +63,7 @@ const sumKeys = computed(() => {
     <table class="table table-border">
         <thead>
             <tr>
-                <th class="text-end">{{ summaryTypes[summarizeBy].label }}</th>
+                <th class="text-end">{{ summaryType.label }}</th>
                 <th></th>
                 <th class="text-center">Games</th>
                 <th class="text-center">Checks</th>
@@ -70,9 +72,8 @@ const sumKeys = computed(() => {
         <tbody>
             <tr v-for="key in sumKeys">
                 <td class="text-end shrink-column">
-                    <component v-if="summaryTypes[props.summarizeBy].keyDisplay"
-                        :is="summaryTypes[props.summarizeBy].keyDisplay.component"
-                        v-bind="{ [summaryTypes[props.summarizeBy].keyDisplay.bindTo]: summaryTypes[props.summarizeBy].keyDisplay.map(key) }">
+                    <component v-if="summaryType.keyDisplay" :is="summaryType.keyDisplay.component"
+                        v-bind="{ [summaryType.keyDisplay.bindTo]: summaryType.keyDisplay.map(key) }">
                     </component>
                     <template v-else>{{ key }}</template>
                 </td>
