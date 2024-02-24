@@ -5,6 +5,7 @@ const SETTINGS_KEY = 'settings';
 
 const SETTINGS_SCHEMA = Joi.object().keys({
     defaultPingPreference: Joi.string().default("never"),
+    unauthenticatedDiscordUsername: Joi.string().empty(""),
 
     auth: Joi.object().keys({
         token: Joi.string(),

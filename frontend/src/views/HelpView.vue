@@ -19,9 +19,15 @@ import ShouldPing from '@/components/ShouldPing.vue';
             Sheets in particular.
         </p>
         <p>
-            The very first thing you should do is log in with Discord using the
-            button in the top right. You must do this before you can claim any
-            slots.
+            The very first thing you should do is either sign in with Discord
+            using the button in the top right, or set your discord username in
+            the settings. You must do either of these things before you can
+            claim any slots.
+        </p>
+        <p>
+            If you do not sign in to Discord, your claims will be annotated with
+            an unauthenticated icon (<i title="Unauthenticated" class="bg-transparent text-warning bi-unlock-fill"></i>) to
+            help distinguish authenticated vs unauthenticated claims.
         </p>
         <h2>Tracker Title</h2>
         <p>

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter, reduce, join, includes, pick, uniqBy, isEqual } from 'lodash-es';
+import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter, reduce, join, includes, uniqBy, isEqual } from 'lodash-es';
 import moment from 'moment';
 import { settings } from '@/settings';
 import { now } from '@/time';
@@ -56,12 +56,25 @@ function hintsClass(game) {
     }
 }
 
+const currentUser = computed(() =>
+    settings.value.auth?.token ? {
+        id: settings.value.auth.userId,
+        discordUsername: settings.value.auth.discordUsername,
+    } : settings.value.unauthenticatedDiscordUsername ? {
+        discordUsername: settings.value.unauthenticatedDiscordUsername,
+    } : undefined
+);
+
 function getClaimingUser(game) {
-    if (game.claimed_by_ct_user_id !== undefined || game.discord_username?.length) {
+    if (game.claimed_by_ct_user_id !== undefined) {
         return {
             id: game.claimed_by_ct_user_id,
             discordUsername: game.discord_username,
         };
+    }
+
+    if (game.discord_username?.length) {
+        return { discordUsername: game.discord_username };
     }
 
     return undefined;
@@ -78,22 +91,15 @@ const players = computed(() =>
 );
 
 const playersExceptSelf = computed(() =>
-    settings.value.auth?.token ?
-        filter(players.value, p => p.id !== settings.value.auth.userId) :
+    currentUser.value ?
+        filter(players.value, p => !isEqual(p, currentUser.value)) :
         players.value
 );
 
 const PLAYER_FILTER_ALL = Symbol();
 const PLAYER_FILTER_UNOWNED = Symbol();
-const PLAYER_FILTER_MINE = Symbol();
 
 const playerFilter = ref(PLAYER_FILTER_ALL);
-
-watch(settings, () => {
-    if (!settings.auth?.discordUsername && playerFilter.value === PLAYER_FILTER_MINE) {
-        playerFilter.value = PLAYER_FILTER_ALL;
-    }
-});
 
 const lastCheckedThresholds = [
     { days: 2, color: 'danger' },
@@ -188,8 +194,7 @@ const filteredGames = computed(() =>
         return (
             playerFilter.value === PLAYER_FILTER_ALL ? true :
                 playerFilter.value === PLAYER_FILTER_UNOWNED ? !user :
-                    playerFilter.value === PLAYER_FILTER_MINE ? user?.id === settings.value.auth?.userId :
-                        isEqual(playerFilter.value, user)
+                    isEqual(playerFilter.value, user)
         ) &&
             statusFilter.value[g.status]
     })
@@ -342,7 +347,12 @@ async function updateGame(game, mutator) {
 
 function claimGame(game) {
     updateGame(game, g => {
-        g.claimed_by_ct_user_id = settings.value.auth.userId;
+        if (settings.value.auth?.token) {
+            g.claimed_by_ct_user_id = settings.value.auth.userId;
+        } else {
+            g.discord_username = settings.value.unauthenticatedDiscordUsername;
+        }
+
         g.discord_ping = settings.value.defaultPingPreference;
     });
 }
@@ -411,12 +421,9 @@ const editingTitle = ref(false);
 const editTitleInput = ref(undefined);
 
 function editTitle() {
-    // Editing the title requires authentication.
-    if (settings.value.auth?.token) {
-        editedTitle.value = trackerData.value.title || '';
-        editingTitle.value = true;
-        setTimeout(() => { editTitleInput.value?.focus(); });
-    }
+    editedTitle.value = trackerData.value.title || '';
+    editingTitle.value = true;
+    setTimeout(() => { editTitleInput.value?.focus(); });
 }
 
 function saveTitle() {
@@ -461,8 +468,9 @@ loadTracker();
     <div v-if="error && !trackerData" class="text-center text-danger">Failed to load tracker data ({{ error.message }})
     </div>
     <template v-if="trackerData">
-        <div v-if="!settings.auth?.token" class="alert alert-info text-center">
-            You will be unable to claim slots until you sign in.
+        <div v-if="!currentUser" class="alert alert-info text-center">
+            You will be unable to claim slots until you either sign in with Discord or set your Discord username in the
+            <router-link to="/settings">settings</router-link>.
         </div>
         <h2 v-if="!editingTitle" @click="editTitle" class="text-center mb-4"
             :class="{ 'text-muted': !trackerData.title.length, 'fst-italic': !trackerData.title.length }">{{
@@ -501,13 +509,13 @@ loadTracker();
                                         Unclaimed
                                     </button>
                                 </li>
-                                <template v-if="settings.auth?.discordUsername">
+                                <template v-if="currentUser">
                                     <li>
                                         <hr class="dropdown-divider">
                                     </li>
-                                    <button class="dropdown-item" :class="{ active: playerFilter === PLAYER_FILTER_MINE }"
-                                        @click="playerFilter = PLAYER_FILTER_MINE">
-                                        {{ settings.auth.discordUsername }}
+                                    <button class="dropdown-item" :class="{ active: isEqual(playerFilter, currentUser) }"
+                                        @click="playerFilter = currentUser">
+                                        <UsernameDisplay :user="currentUser"></UsernameDisplay>
                                     </button>
                                 </template>
                                 <template v-if="playersExceptSelf.length">
@@ -576,31 +584,26 @@ loadTracker();
                         <td>
                             <span v-if="game.discord_username && game.status === 'done'" class="text-danger">Never</span>
                             <template v-else-if="game.discord_username">
-                                <template v-if="settings.auth?.token">
-                                    <button class="btn btn-sm dropdown-toggle" :disabled="loading"
-                                        :class="[`btn-outline-${pingPreference.byId[game.discord_ping].color}`]"
-                                        data-bs-toggle="dropdown">
-                                        {{ pingPreference.byId[game.discord_ping].label }}
-                                    </button>
-                                    <ul class="dropdown-menu">
-                                        <li v-for="pref in pingPreference">
-                                            <button class="dropdown-item" :class="[`text-${pref.color}`]"
-                                                :disabled="loading || pref.id === game.discord_ping"
-                                                @click="setPing(game, pref.id)">{{ pref.label }}</button>
-                                        </li>
-                                    </ul>
-                                </template>
-                                <span v-else :class="[`text-${pingPreference.byId[game.discord_ping].color}`]">{{
-                                    pingPreference.byId[game.discord_ping].label }}</span>
+                                <button class="btn btn-sm dropdown-toggle" :disabled="loading"
+                                    :class="[`btn-outline-${pingPreference.byId[game.discord_ping].color}`]"
+                                    data-bs-toggle="dropdown">
+                                    {{ pingPreference.byId[game.discord_ping].label }}
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li v-for="pref in pingPreference">
+                                        <button class="dropdown-item" :class="[`text-${pref.color}`]"
+                                            :disabled="loading || pref.id === game.discord_ping"
+                                            @click="setPing(game, pref.id)">{{ pref.label }}</button>
+                                    </li>
+                                </ul>
                             </template>
                         </td>
                         <td>
-                            <template v-if="settings.auth?.token">
-                                <button v-if="!game.discord_username?.length" class="btn btn-sm btn-outline-secondary"
+                            <template v-if="currentUser">
+                                <button v-if="!game.discord_username" class="btn btn-sm btn-outline-secondary"
                                     :disabled="loading" @click="claimGame(game)">Claim</button>
 
-                                <template
-                                    v-if="game.discord_username?.length && game.claimed_by_ct_user_id !== settings.auth.userId">
+                                <template v-if="game.discord_username && !isEqual(getClaimingUser(game), currentUser)">
                                     <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
                                         data-bs-toggle="dropdown">Claim</button>
                                     <div class="dropdown-menu text-warning p-3">
@@ -612,7 +615,7 @@ loadTracker();
                                     </div>
                                 </template>
 
-                                <button v-if="game.claimed_by_ct_user_id === settings.auth.userId"
+                                <button v-if="isEqual(getClaimingUser(game), currentUser)"
                                     class="btn btn-sm btn-outline-warning" :disabled="loading"
                                     @click="unclaimGame(game)">Disclaim</button>
                             </template>
@@ -624,32 +627,26 @@ loadTracker();
                         </td>
                         <td>{{ game.game }}</td>
                         <td>
-                            <template v-if="settings.auth?.token">
-                                <button class="btn btn-sm dropdown-toggle" :disabled="loading"
-                                    :class="[`btn-outline-${gameStatus.byId[game.status].color}`]"
-                                    data-bs-toggle="dropdown">
-                                    {{ gameStatus.byId[game.status].label }}
-                                </button>
-                                <ul class="dropdown-menu">
-                                    <li v-for="status in statuses">
-                                        <button class="dropdown-item" :class="[`text-${gameStatus.byId[status].color}`]"
-                                            :disabled="loading || status === game.status"
-                                            @click="setGameStatus(game, status)">{{
-                                                gameStatus.byId[status].label }}</button>
-                                    </li>
-                                </ul>
-                            </template>
-                            <span v-else :class="[`text-${gameStatus.byId[game.status].color}`]">{{
-                                gameStatus.byId[game.status].label }}</span>
+                            <button class="btn btn-sm dropdown-toggle" :disabled="loading"
+                                :class="[`btn-outline-${gameStatus.byId[game.status].color}`]" data-bs-toggle="dropdown">
+                                {{ gameStatus.byId[game.status].label }}
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li v-for="status in statuses">
+                                    <button class="dropdown-item" :class="[`text-${gameStatus.byId[status].color}`]"
+                                        :disabled="loading || status === game.status"
+                                        @click="setGameStatus(game, status)">{{
+                                            gameStatus.byId[status].label }}</button>
+                                </li>
+                            </ul>
                         </td>
-                        <td :class="{ [lastCheckedClass(game)]: true, 'text-end': settings.auth?.token }">
+                        <td :class="[lastCheckedClass(game)]" class="text-end">
                             <span :title="displayDateTime(gameLastUpdated(game))">{{
                                 displayLastChecked(game) }}</span>
                         </td>
-                        <td class="text-start" :class="{ 'p-0': !settings.auth?.token }">
-                            <button v-if="settings.auth?.token" class=" btn btn-sm btn-outline-secondary"
-                                :class="{ invisible: game.status !== 'bk' }" :disabled="loading"
-                                @click="updateLastChecked(game)">Still BK</button>
+                        <td class="text-start p-0">
+                            <button class=" btn btn-sm btn-outline-secondary" :class="{ invisible: game.status !== 'bk' }"
+                                :disabled="loading" @click="updateLastChecked(game)">Still BK</button>
                         </td>
                         <td>
                             <ChecksBar :done="game.checks_done" :total="game.checks_total"></ChecksBar>
@@ -727,8 +724,7 @@ loadTracker();
                                     <div class="fw-bold">Notes</div>
                                     <textarea placeholder="Enter any notes about your game here." class="form-control"
                                         rows="5" v-model="game.$newnotes" @blur="updateNotes(game)"
-                                        @keyup.esc="game.$newnotes = game.notes"
-                                        :readonly="!settings.auth?.token"></textarea>
+                                        @keyup.esc="game.$newnotes = game.notes"></textarea>
                                     <div class="text-muted">
                                         Saves automatically when you click off of the field. Press ESC to cancel any edits.
                                     </div>

@@ -519,11 +519,6 @@ struct UpdateTrackerRequest {
 
 async fn update_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
-
-    // Not used for now but requires that the user at least be logged in.  Will
-    // be used later for an audit trail.
-    AuthenticatedUser(_): AuthenticatedUser,
-
     Path(tracker_id): Path<String>,
     Json(tracker_update): Json<UpdateTrackerRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
@@ -566,7 +561,7 @@ struct UpdateGameRequest {
 
 async fn update_game<D>(
     State(state): State<Arc<AppState<D>>>,
-    AuthenticatedUser(user): AuthenticatedUser,
+    user: Option<AuthenticatedUser>,
     Path((tracker_id, game_id)): Path<(String, i32)>,
     Json(game_update): Json<UpdateGameRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
@@ -596,32 +591,28 @@ where
         return Err(StatusCode::NOT_FOUND);
     }
 
-    // Reject new unauthenticated claims.
-    if game.discord_username.is_none()
-        && game_update.claimed_by_ct_user_id.is_none()
-        && game_update.discord_username.is_some()
-    {
-        return Err(StatusCode::FORBIDDEN);
-    }
-
-    // Reject new authenticated claims for a different user ID.
-    if game.claimed_by_ct_user_id.is_none()
+    // If the claimed user ID is changing to a value other than None, it must
+    // match the authenticated user's ID.
+    if game_update.claimed_by_ct_user_id != game.claimed_by_ct_user_id
         && game_update
             .claimed_by_ct_user_id
-            .is_some_and(|id| id != user.id)
+            .is_some_and(|id| user.as_ref().map_or(true, |u| u.0.id != id))
     {
         return Err(StatusCode::FORBIDDEN);
     }
 
     // Update the username.
-    game.discord_username = match game_update.claimed_by_ct_user_id {
+    game.discord_username = match (game_update.claimed_by_ct_user_id, user) {
         // If already claimed by the same user, this should be a no-op.
         // Otherwise, sets the display name.
-        Some(id) if id == user.id => Some(user.discord_username),
-        // No-op.
-        Some(_) => game.discord_username,
-        // Clear, which should only be a change when disclaiming a slot.
-        None => None,
+        (Some(id), Some(u)) if id == u.0.id => Some(u.0.discord_username),
+        // No-op. The slot remains claimed by someone else, so keep the current
+        // username.
+        (Some(_), _) => game.discord_username,
+        // No claiming user means the display name can be whatever was in the
+        // request, which is either None for an unclaimed slot, or Some for an
+        // unauthenticated claim.
+        (None, _) => game_update.discord_username,
     };
 
     game.claimed_by_ct_user_id = game_update.claimed_by_ct_user_id;

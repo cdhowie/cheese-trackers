@@ -70,7 +70,7 @@ function logout() {
                 Welcome, {{ localSettings.auth.discordUsername }}!
                 <button class="btn btn-sm btn-secondary ms-2" @click="logout">Log out</button>
             </template>
-            <button v-else class="btn btn-sm btn-primary" @click="login">Log in with Discord</button>
+            <button v-else class="btn btn-sm btn-primary" @click="login">Sign in with Discord</button>
         </div>
     </nav>
 
