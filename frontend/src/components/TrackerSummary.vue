@@ -32,7 +32,7 @@ const summaryData = computed(() => {
 });
 
 const sumKeys = computed(() => {
-    return orderBy(Object.keys(summaryData.value));
+    return orderBy(Object.keys(summaryData.value), v => v.toLowerCase());
 });
 </script>
 
