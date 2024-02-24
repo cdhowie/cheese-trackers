@@ -101,6 +101,17 @@ const PLAYER_FILTER_UNOWNED = Symbol();
 
 const playerFilter = ref(PLAYER_FILTER_ALL);
 
+const uniqueGames = computed(() =>
+    orderBy(
+        uniq(
+            map(trackerData.value.games, 'game')
+        ),
+        i => i.toLowerCase()
+    )
+);
+
+const gameFilter = ref(undefined);
+
 const lastCheckedThresholds = [
     { days: 2, color: 'danger' },
     { days: 1, color: 'warning' },
@@ -191,12 +202,14 @@ const filteredGames = computed(() =>
     filter(trackerData.value?.games, g => {
         const user = getClaimingUser(g);
 
-        return (
+        return statusFilter.value[g.status] && (
             playerFilter.value === PLAYER_FILTER_ALL ? true :
                 playerFilter.value === PLAYER_FILTER_UNOWNED ? !user :
                     isEqual(playerFilter.value, user)
-        ) &&
-            statusFilter.value[g.status]
+        ) && (
+                gameFilter.value === undefined ||
+                gameFilter.value === g.game
+            );
     })
 );
 
@@ -211,6 +224,10 @@ function sortByGame(g) {
 function sortByActivity(g) {
     const days = gameDaysSinceLastChecked(g);
     return days === undefined ? Number.POSITIVE_INFINITY : days;
+}
+
+function sortByOwner(g) {
+    return (g.discord_username || '').toLowerCase();
 }
 
 const activeSort = ref([sortByName, false]);
@@ -482,17 +499,24 @@ loadTracker();
         <table class="table table-sm table-hover text-center tracker-table">
             <thead style="position: sticky; top: 0; z-index: 100">
                 <tr>
-                    <th class="sortable-column" @click="setSort(sortByName, false)">
-                        Name
-                        <i v-if="activeSort[0] === sortByName"
-                            :class="{ 'bi-sort-alpha-down': !activeSort[1], 'bi-sort-alpha-up': activeSort[1] }"></i>
+                    <th @click="setSort(sortByName, false)">
+                        <span class="sorter">
+                            Name
+                            <i v-if="activeSort[0] === sortByName"
+                                :class="{ 'bi-sort-alpha-down': !activeSort[1], 'bi-sort-alpha-up': activeSort[1] }"></i>
+                        </span>
                     </th>
                     <th>Ping</th>
                     <th></th>
                     <th>
                         <div class="dropdown">
+                            <span @click="setSort(sortByOwner, false)" class="sorter">
+                                Owner (Discord Username)
+                                <i v-if="activeSort[0] === sortByOwner" class="me-1"
+                                    :class="{ 'bi-sort-alpha-down': !activeSort[1], 'bi-sort-alpha-up': activeSort[1] }"></i>
+                            </span>
                             <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown">
-                                Owner (Discord Username) <i
+                                <i
                                     :class="{ 'bi-funnel': playerFilter === PLAYER_FILTER_ALL, 'bi-funnel-fill': playerFilter !== PLAYER_FILTER_ALL }"></i>
                             </button>
                             <ul class="dropdown-menu">
@@ -513,34 +537,59 @@ loadTracker();
                                     <li>
                                         <hr class="dropdown-divider">
                                     </li>
-                                    <button class="dropdown-item" :class="{ active: isEqual(playerFilter, currentUser) }"
-                                        @click="playerFilter = currentUser">
-                                        <UsernameDisplay :user="currentUser"></UsernameDisplay>
-                                    </button>
+                                    <li>
+                                        <button class="dropdown-item"
+                                            :class="{ active: isEqual(playerFilter, currentUser) }"
+                                            @click="playerFilter = currentUser">
+                                            <UsernameDisplay :user="currentUser"></UsernameDisplay>
+                                        </button>
+                                    </li>
                                 </template>
                                 <template v-if="playersExceptSelf.length">
                                     <li>
                                         <hr class="dropdown-divider">
                                     </li>
-                                    <button v-for="player in playersExceptSelf" class="dropdown-item"
-                                        :class="{ active: playerFilter === player }" @click="playerFilter = player">
-                                        <UsernameDisplay :user="player"></UsernameDisplay>
-                                    </button>
+                                    <li>
+                                        <button v-for="player in playersExceptSelf" class="dropdown-item"
+                                            :class="{ active: playerFilter === player }" @click="playerFilter = player">
+                                            <UsernameDisplay :user="player"></UsernameDisplay>
+                                        </button>
+                                    </li>
                                 </template>
                             </ul>
                         </div>
                     </th>
-                    <th class="sortable-column" @click="setSort(sortByGame, false)">
-                        Game
-                        <i v-if="activeSort[0] === sortByGame"
-                            :class="{ 'bi-sort-alpha-down': !activeSort[1], 'bi-sort-alpha-up': activeSort[1] }"></i>
+                    <th>
+                        <div class="dropdown">
+                            <span @click="setSort(sortByGame, false)" class="sorter">
+                                Game
+                                <i v-if="activeSort[0] === sortByGame" class="me-1"
+                                    :class="{ 'bi-sort-alpha-down': !activeSort[1], 'bi-sort-alpha-up': activeSort[1] }"></i>
+                            </span>
+                            <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown">
+                                <i :class="{ 'bi-funnel': !gameFilter, 'bi-funnel-fill': !!gameFilter }"></i>
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li>
+                                    <button class="dropdown-item" :class="{ active: !gameFilter }"
+                                        @click="gameFilter = undefined">All</button>
+                                </li>
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
+                                <li v-for="g in uniqueGames">
+                                    <button class="dropdown-item" :class="{ active: gameFilter === g }"
+                                        @click="gameFilter = g">{{ g }}</button>
+                                </li>
+                            </ul>
+                        </div>
                     </th>
                     <th>
                         <div class="dropdown">
+                            Status
                             <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown"
                                 data-bs-auto-close="outside">
-                                Status <i
-                                    :class="{ 'bi-funnel': !statusFilterActive, 'bi-funnel-fill': statusFilterActive }"></i>
+                                <i :class="{ 'bi-funnel': !statusFilterActive, 'bi-funnel-fill': statusFilterActive }"></i>
                             </button>
                             <ul class="dropdown-menu">
                                 <li v-for="status in statuses">
@@ -556,10 +605,12 @@ loadTracker();
                             </ul>
                         </div>
                     </th>
-                    <th colspan="2" class="sortable-column" @click="setSort(sortByActivity, true)">
-                        Last Activity (Days)
-                        <i v-if="activeSort[0] === sortByActivity"
-                            :class="{ 'bi-sort-numeric-down': !activeSort[1], 'bi-sort-numeric-up': activeSort[1] }"></i>
+                    <th colspan="2" @click="setSort(sortByActivity, true)">
+                        <span class="sorter">
+                            Last Activity (Days)
+                            <i v-if="activeSort[0] === sortByActivity"
+                                :class="{ 'bi-sort-numeric-down': !activeSort[1], 'bi-sort-numeric-up': activeSort[1] }"></i>
+                        </span>
                     </th>
                     <th>Checks</th>
                     <th>
@@ -851,7 +902,7 @@ tr tr:hover .mw-copy-hint {
     white-space: nowrap;
 }
 
-.sortable-column {
+.sorter {
     cursor: pointer;
 }
 
@@ -861,5 +912,10 @@ tr tr:hover .mw-copy-hint {
 
 .mw-underline-hover:hover {
     text-decoration: underline;
+}
+
+.dropdown-menu {
+    max-height: 50vh;
+    overflow-y: auto;
 }
 </style>
