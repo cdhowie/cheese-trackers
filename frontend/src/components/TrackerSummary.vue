@@ -4,13 +4,34 @@ import { includes, filter, groupBy, mapValues, orderBy, sumBy } from 'lodash-es'
 import { gameStatus } from '@/types';
 import { percent } from '@/util';
 import ChecksBar from './ChecksBar.vue';
+import UsernameDisplay from './UsernameDisplay.vue';
 
 const props = defineProps(['trackerData', 'summarizeBy']);
 
-const summaryLabels = {
-    discord_username: 'Player',
-    game: 'Game',
-}
+const summaryTypes = {
+    game: {
+        label: 'Game',
+        key: g => g.game,
+        sortKey: key => key.toLowerCase(),
+    },
+    owner: {
+        label: 'Player',
+        key: g => JSON.stringify([g.discord_username, g.claimed_by_ct_user_id]),
+        sortKey: key => (JSON.parse(key)[0] || '').toLowerCase(),
+        keyDisplay: {
+            component: UsernameDisplay,
+            map: key => {
+                const [discordUsername, id] = JSON.parse(key);
+                return discordUsername && {
+                    discordUsername,
+                    id: id === null ? undefined : id,
+                };
+            },
+            bindTo: 'user',
+        },
+    },
+};
+
 const STATUSES = ['unknown', 'unblocked', 'bk', 'open', 'all_checks', 'goal', 'done'];
 
 const summaryData = computed(() => {
@@ -18,9 +39,9 @@ const summaryData = computed(() => {
         groupBy(
             filter(
                 (props.trackerData || {}).games,
-                g => g[props.summarizeBy]?.length && includes(STATUSES, g.status)
+                g => includes(STATUSES, g.status)
             ),
-            props.summarizeBy
+            summaryTypes[props.summarizeBy].key
         ),
         games => ({
             count: games.length,
@@ -32,7 +53,7 @@ const summaryData = computed(() => {
 });
 
 const sumKeys = computed(() => {
-    return orderBy(Object.keys(summaryData.value), v => v.toLowerCase());
+    return orderBy(Object.keys(summaryData.value), summaryTypes[props.summarizeBy].sortKey);
 });
 </script>
 
@@ -40,7 +61,7 @@ const sumKeys = computed(() => {
     <table class="table table-border">
         <thead>
             <tr>
-                <th class="text-end">{{ summaryLabels[summarizeBy] }}</th>
+                <th class="text-end">{{ summaryTypes[summarizeBy].label }}</th>
                 <th></th>
                 <th class="text-center">Games</th>
                 <th class="text-center">Checks</th>
@@ -48,7 +69,13 @@ const sumKeys = computed(() => {
         </thead>
         <tbody>
             <tr v-for="key in sumKeys">
-                <td class="text-end shrink-column">{{ key }}</td>
+                <td class="text-end shrink-column">
+                    <component v-if="summaryTypes[props.summarizeBy].keyDisplay"
+                        :is="summaryTypes[props.summarizeBy].keyDisplay.component"
+                        v-bind="{ [summaryTypes[props.summarizeBy].keyDisplay.bindTo]: summaryTypes[props.summarizeBy].keyDisplay.map(key) }">
+                    </component>
+                    <template v-else>{{ key }}</template>
+                </td>
                 <td class="text-end shrink-column">{{ summaryData[key].count }}</td>
                 <td class="align-middle">
                     <div class="progress">

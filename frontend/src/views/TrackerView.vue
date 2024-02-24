@@ -672,9 +672,7 @@ loadTracker();
                             </template>
                         </td>
                         <td>
-                            <UsernameDisplay v-if="game.discord_username?.length" :user="getClaimingUser(game)">
-                            </UsernameDisplay>
-                            <span v-else class="text-muted">(Unclaimed)</span>
+                            <UsernameDisplay :user="getClaimingUser(game)"></UsernameDisplay>
                         </td>
                         <td>{{ game.game }}</td>
                         <td>
@@ -857,7 +855,7 @@ loadTracker();
         </div>
         <div class="row">
             <div class="col-12 col-lg-6">
-                <TrackerSummary :tracker-data="trackerData" summarize-by="discord_username"></TrackerSummary>
+                <TrackerSummary :tracker-data="trackerData" summarize-by="owner"></TrackerSummary>
             </div>
             <div class="col-12 col-lg-6">
                 <TrackerSummary :tracker-data="trackerData" summarize-by="game"></TrackerSummary>
