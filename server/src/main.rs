@@ -11,8 +11,8 @@ use axum::{
 use chrono::{DateTime, Utc};
 use db::{
     model::{
-        ApGame, ApGameIden, ApHint, ApTracker, ApTrackerIden, CtUser, GameStatus, JsError,
-        PingPreference, TrackerGameStatus,
+        ApGame, ApGameIden, ApHint, ApHintIden, ApTracker, ApTrackerIden, CtUser, GameStatus,
+        JsError, PingPreference, TrackerGameStatus,
     },
     DataAccess, DataAccessProvider, Transactable, Transaction,
 };
@@ -23,6 +23,7 @@ use futures::{
 use jsonwebtoken::Header;
 use oauth2::TokenResponse;
 use state::{GetDataAccessProvider, GetTokenProcessor};
+use stream::try_into_grouping_map_by;
 use tokio::{net::TcpListener, signal::unix::SignalKind, sync::RwLock};
 use tower_http::{
     cors::CorsLayer,
@@ -38,6 +39,7 @@ mod db;
 mod logging;
 mod signal;
 mod state;
+mod stream;
 mod tracker;
 
 #[derive(Debug, thiserror::Error)]
@@ -170,9 +172,7 @@ impl<D> AppState<D> {
 
         let now = Utc::now();
 
-        // Both arms return a mapping of game player names to their respective
-        // database IDs.  We use this data to populate the hints table.
-        let name_to_id = match db.get_tracker_by_ap_tracker_id(&tracker_id).await? {
+        match db.get_tracker_by_ap_tracker_id(&tracker_id).await? {
             None => {
                 let tracker = db
                     .create_ap_trackers([db::model::ApTracker {
@@ -227,7 +227,31 @@ impl<D> AppState<D> {
                     name_to_id.insert(game.name, game.id);
                 }
 
-                name_to_id
+                db.create_ap_hints(
+                    hints
+                        .into_iter()
+                        .map(|hint| {
+                            Ok::<_, TrackerUpdateError>(ApHint {
+                                id: 0,
+                                finder_game_id: *name_to_id.get(&hint.finder).ok_or_else(|| {
+                                    TrackerUpdateError::HintGameMissing(hint.finder)
+                                })?,
+                                // If the receiving game can't be found, it's most
+                                // likely an item link check, which means the receiver
+                                // would be multiple games.  We record this as null in
+                                // the database.
+                                receiver_game_id: name_to_id.get(&hint.receiver).copied(),
+                                item: hint.item,
+                                location: hint.location,
+                                entrance: hint.entrance,
+                                found: hint.found,
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
+                )
+                // This drives the stream to completion.
+                .try_for_each(|_| std::future::ready(Ok(())))
+                .await?;
             }
 
             Some(mut tracker) => {
@@ -305,48 +329,86 @@ impl<D> AppState<D> {
                     db.update_ap_game(db_game, &columns).await?;
                 }
 
-                // Synchronizing hints is a bit tricky because the data we
-                // receive has no opaque identifier, and data can be duplicated
-                // since there can be multiple items with the exact same finder,
-                // receiver, item, and location.
-                //
-                // Eventually we could possibly make this more optimized, but
-                // for now just replace all of the hints in the database.
-                db.delete_ap_hints_by_tracker_id(tracker.id).await?;
+                // Reconcile hints.  We need to match up the hints from the
+                // tracker with hints in the database, updating hints that have
+                // changed their found status, and inserting new hints.
+
+                let mut existing_hints =
+                    try_into_grouping_map_by(db.get_ap_hints_by_tracker_id(tracker.id), |hint| {
+                        (
+                            hint.finder_game_id,
+                            hint.receiver_game_id,
+                            hint.item.clone(),
+                            hint.location.clone(),
+                            hint.entrance.clone(),
+                        )
+                    })
+                    .await?;
+
+                // Reverse each Vec so we can pop() to take the "first" element.
+                for v in existing_hints.values_mut() {
+                    v.reverse();
+                }
+
+                let mut new_hints = vec![];
+
+                for tracker_hint in hints {
+                    let finder = name_to_id
+                        .get(&tracker_hint.finder)
+                        .copied()
+                        .ok_or_else(|| TrackerUpdateError::HintGameMissing(tracker_hint.finder))?;
+
+                    let receiver = name_to_id.get(&tracker_hint.receiver).copied();
+
+                    match existing_hints
+                        .get_mut(&(
+                            finder,
+                            receiver,
+                            tracker_hint.item.clone(),
+                            tracker_hint.location.clone(),
+                            tracker_hint.entrance.clone(),
+                        ))
+                        .and_then(|v| v.pop())
+                    {
+                        Some(mut h) => {
+                            // Hint exists.  Update if the found state changed.
+                            if h.found != tracker_hint.found {
+                                h.found = tracker_hint.found;
+                                db.update_ap_hint(h, &[ApHintIden::Found]).await?;
+                            }
+                        }
+                        None => {
+                            // This is a new hint.
+                            new_hints.push(ApHint {
+                                id: 0,
+                                finder_game_id: finder,
+                                receiver_game_id: receiver,
+                                item: tracker_hint.item,
+                                location: tracker_hint.location,
+                                entrance: tracker_hint.entrance,
+                                found: tracker_hint.found,
+                            });
+                        }
+                    }
+                }
+
+                if !new_hints.is_empty() {
+                    db.create_ap_hints(new_hints)
+                        .try_for_each(|_| std::future::ready(Ok(())))
+                        .await?;
+                }
+
+                // Any remaining existing hints don't exist anymore.  This
+                // should never happen, but...
+                for hint in existing_hints.into_values().flatten() {
+                    db.delete_ap_hint_by_id(hint.id).await?;
+                }
 
                 tracker.updated_at = now;
                 db.update_ap_tracker(tracker, &[ApTrackerIden::UpdatedAt])
                     .await?;
-
-                name_to_id
             }
         };
-
-        db.create_ap_hints(
-            hints
-                .into_iter()
-                .map(|hint| {
-                    Ok::<_, TrackerUpdateError>(ApHint {
-                        id: 0,
-                        finder_game_id: *name_to_id
-                            .get(&hint.finder)
-                            .ok_or_else(|| TrackerUpdateError::HintGameMissing(hint.finder))?,
-                        // If the receiving game can't be found, it's most
-                        // likely an item link check, which means the receiver
-                        // would be multiple games.  We record this as null in
-                        // the database.
-                        receiver_game_id: name_to_id.get(&hint.receiver).copied(),
-                        item: hint.item,
-                        location: hint.location,
-                        entrance: hint.entrance,
-                        found: hint.found,
-                    })
-                })
-                .collect::<Result<Vec<_>, _>>()?,
-        )
-        // This drives the stream to completion.
-        .try_for_each(|_| std::future::ready(Ok(())))
-        .await?;
 
         Ok(())
     }

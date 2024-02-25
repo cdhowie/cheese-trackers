@@ -155,6 +155,33 @@ pub trait DataAccess {
         's: 'f,
         'v: 'f;
 
+    /// Updates an existing [`ApHint`].
+    ///
+    /// If an existing hint is found, this function will return `true`;
+    /// otherwise, it will return `false`.
+    ///
+    /// If `columns` is empty, all columns (except the primary key) will be
+    /// updated.
+    ///
+    /// # Panics
+    ///
+    /// This function may panic if `columns` contains duplicate identifiers or
+    /// contains the primary key for the table.  (Implementations may also ignore
+    /// the presence of duplicates and/or the primary key, but this is not guaranteed.)
+    fn update_ap_hint<'f, 's, 'c>(
+        &'s mut self,
+        hint: ApHint,
+        columns: &'c [ApHintIden],
+    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    where
+        's: 'f,
+        'c: 'f;
+
+    /// Deletes an existing [`ApHint`] by its ID.
+    ///
+    /// If a hint was deleted, it is returned.
+    fn delete_ap_hint_by_id(&mut self, id: i32) -> BoxFuture<'_, sqlx::Result<Option<ApHint>>>;
+
     /// Gets a [`CtUser`] by its id.
     fn get_ct_user_by_id(&mut self, id: i32) -> BoxFuture<'_, sqlx::Result<Option<CtUser>>>;
 
@@ -303,6 +330,21 @@ where
             yield row;
         }
     }
+}
+
+async fn pg_delete<T>(executor: &mut PgConnection, id: i32) -> sqlx::Result<Option<T>>
+where
+    T: Model + for<'a> FromRow<'a, PgRow> + Send + Unpin,
+{
+    let (sql, values) = Query::delete()
+        .from_table(T::table())
+        .and_where(Expr::col(T::primary_key()).eq(id))
+        .returning_all()
+        .build_sqlx(PostgresQueryBuilder);
+
+    sqlx::query_as_with(&sql, values)
+        .fetch_optional(executor)
+        .await
 }
 
 async fn pg_update<T>(
@@ -486,6 +528,22 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         'v: 'f,
     {
         pg_insert(self.0.as_mut(), hints).boxed()
+    }
+
+    fn update_ap_hint<'f, 's, 'c>(
+        &'s mut self,
+        hint: ApHint,
+        columns: &'c [ApHintIden],
+    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    where
+        's: 'f,
+        'c: 'f,
+    {
+        pg_update(self.0.as_mut(), hint, columns).boxed()
+    }
+
+    fn delete_ap_hint_by_id(&mut self, id: i32) -> BoxFuture<'_, sqlx::Result<Option<ApHint>>> {
+        pg_delete(self.0.as_mut(), id).boxed()
     }
 
     fn get_ct_user_by_id(&mut self, id: i32) -> BoxFuture<'_, sqlx::Result<Option<CtUser>>> {
