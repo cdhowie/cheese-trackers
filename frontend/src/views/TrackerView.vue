@@ -729,7 +729,8 @@ loadTracker();
                                         </button>
                                         <button class=" btn btn-sm btn-outline-light ms-2"
                                             :disabled="displayHintsByGame(game.id).length === 0"
-                                            @click="copyHints(displayHintsByGame(game.id))">Copy all</button>
+                                            @click="copyHints(displayHintsByGame(game.id))"><i class="bi-copy"></i> Copy
+                                            all</button>
                                     </div>
                                     <div v-if="displayHintsByGame(game.id).length === 0" class="text-muted">
                                         There are no unfound hints right now.
@@ -762,7 +763,7 @@ loadTracker();
                                                             :title="HINT_STATUS_UI[hintStatus(hint)].icontooltip"></i> <a
                                                             href="#" class="bg-transparent p-0 mw-copy-hint"
                                                             @click.prevent="clipboardCopy(hintToString(hint))"
-                                                            title="Copy to clipboard">&#x1F4C4;</a>
+                                                            title="Copy to clipboard"><i class="bi-copy"></i></a>
                                                     </td>
                                                 </tr>
                                             </table>
