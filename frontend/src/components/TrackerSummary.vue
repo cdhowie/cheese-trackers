@@ -5,6 +5,7 @@ import { gameStatus } from '@/types';
 import { percent } from '@/util';
 import ChecksBar from './ChecksBar.vue';
 import UsernameDisplay from './UsernameDisplay.vue';
+import GameDisplay from './GameDisplay.vue';
 
 const props = defineProps(['trackerData', 'summarizeBy']);
 
@@ -13,6 +14,11 @@ const summaryTypes = {
         label: 'Game',
         key: g => g.game,
         sortKey: key => key.toLowerCase(),
+        keyDisplay: {
+            component: GameDisplay,
+            map: k => k,
+            bindTo: 'game',
+        },
     },
     owner: {
         label: 'Player',

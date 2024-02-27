@@ -10,6 +10,7 @@ import { percent, synchronize } from '@/util';
 import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
 import UsernameDisplay from '@/components/UsernameDisplay.vue';
+import GameDisplay from '@/components/GameDisplay.vue';
 
 const props = defineProps(['aptrackerid']);
 
@@ -579,7 +580,9 @@ loadTracker();
                                 </li>
                                 <li v-for="g in uniqueGames">
                                     <button class="dropdown-item" :class="{ active: gameFilter === g }"
-                                        @click="gameFilter = g">{{ g }}</button>
+                                        @click="gameFilter = g">
+                                        <GameDisplay :game="g"></GameDisplay>
+                                    </button>
                                 </li>
                             </ul>
                         </div>
@@ -674,7 +677,9 @@ loadTracker();
                         <td>
                             <UsernameDisplay :user="getClaimingUser(game)"></UsernameDisplay>
                         </td>
-                        <td>{{ game.game }}</td>
+                        <td>
+                            <GameDisplay :game="game.game"></GameDisplay>
+                        </td>
                         <td>
                             <button class="btn btn-sm dropdown-toggle" :disabled="loading"
                                 :class="[`btn-outline-${gameStatus.byId[game.status].color}`]" data-bs-toggle="dropdown">
