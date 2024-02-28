@@ -1,16 +1,17 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq, mapValues, map, filter, reduce, join, includes, uniqBy, isEqual } from 'lodash-es';
+import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, isEqual, fromPairs, every } from 'lodash-es';
 import moment from 'moment';
 import { settings } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker } from '@/api';
-import { gameStatus, pingPreference } from '@/types';
+import { progressionStatus, completionStatus, availabilityStatus, pingPreference } from '@/types';
 import { percent, synchronize } from '@/util';
 import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
 import UsernameDisplay from '@/components/UsernameDisplay.vue';
 import GameDisplay from '@/components/GameDisplay.vue';
+import DropdownSelector from '@/components/DropdownSelector.vue';
 
 const props = defineProps(['aptrackerid']);
 
@@ -136,7 +137,7 @@ function gameDaysSinceLastChecked(game) {
 }
 
 function isGameCompleted(game) {
-    return includes(['done', 'released', 'glitched'], game.status);
+    return includes(['done', 'released'], game.completion_status);
 }
 
 function lastCheckedClass(game) {
@@ -163,10 +164,9 @@ function displayLastChecked(game) {
     return days === undefined ? 'Never' : days.toFixed(1);
 }
 
-const statGames = computed((() => {
-    const excludedStatuses = ['released', 'glitched'];
-    return () => filter(trackerData.value?.games, g => !includes(excludedStatuses, g.status));
-})());
+const statGames = computed(() =>
+    filter(trackerData.value?.games, g => g.completion_status !== 'released')
+);
 
 const statUniqueGames = computed(() =>
     uniq(statGames.value.map(g => g.game)).length
@@ -180,34 +180,60 @@ const statTotalChecks = computed(() =>
     sumBy(statGames.value, 'checks_total')
 );
 
-const statGamesByStatus = computed(() =>
-    groupBy(statGames.value, 'status')
+const statGamesByCompletionStatus = computed(() =>
+    groupBy(
+        filter(
+            statGames.value,
+            g => g.completion_status !== 'incomplete' || g.progression_status !== 'bk'
+        ),
+        'completion_status'
+    )
+);
+
+const statGamesByProgressionStatus = computed(() =>
+    groupBy(statGames.value, 'progression_status')
 );
 
 function statChecksByStatusProgression(status) {
-    if (status === 'done') {
-        return sumBy(statGames.value, 'checks_done');
-    }
-
-    return sumBy(statGamesByStatus.value[status], g => g.checks_total - g.checks_done);
+    return sumBy(statGamesByProgressionStatus.value[status], g => g.checks_total - g.checks_done);
 }
 
-const statuses = gameStatus.map(i => i.id);
-const statusFilter = ref(mapValues(gameStatus.byId, () => true));
+function makeStatusFilter(type, gameKey) {
+    const types = ref(fromPairs(map(type, t => [t.id, true])));
+    const isActive = computed(() =>
+        !every(type, t => types.value[t.id])
+    );
+    function showGame(g) {
+        return types.value[g[gameKey]];
+    }
+    function toggle(status) {
+        status = status.id || status;
+        types.value[status] = !types.value[status];
+    }
+    function classes(status) {
+        return types.value[status.id] ?
+            ['active', `bg-${status.color}`, `text-bg-${status.color}`] :
+            [`text-${status.color}`];
+    }
 
-const statusFilterActive = computed(() =>
-    !statuses.every(s => statusFilter.value[s])
-);
+    return { types, isActive, showGame, toggle, classes };
+}
+
+const progressionFilter = makeStatusFilter(progressionStatus, 'progression_status');
+const completionFilter = makeStatusFilter(completionStatus, 'completion_status');
+const availabilityFilter = makeStatusFilter(availabilityStatus, 'availability_status');
 
 const filteredGames = computed(() =>
     filter(trackerData.value?.games, g => {
         const user = getClaimingUser(g);
 
-        return statusFilter.value[g.status] && (
-            playerFilter.value === PLAYER_FILTER_ALL ? true :
-                playerFilter.value === PLAYER_FILTER_UNOWNED ? !user :
-                    isEqual(playerFilter.value, user)
+        return every(
+            [progressionFilter, completionFilter, availabilityFilter], f => f.showGame(g)
         ) && (
+                playerFilter.value === PLAYER_FILTER_ALL ? true :
+                    playerFilter.value === PLAYER_FILTER_UNOWNED ? !user :
+                        isEqual(playerFilter.value, user)
+            ) && (
                 gameFilter.value === undefined ||
                 gameFilter.value === g.game
             );
@@ -278,7 +304,7 @@ function hintStatus(hint) {
     return hint.found ? 'found' :
         (
             hint.receiver_game_id !== undefined &&
-            gameById.value[hint.receiver_game_id].status === 'done'
+            gameById.value[hint.receiver_game_id].completion_status === 'done'
         ) ? 'useless' :
             'notfound';
 }
@@ -371,6 +397,10 @@ function claimGame(game) {
             g.discord_username = settings.value.unauthenticatedDiscordUsername;
         }
 
+        if (includes(['unknown', 'open'], g.availability_status)) {
+            g.availability_status = 'claimed';
+        }
+
         g.discord_ping = settings.value.defaultPingPreference;
     });
 }
@@ -379,18 +409,24 @@ function unclaimGame(game) {
     updateGame(game, g => {
         delete g.claimed_by_ct_user_id;
         delete g.discord_username;
+
+        if (g.availability_status === 'claimed') {
+            g.availability_status = 'open';
+        }
+
         g.discord_ping = 'never';
     });
 }
 
-function setGameStatus(game, status) {
+function setGameProgressionStatus(game, status) {
+    status = status.id || status;
     const nowStr = (new Date()).toISOString();
 
     // HACK: We use setTimeout here because otherwise the dropdown becomes
     // disabled before Bootstrap closes the dropdown.  When it tries to do so,
     // it finds it disabled and won't close it.
     setTimeout(() => updateGame(game, g => {
-        g.status = status;
+        g.progression_status = status;
 
         // If setting to BK then also update "last checked."
         if (status === 'bk') {
@@ -399,8 +435,22 @@ function setGameStatus(game, status) {
     }));
 }
 
+function setGameCompletionStatus(game, status) {
+    setTimeout(() => updateGame(game, g => {
+        g.completion_status = status.id || status;
+    }))
+}
+
+function setGameAvailabilityStatus(game, status) {
+    setTimeout(() => updateGame(game, g => {
+        g.availability_status = status.id || status;
+    }));
+}
+
 function setPing(game, preference) {
-    setTimeout(() => updateGame(game, g => { g.discord_ping = preference; }));
+    setTimeout(() => updateGame(game, g => {
+        g.discord_ping = preference.id || preference;
+    }));
 }
 
 function updateLastChecked(game) {
@@ -508,7 +558,20 @@ loadTracker();
                         </span>
                     </th>
                     <th>Ping</th>
-                    <th></th>
+                    <th colspan="2">
+                        Availability
+                        <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                            <i :class="[availabilityFilter.isActive.value ? 'bi-funnel-fill' : 'bi-funnel']"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li v-for="status in availabilityStatus">
+                                <button class="dropdown-item" :class="availabilityFilter.classes(status)"
+                                    @click="availabilityFilter.toggle(status)">
+                                    {{ status.label }}
+                                </button>
+                            </li>
+                        </ul>
+                    </th>
                     <th>
                         <div class="dropdown">
                             <span @click="setSort(sortByOwner, false)" class="sorter">
@@ -587,22 +650,31 @@ loadTracker();
                             </ul>
                         </div>
                     </th>
-                    <th>
+                    <th colspan="2">
                         <div class="dropdown">
                             Status
                             <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown"
                                 data-bs-auto-close="outside">
-                                <i :class="{ 'bi-funnel': !statusFilterActive, 'bi-funnel-fill': statusFilterActive }"></i>
+                                <i :class="[
+                                    (progressionFilter.isActive.value || completionFilter.isActive.value) ?
+                                        'bi-funnel-fill'
+                                        : 'bi-funnel'
+                                ]"></i>
                             </button>
                             <ul class="dropdown-menu">
-                                <li v-for="status in statuses">
-                                    <button class="dropdown-item" :class="{
-                                        active: statusFilter[status],
-                                        [`bg-${gameStatus.byId[status].color}`]: statusFilter[status],
-                                        [`text-bg-${gameStatus.byId[status].color}`]: statusFilter[status],
-                                        [`text-${gameStatus.byId[status].color}`]: !statusFilter[status]
-                                    }" @click="statusFilter[status] = !statusFilter[status]">
-                                        {{ gameStatus.byId[status].label }}
+                                <li v-for="status in progressionStatus">
+                                    <button class="dropdown-item" :class="progressionFilter.classes(status)"
+                                        @click="progressionFilter.toggle(status)">
+                                        {{ status.label }}
+                                    </button>
+                                </li>
+                                <li>
+                                    <hr class="dropdown-divider">
+                                </li>
+                                <li v-for="status in completionStatus">
+                                    <button class="dropdown-item" :class="completionFilter.classes(status)"
+                                        @click="completionFilter.toggle(status)">
+                                        {{ status.label }}
                                     </button>
                                 </li>
                             </ul>
@@ -624,7 +696,7 @@ loadTracker();
             </thead>
             <tbody>
                 <tr v-if="sortedAndFilteredGames.length === 0">
-                    <td colspan="10" class="text-center text-muted">
+                    <td colspan="12" class="text-center text-muted">
                         No slots match the selected filters.
                     </td>
                 </tr>
@@ -637,20 +709,15 @@ loadTracker();
                         </td>
                         <td>
                             <span v-if="game.discord_username && isGameCompleted(game)" class="text-danger">Never</span>
-                            <template v-else-if="game.discord_username">
-                                <button class="btn btn-sm dropdown-toggle" :disabled="loading"
-                                    :class="[`btn-outline-${pingPreference.byId[game.discord_ping].color}`]"
-                                    data-bs-toggle="dropdown">
-                                    {{ pingPreference.byId[game.discord_ping].label }}
-                                </button>
-                                <ul class="dropdown-menu">
-                                    <li v-for="pref in pingPreference">
-                                        <button class="dropdown-item" :class="[`text-${pref.color}`]"
-                                            :disabled="loading || pref.id === game.discord_ping"
-                                            @click="setPing(game, pref.id)">{{ pref.label }}</button>
-                                    </li>
-                                </ul>
-                            </template>
+                            <DropdownSelector v-else-if="game.discord_username" :options="pingPreference"
+                                :value="pingPreference.byId[game.discord_ping]" :disabled="loading"
+                                @selected="s => setPing(game, s)"></DropdownSelector>
+                        </td>
+                        <td>
+                            <DropdownSelector :options="availabilityStatus"
+                                :value="availabilityStatus.byId[game.availability_status]" :disabled="loading"
+                                @selected="s => setGameAvailabilityStatus(game, s)">
+                            </DropdownSelector>
                         </td>
                         <td>
                             <template v-if="currentUser">
@@ -681,26 +748,24 @@ loadTracker();
                             <GameDisplay :game="game.game"></GameDisplay>
                         </td>
                         <td>
-                            <button class="btn btn-sm dropdown-toggle" :disabled="loading"
-                                :class="[`btn-outline-${gameStatus.byId[game.status].color}`]" data-bs-toggle="dropdown">
-                                {{ gameStatus.byId[game.status].label }}
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li v-for="status in statuses">
-                                    <button class="dropdown-item" :class="[`text-${gameStatus.byId[status].color}`]"
-                                        :disabled="loading || status === game.status"
-                                        @click="setGameStatus(game, status)">{{
-                                            gameStatus.byId[status].label }}</button>
-                                </li>
-                            </ul>
+                            <DropdownSelector v-if="!includes(['done', 'released'], game.completion_status)"
+                                :options="progressionStatus" :value="progressionStatus.byId[game.progression_status]"
+                                :disabled="loading" @selected="s => setGameProgressionStatus(game, s)"></DropdownSelector>
+                        </td>
+                        <td>
+                            <DropdownSelector :options="completionStatus"
+                                :value="completionStatus.byId[game.completion_status]" :disabled="loading"
+                                @selected="s => setGameCompletionStatus(game, s)">
+                            </DropdownSelector>
                         </td>
                         <td :class="[lastCheckedClass(game)]" class="text-end">
                             <span :title="displayDateTime(gameLastUpdated(game))">{{
                                 displayLastChecked(game) }}</span>
                         </td>
                         <td class="text-start p-0">
-                            <button class=" btn btn-sm btn-outline-secondary" :class="{ invisible: game.status !== 'bk' }"
-                                :disabled="loading" @click="updateLastChecked(game)">Still BK</button>
+                            <button class=" btn btn-sm btn-outline-secondary"
+                                :class="{ invisible: game.progression_status !== 'bk' }" :disabled="loading"
+                                @click="updateLastChecked(game)">Still BK</button>
                         </td>
                         <td>
                             <ChecksBar :done="game.checks_done" :total="game.checks_total"></ChecksBar>
@@ -714,7 +779,7 @@ loadTracker();
                         </td>
                     </tr>
                     <tr v-if="gameExpanded[game.id]">
-                        <td colspan="11" class="container-fluid">
+                        <td colspan="12" class="container-fluid">
                             <div class="row">
                                 <div class="col-12 col-xl-6">
                                     <div>
@@ -823,33 +888,26 @@ loadTracker();
                                 <th class="text-end shrink-column">Progression</th>
                                 <td class="align-middle">
                                     <div class="progress">
-                                        <div v-for="status in statuses" class="progress-bar"
-                                            :class="[`bg-${gameStatus.byId[status].color}`]"
-                                            :style="{ width: `${percent(statChecksByStatusProgression(status), statTotalChecks)}%` }">
+                                        <div v-for="status in progressionStatus" class="progress-bar"
+                                            :class="[`bg-${status.color}`]"
+                                            :style="{ width: `${percent(statChecksByStatusProgression(status.id), statTotalChecks)}%` }">
+                                        </div>
+                                        <div class="progress-bar bg-success"
+                                            :style="{ width: `${percent(sumBy(statGames, 'checks_done'), statTotalChecks)}%` }">
                                         </div>
                                     </div>
                                 </td>
                             </tr>
-                            <!--
                             <tr>
-                                <th class="text-end shrink-column">By total checks</th>
+                                <th class="text-end shrink-column">Completion</th>
                                 <td class="align-middle">
                                     <div class="progress">
-                                        <div v-for="status in statuses" class="progress-bar"
-                                            :class="[`bg-${gameStatus.byId[status].color}`]"
-                                            :style="{ width: `${percent(sumBy(statGamesByStatus[status], 'checks_total'), statTotalChecks)}%` }">
+                                        <div class="progress-bar bg-danger"
+                                            :style="{ width: `${percent(filter(statGames, g => g.completion_status === 'incomplete' && g.progression_status === 'bk').length, statGames.length)}%` }">
                                         </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            -->
-                            <tr>
-                                <th class="text-end shrink-column">By slot</th>
-                                <td class="align-middle">
-                                    <div class="progress">
-                                        <div v-for="status in statuses" class="progress-bar"
-                                            :class="[`bg-${gameStatus.byId[status].color}`]"
-                                            :style="{ width: `${percent(statGamesByStatus[status]?.length || 0, statGames.length)}%` }">
+                                        <div v-for="status in completionStatus" class="progress-bar"
+                                            :class="[`bg-${status.color}`]"
+                                            :style="{ width: `${percent(statGamesByCompletionStatus[status.id]?.length || 0, statGames.length)}%` }">
                                         </div>
                                     </div>
                                 </td>

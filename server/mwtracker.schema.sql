@@ -346,3 +346,46 @@ CREATE TABLE public.js_error
         ON UPDATE CASCADE
         ON DELETE SET NULL
 );
+
+CREATE TYPE public.progression_status AS ENUM
+    ('unknown', 'unblocked', 'bk');
+
+CREATE TYPE public.completion_status AS ENUM
+    ('incomplete', 'all_checks', 'goal', 'done', 'released');
+
+CREATE TYPE public.availability_status AS ENUM
+    ('unknown', 'open', 'claimed', 'public');
+
+ALTER TABLE public.ap_game
+    ADD COLUMN availability_status availability_status NOT NULL DEFAULT 'unknown'::availability_status;
+
+UPDATE ap_game SET availability_status = CASE
+	WHEN status = 'open' THEN CASE
+		WHEN discord_username IS NOT NULL THEN 'public'
+		ELSE 'open'
+	END
+	ELSE CASE
+		WHEN discord_username IS NOT NULL THEN 'claimed'
+		ELSE 'unknown'
+	END
+END::availability_status;
+
+ALTER TABLE public.ap_game
+    ADD COLUMN completion_status completion_status NOT NULL DEFAULT 'incomplete'::completion_status;
+
+UPDATE ap_game SET completion_status = CASE
+	WHEN status IN ('released', 'glitched') THEN 'released'
+	WHEN status IN ('unknown', 'unblocked', 'bk', 'open') THEN 'incomplete'
+	ELSE status::text
+END::completion_status;
+
+ALTER TABLE public.ap_game
+    ADD COLUMN progression_status progression_status NOT NULL DEFAULT 'unknown'::progression_status;
+
+UPDATE ap_game SET progression_status = CASE
+	WHEN status IN ('all_checks', 'goal', 'open') THEN 'unknown'
+	WHEN status IN ('done', 'released', 'glitched') THEN 'unblocked'
+	ELSE status::text
+END::progression_status;
+
+ALTER TABLE public.ap_game DROP COLUMN status;

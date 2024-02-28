@@ -1,5 +1,5 @@
 <script setup>
-import ShouldPing from '@/components/ShouldPing.vue';
+import YesNo from '@/components/ShouldPing.vue';
 </script>
 
 <template>
@@ -42,8 +42,9 @@ import ShouldPing from '@/components/ShouldPing.vue';
         <p>
             When you open a tracker, you will be presented with a large table.
             Each row in this table corresponds to one of the slots in the
-            multiworld. Here is a list of the columns of this table and what
-            they represent:
+            multiworld. Some columns can be sorted by clicking their header
+            laber, and/or filtered by clicking the filter button in the header.
+            Here is a list of the columns of this table and what they represent:
         </p>
         <ul>
             <li>
@@ -57,10 +58,6 @@ import ShouldPing from '@/components/ShouldPing.vue';
                     quickly determine if a slot has available progression
                     without needing to open the game or the AP text client.
                 </p>
-                <p>
-                    Clicking the title of this column will allow you to sort on
-                    this column.
-                </p>
             </li>
             <li>
                 <b>Ping</b>: Indicates under what circumstances the owner of
@@ -70,37 +67,33 @@ import ShouldPing from '@/components/ShouldPing.vue';
             </li>
             <li>
                 <p>
-                    <b>Owner</b>: The Discord username of the player who has
-                    claimed this slot. If this is not your slot, a "claim"
-                    button will appear, which can be used to claim the slot for
-                    yourself. If this is your slot, a "disclaim" button will
-                    appear instead, allowing you to release your claim on the
-                    slot. It goes without saying that you should not claim a
-                    slot owned by another player without consulting them or the
-                    organizer of the multiworld first. (An additional popup
-                    confirmation will appear when you attempt to claim someone
-                    else's slot to help prevent accidents.)
+                    <b>Availability</b>: Indicates whether the slot is available
+                    to claim or play. See the "availability" section below for
+                    details.
                 </p>
                 <p>
-                    Clicking the title of this column will allow you to filter
-                    slots by a specific owner. This is a good way to show only
-                    your own slots, particularly if you own a large number of
-                    slots.
+                    If this is not your slot, a "claim" button will appear,
+                    which can be used to claim the slot for yourself. If this is
+                    your slot, a "disclaim" button will appear instead, allowing
+                    you to release your claim on the slot. It goes without
+                    saying that you should not claim a slot owned by another
+                    player without consulting them or the organizer of the
+                    multiworld first. (An additional popup confirmation will
+                    appear when you attempt to claim someone else's slot to help
+                    prevent accidents.)
                 </p>
+            </li>
+            <li>
+                <b>Owner</b>: The Discord username of the player who has claimed
+                this slot.
             </li>
             <li>
                 <b>Game</b>: The game being played in this slot.
             </li>
             <li>
-                <p>
-                    <b>Status</b>: The status of the game in this slot. See the
-                    "status" section below for more information about what the
-                    various statuses mean.
-                </p>
-                <p>
-                    Clicking the title of this column will allow you to filter
-                    slots by any combination of statuses.
-                </p>
+                <b>Status</b>: The status of the game in this slot. This is
+                broken down into progression and completion statuses, which are
+                each documented in their own sections below.
             </li>
             <li>
                 <p>
@@ -122,10 +115,6 @@ import ShouldPing from '@/components/ShouldPing.vue';
                     thresholds for the colors in this column may be customizable
                     per tracker.
                 </p>
-                <p>
-                    Clicking the title of this column will allow you to sort on
-                    this column.
-                </p>
             </li>
             <li>
                 <b>Checks</b>: Shows the number of completed and total checks in
@@ -145,10 +134,6 @@ import ShouldPing from '@/components/ShouldPing.vue';
                 <p>
                     If there are notes for a slot, there will also be an
                     asterisk (*) displayed after the hint count.
-                </p>
-                <p>
-                    Clicking the title of this column will expand or collapse
-                    the hints and notes panes for all slots.
                 </p>
             </li>
         </ul>
@@ -177,12 +162,71 @@ import ShouldPing from '@/components/ShouldPing.vue';
             You can see the time the Archipelago tracker information was last
             pulled at the bottom of the tracker.
         </p>
+        <h2>Availability</h2>
+        <p>
+            This column communicates whether the slot is available to claim or
+            play. The following options are available:
+        </p>
+        <ul>
+            <li>
+                <span class="fw-bold text-muted">Unknown</span>: It is not known
+                whether the slot is available to play. This is the default
+                because different asyncs will start with different slot
+                ownership.
+            </li>
+            <li>
+                <span class="fw-bold text-success">Open</span>: This slot is
+                open to be claimed. Different asyncs may have different policies
+                regarding who may claim slots. For example, some asyncs may have
+                a maximum number of slots per player, a maximum number of
+                <i>incomplete</i> slots per player, or some other policy. If in
+                doubt, contact the organizer before claiming an open slot.
+            </li>
+            <li>
+                <span class="fw-bold text-light">Claimed</span>: This slot has
+                been claimed by another user. You should not play on this slot
+                or claim it without consulting the owner and/or the organizer.
+            </li>
+            <li>
+                <span class="fw-bold text-info">Public</span>: This slot is
+                available for anyone to play without needing to claim it. The
+                slot may still have a primary owner.
+            </li>
+        </ul>
+        <p>
+            Availability is managed semi-automatically:
+        </p>
+        <ul>
+            <li>
+                If a slot marked <span class="fw-bold text-muted">unknown</span> or
+                <span class="fw-bold text-success">open</span> is claimed, its
+                availability will automatically change to
+                <span class="fw-bold text-light">claimed</span>.
+            </li>
+            <li>
+                If a slot marked <span class="fw-bold text-light">claimed</span>
+                is disclaimed, its availability will automatically change to
+                <span class="fw-bold text-success">open</span>.
+            </li>
+        </ul>
         <h2>Status</h2>
         <p>
             The status column is used to communicate what is happening with a
-            particular slot. The following statuses are available:
+            particular slot. This is broken down into progression status and
+            completion status.
+        </p>
+        <p>
+            Progression status communicates whether progress can be made on the
+            slot.
         </p>
         <ul>
+            <li>
+                <span class="fw-bold text-muted">Unknown</span>: It is not known
+                whether progression is possible. This is the default state. It
+                may also be manually selected, for example if someone needs to
+                disclaim a slot and doesn't remember if there is available
+                progression.
+            </li>
             <li>
                 <span class="fw-bold text-light">Unblocked</span>: This slot has
                 available progression. The owner may or may not be playing it at
@@ -192,57 +236,72 @@ import ShouldPing from '@/components/ShouldPing.vue';
                 <span class="fw-bold text-danger">BK</span>: This slot has no
                 available progression, and is waiting on items from other slots.
             </li>
-            <li>
-                <span class="fw-bold text-warning">All checks</span>: This slot
-                has sent all of its checks but its goal is not yet complete.
-            </li>
-            <li>
-                <span class="fw-bold text-warning">Goal</span>: This slot's goal
-                is complete but it has not sent all of its checks.
-            </li>
-            <li>
-                <span class="fw-bold text-success">Done</span>: This slot
-                has sent all of its checks and its goal is complete.
-            </li>
-            <li>
-                <span class="fw-bold text-info">Open</span>: This slot is open
-                for a player to claim it. This may be because the prior owner
-                has abandoned it, or the organizer of the multiworld
-                intentionally included some unclaimed slots so that new players
-                can join the multiworld after it starts. Note that the organizer
-                of a multiworld may have restrictions around who can claim open
-                slots, so it may be prudent to consult them before claiming an
-                open slot on the tracker.
-            </li>
-            <li>
-                <span class="fw-bold text-muted">Released</span>: The owner of
-                this slot has abandoned it and released the items it held
-                because the owner does not think they can complete it. This
-                could be due to an unexpected personal situation, the slot's
-                settings proved too challenging, or some other reason. Before
-                you release a slot, consult with the organizer of your
-                multiworld. It's likely someone else can take it over instead.
-            </li>
-            <li>
-                <span class="fw-bold text-muted">Glitched</span>: The owner of
-                this slot has abandoned it and released the items it held
-                because a generation issue is preventing progress or completion
-                of the slot.
-            </li>
-            <li>
-                <span class="fw-bold text-muted">Unknown</span>: The slot's
-                status is not known. This is the default status for slots when
-                one of the automatically-set statuses does not apply. Typically,
-                this status will be used by slots where the slot owner is not
-                updating the tracker.
-            </li>
         </ul>
         <p>
-            If a slot is not currently marked "released" or "glitched," then its
-            status may be automatically changed to "all checks," "goal," or
-            "done" when the Archipelago tracker indicates that the slot meets
-            the relevant criteria. You should never have to manually set these
-            statuses.
+            Completion status communicates how complete the slot is.
+        </p>
+        <table class="table text-center">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>All checks obtained</th>
+                    <th>Goal complete</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="fw-bold text-light">Incomplete</td>
+                    <td><yes-no value="no"></yes-no></td>
+                    <td><yes-no value="no"></yes-no></td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-info">All checks</td>
+                    <td><yes-no value="yes"></yes-no></td>
+                    <td><yes-no value="no"></yes-no></td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-info">Goal</td>
+                    <td><yes-no value="no"></yes-no></td>
+                    <td><yes-no value="yes"></yes-no></td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-success">Done</td>
+                    <td><yes-no value="yes"></yes-no></td>
+                    <td><yes-no value="yes"></yes-no></td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-muted align-middle">Released</td>
+                    <td colspan="2">
+                        The owner of this slot has abandoned it and released the
+                        items it held because the owner does not think they can
+                        complete it. This could be due to an unexpected personal
+                        situation, the slot's settings proved too challenging,
+                        or some other reason. Before you release a slot, consult
+                        with the organizer of your multiworld. It's likely
+                        someone else can take it over instead.
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        <p>
+            If a slot is not currently marked "released," then its status will
+            be automatically changed to "all checks," "goal," or "done" when the
+            Archipelago tracker indicates that the slot meets the relevant
+            criteria.
+        </p>
+        <p>
+            You can manually select a more complete status than indicated by the
+            Archipelago tracker, but not a less complete status. This is useful
+            for games where not all checks are possible (in slots with
+            accessibilty set to "minimal" during generation, for example), which
+            can be set to "done" when there is no more possible progression even
+            though not all checks have been obtained. You can also always select
+            "released" -- this status supersedes all others.
+        </p>
+        <p>
+            In particular, note that if the automatic status would be "all
+            checks" or "goal" and you try to manually set the other one, this is
+            interpreted as "done" (all checks + goal = done).
         </p>
         <h2>Hints and Notes</h2>
         <p>
@@ -299,55 +358,55 @@ import ShouldPing from '@/components/ShouldPing.vue';
             <tbody>
                 <tr>
                     <td>You hint an item found by the slot.</td>
-                    <td><should-ping value="yes"></should-ping></td>
-                    <td><should-ping value="yes"></should-ping></td>
-                    <td><should-ping value="yes"></should-ping></td>
-                    <td><should-ping value="notes"></should-ping></td>
-                    <td><should-ping value="no"></should-ping></td>
+                    <td><yes-no value="yes"></yes-no></td>
+                    <td><yes-no value="yes"></yes-no></td>
+                    <td><yes-no value="yes"></yes-no></td>
+                    <td><yes-no value="notes"></yes-no></td>
+                    <td><yes-no value="no"></yes-no></td>
                 </tr>
                 <tr>
                     <td>You find an item that was hinted by the slot.</td>
-                    <td><should-ping value="yes"></should-ping></td>
-                    <td><should-ping value="yes"></should-ping></td>
-                    <td><should-ping value="yes"></should-ping></td>
-                    <td><should-ping value="notes"></should-ping></td>
-                    <td><should-ping value="no"></should-ping></td>
+                    <td><yes-no value="yes"></yes-no></td>
+                    <td><yes-no value="yes"></yes-no></td>
+                    <td><yes-no value="yes"></yes-no></td>
+                    <td><yes-no value="notes"></yes-no></td>
+                    <td><yes-no value="no"></yes-no></td>
                 </tr>
                 <tr>
                     <td>You get a progression item you are 100% sure is critical.</td>
-                    <td><should-ping value="yes"></should-ping></td>
-                    <td><should-ping value="yes"></should-ping></td>
-                    <td><should-ping value="no"></should-ping></td>
-                    <td><should-ping value="notes"></should-ping></td>
-                    <td><should-ping value="no"></should-ping></td>
+                    <td><yes-no value="yes"></yes-no></td>
+                    <td><yes-no value="yes"></yes-no></td>
+                    <td><yes-no value="no"></yes-no></td>
+                    <td><yes-no value="notes"></yes-no></td>
+                    <td><yes-no value="no"></yes-no></td>
                 </tr>
                 <tr>
                     <td>You get a progression item you are not 100% sure is critical.</td>
-                    <td><should-ping value="yes"></should-ping></td>
-                    <td><should-ping value="no"></should-ping></td>
-                    <td><should-ping value="no"></should-ping></td>
-                    <td><should-ping value="notes"></should-ping></td>
-                    <td><should-ping value="no"></should-ping></td>
+                    <td><yes-no value="yes"></yes-no></td>
+                    <td><yes-no value="no"></yes-no></td>
+                    <td><yes-no value="no"></yes-no></td>
+                    <td><yes-no value="notes"></yes-no></td>
+                    <td><yes-no value="no"></yes-no></td>
                 </tr>
                 <tr>
                     <td>You are getting impatient not receiving a hinted item.</td>
-                    <td><should-ping value="no"></should-ping></td>
-                    <td><should-ping value="no"></should-ping></td>
-                    <td><should-ping value="no"></should-ping></td>
-                    <td><should-ping value="no"></should-ping></td>
-                    <td><should-ping value="no"></should-ping></td>
+                    <td><yes-no value="no"></yes-no></td>
+                    <td><yes-no value="no"></yes-no></td>
+                    <td><yes-no value="no"></yes-no></td>
+                    <td><yes-no value="no"></yes-no></td>
+                    <td><yes-no value="no"></yes-no></td>
                 </tr>
             </tbody>
         </table>
         <div class="row text-center">
             <div class="col-4">
-                <should-ping value="yes"></should-ping> You can ping
+                <yes-no value="yes"></yes-no> You can ping
             </div>
             <div class="col-4">
-                <should-ping value="notes"></should-ping> Check the slot's notes to see if you can ping
+                <yes-no value="notes"></yes-no> Check the slot's notes to see if you can ping
             </div>
             <div class="col-4">
-                <should-ping value="no"></should-ping> Do not ping
+                <yes-no value="no"></yes-no> Do not ping
             </div>
         </div>
         <h2>Reports</h2>
@@ -359,7 +418,7 @@ import ShouldPing from '@/components/ShouldPing.vue';
         <p>
             <i>
                 Note that all information in the report excludes slots marked
-                "released" or "glitched."
+                "released."
             </i>
             These slots are considered to be removed from the multiworld, so
             their checks do not count for or against progression.
@@ -370,33 +429,48 @@ import ShouldPing from '@/components/ShouldPing.vue';
         </p>
         <p>
             The status summary shows two bars, which helps visualise the status
-            information of all of the slots at once. The colors used reflect
-            statuses, so white means "unblocked," red means "BK," and so on.
-            Consult the "status" section to see the colors for each status.
+            information of all of the slots at once.
         </p>
         <ul>
             <li>
-                <b>Progression</b> shows an aggregate report about checks and is
-                intended to visualize the entire progress of the whole
-                multiworld. The green bar represents completed checks, which
-                means it contains all checks for "done" and "all checks" slots
-                <i>as well as completed checks from slots that have not been
-                    completed themselves.</i> This allows you to see at a glance
-                (roughly) what percentage of <i>checks</i> are in unblocked or
-                BK slots.
+                <p>
+                    <b>Progression</b> shows an aggregate report about checks and is
+                    intended to visualize the entire progress of the whole
+                    multiworld. The green bar represents completed checks, which
+                    means it contains all checks for "done" and "all checks" slots
+                    <i>as well as completed checks from slots that have not been
+                        completed themselves.</i> This allows you to see at a glance
+                    (roughly) what percentage of <i>checks</i> are in unblocked or
+                    BK slots.
+                </p>
+                <p>
+                    The colors represent the corresponding progression status
+                    for remaining checks, except for green which represents
+                    completed checks.
+                </p>
             </li>
             <li>
-                <b>By slot</b> is far simpler and shows how many slots are in
-                which status. While this is interesting data, note that
-                interpreting this in terms of "how much is left to do in the
-                multiworld" can cause slots with very few checks (such as
-                Clique) to skew your interpretation. (This is why the
-                "progression" bar exists.)
+                <p>
+                    <b>Completion</b> is far simpler and shows how many slots
+                    are in which status. While this is interesting data, note
+                    that interpreting this in terms of "how much is left to do
+                    in the multiworld" can cause slots with very few checks
+                    (such as Clique) to skew your interpretation. (This is why
+                    the "progression" bar exists.)
+                </p>
+                <p>
+                    The colors represent the corresponding completion status of
+                    each slot, except for red. The red section represents
+                    incomplete and BK slots, which are <i>not</i> represented in
+                    the white (incomplete) section.
+                </p>
             </li>
         </ul>
         <p>
             Below these bars, there are two tables, which simply break down the
-            slots two ways: one by player, and one by game.
+            slots two ways: one by player, and one by game. The "slots" column
+            of these tables contains a bar showing the completion status of each
+            slot, the same way that the global "completion" bar does.
         </p>
     </div>
 </template>

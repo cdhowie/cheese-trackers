@@ -11,8 +11,8 @@ use axum::{
 use chrono::{DateTime, Utc};
 use db::{
     model::{
-        ApGame, ApGameIden, ApHint, ApHintIden, ApTracker, ApTrackerIden, CtUser, GameStatus,
-        JsError, PingPreference, TrackerGameStatus,
+        ApGame, ApGameIden, ApHint, ApHintIden, ApTracker, ApTrackerIden, AvailabilityStatus,
+        CompletionStatus, CtUser, JsError, PingPreference, ProgressionStatus, TrackerGameStatus,
     },
     DataAccess, DataAccessProvider, Transactable, Transaction,
 };
@@ -109,20 +109,19 @@ impl<D: DataAccessProvider> GetDataAccessProvider for AppState<D> {
     }
 }
 
-fn update_game_status(game: &mut ApGame) -> bool {
-    if matches!(game.status, GameStatus::Released | GameStatus::Glitched) {
-        // Released and glitched are special cases that take priority over all others.
-        false
-    } else {
-        game.status = match (game.checks_done == game.checks_total, game.tracker_status) {
-            (true, TrackerGameStatus::GoalCompleted) => GameStatus::Done,
-            (true, _) => GameStatus::AllChecks,
-            (false, TrackerGameStatus::GoalCompleted) => GameStatus::Goal,
-            _ => return false,
-        };
+fn update_game_completion_status(game: &mut ApGame) -> bool {
+    let auto_status = match (game.checks_done == game.checks_total, game.tracker_status) {
+        (true, TrackerGameStatus::GoalCompleted) => CompletionStatus::Done,
+        (true, _) => CompletionStatus::AllChecks,
+        (false, TrackerGameStatus::GoalCompleted) => CompletionStatus::Goal,
+        (false, _) => CompletionStatus::Incomplete,
+    };
 
-        true
-    }
+    let new_status = auto_status.merge_with(game.completion_status);
+
+    let r = new_status != game.completion_status;
+    game.completion_status = new_status;
+    r
 }
 
 impl<D> AppState<D> {
@@ -210,13 +209,15 @@ impl<D> AppState<D> {
                         last_activity: game.last_activity.map(|d| now - d),
                         discord_username: None,
                         discord_ping: PingPreference::Never,
-                        status: GameStatus::Unknown,
+                        availability_status: AvailabilityStatus::Unknown,
+                        completion_status: CompletionStatus::Incomplete,
+                        progression_status: ProgressionStatus::Unknown,
                         last_checked: None,
                         notes: String::new(),
                         claimed_by_ct_user_id: None,
                     };
 
-                    update_game_status(&mut game);
+                    update_game_completion_status(&mut game);
 
                     let game = db
                         .create_ap_games([game])
@@ -322,8 +323,8 @@ impl<D> AppState<D> {
                         columns.push(ApGameIden::LastActivity);
                     }
 
-                    if update_game_status(&mut db_game) {
-                        columns.push(ApGameIden::Status);
+                    if update_game_completion_status(&mut db_game) {
+                        columns.push(ApGameIden::CompletionStatus);
                     }
 
                     db.update_ap_game(db_game, &columns).await?;
@@ -616,7 +617,9 @@ struct UpdateGameRequest {
     pub claimed_by_ct_user_id: Option<i32>,
     pub discord_username: Option<String>,
     pub discord_ping: PingPreference,
-    pub status: GameStatus,
+    pub availability_status: AvailabilityStatus,
+    pub completion_status: CompletionStatus,
+    pub progression_status: ProgressionStatus,
     pub last_checked: Option<DateTime<Utc>>,
     pub notes: String,
 }
@@ -679,11 +682,13 @@ where
 
     game.claimed_by_ct_user_id = game_update.claimed_by_ct_user_id;
     game.discord_ping = game_update.discord_ping;
-    game.status = game_update.status;
+    game.availability_status = game_update.availability_status;
+    game.completion_status = game_update.completion_status;
+    game.progression_status = game_update.progression_status;
     game.last_checked = game_update.last_checked;
     game.notes = game_update.notes;
 
-    update_game_status(&mut game);
+    update_game_completion_status(&mut game);
 
     tx.update_ap_game(
         game.clone(),
@@ -691,7 +696,9 @@ where
             ApGameIden::ClaimedByCtUserId,
             ApGameIden::DiscordUsername,
             ApGameIden::DiscordPing,
-            ApGameIden::Status,
+            ApGameIden::AvailabilityStatus,
+            ApGameIden::CompletionStatus,
+            ApGameIden::ProgressionStatus,
             ApGameIden::LastChecked,
             ApGameIden::Notes,
         ],

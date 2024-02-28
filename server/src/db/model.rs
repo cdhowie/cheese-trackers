@@ -93,65 +93,110 @@ macro_rules! db_struct {
     };
 }
 
-macro_rules! implement_into_simpleexpr {
-    ( $ty:ident { $( $variant:ident ),* $(,)? } ) => {
+macro_rules! db_enum {
+    (
+        $( #[ $nm:meta ] )*
+        $nv:vis enum $n:ident as $dbn:literal {
+            $(
+                $( #[ $fm:meta ] )*
+                $variant:ident
+            ),* $(,)?
+        }
+    ) => {
         paste::paste! {
-            impl From<$ty> for SimpleExpr {
-                fn from(value: $ty) -> Self {
+            #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize)]
+            #[sqlx(type_name = $dbn, rename_all = "snake_case")]
+            #[serde(rename_all = "snake_case")]
+            $nv enum $n {
+                $(
+                    $( #[ $fm:meta ] )*
+                    $variant
+                ),*
+            }
+
+            impl From<$n> for SimpleExpr {
+                fn from(value: $n) -> Self {
                     SimpleExpr::Value(
                         match value {
-                            $( $ty::$variant => stringify!([< $variant:snake >]) ),*
+                            $( $n::$variant => stringify!([< $variant:snake >]) ),*
                         }
                         .into(),
                     )
-                    .cast_as(Alias::new(stringify!([< $ty:snake >])))
+                    .cast_as(Alias::new(stringify!([< $n:snake >])))
                 }
             }
         }
     };
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize)]
-#[sqlx(type_name = "game_status", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum GameStatus {
-    Unblocked,
-    Bk,
-    AllChecks,
-    Done,
-    Open,
-    Released,
-    Glitched,
-    Unknown,
-    Goal,
-}
-
-implement_into_simpleexpr! {
-    GameStatus {
+db_enum! {
+    pub enum ProgressionStatus as "progression_status" {
+        Unknown,
         Unblocked,
         Bk,
-        AllChecks,
-        Done,
-        Open,
-        Released,
-        Glitched,
-        Unknown,
-        Goal,
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize)]
-#[sqlx(type_name = "tracker_game_status", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum TrackerGameStatus {
-    Disconnected,
-    Connected,
-    Playing,
-    GoalCompleted,
+db_enum! {
+    pub enum CompletionStatus as "completion_status" {
+        Incomplete,
+        AllChecks,
+        Goal,
+        Done,
+        Released,
+    }
 }
 
-implement_into_simpleexpr! {
-    TrackerGameStatus {
+impl CompletionStatus {
+    /// Merges two completion statuses.
+    ///
+    /// This is used by the code that determines whether to automatically change
+    /// a game's completion state.  The automatically-determined state is merged
+    /// with whatever the state was before, which might be manually set.
+    ///
+    /// Conceptually, all of the statuses other than released capture the four
+    /// possibilities of "all checks" and "goal complete":
+    ///
+    /// | All checks | Goal complete | Status     |
+    /// |------------|---------------|------------|
+    /// | No         | No            | Incomplete |
+    /// | Yes        | No            | AllChecks  |
+    /// | No         | Yes           | Goal       |
+    /// | Yes        | Yes           | Done       |
+    pub fn merge_with(self, other: CompletionStatus) -> Self {
+        match (self, other) {
+            // Released always takes precedence over anything else.  This must
+            // be tested first.
+            (Self::Released, _) | (_, Self::Released) => Self::Released,
+
+            // Anything takes precedence over incomplete.
+            (Self::Incomplete, x) | (x, Self::Incomplete) => x,
+
+            // Done takes precedence over anything else (except released, which
+            // was already tested).
+            (Self::Done, _) | (_, Self::Done) => Self::Done,
+
+            // All checks + goal means the slot is done.
+            (Self::AllChecks, Self::Goal) | (Self::Goal, Self::AllChecks) => Self::Done,
+
+            // These are the only cases not covered above.
+            (Self::Goal, Self::Goal) => Self::Goal,
+            (Self::AllChecks, Self::AllChecks) => Self::AllChecks,
+        }
+    }
+}
+
+db_enum! {
+    pub enum AvailabilityStatus as "availability_status" {
+        Unknown,
+        Open,
+        Claimed,
+        Public,
+    }
+}
+
+db_enum! {
+    pub enum TrackerGameStatus as "tracker_game_status" {
         Disconnected,
         Connected,
         Playing,
@@ -159,19 +204,8 @@ implement_into_simpleexpr! {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize)]
-#[sqlx(type_name = "ping_preference", rename_all = "snake_case")]
-#[serde(rename_all = "snake_case")]
-pub enum PingPreference {
-    Liberally,
-    Sparingly,
-    Hints,
-    SeeNotes,
-    Never,
-}
-
-implement_into_simpleexpr! {
-    PingPreference {
+db_enum! {
+    pub enum PingPreference as "ping_preference" {
         Liberally,
         Sparingly,
         Hints,
@@ -206,12 +240,14 @@ db_struct! {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub discord_username: Option<String>,
         pub discord_ping: PingPreference,
-        pub status: GameStatus,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub last_checked: Option<DateTime<Utc>>,
         pub notes: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub claimed_by_ct_user_id: Option<i32>,
+        pub availability_status: AvailabilityStatus,
+        pub completion_status: CompletionStatus,
+        pub progression_status: ProgressionStatus,
     }
 }
 

@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
-import { includes, filter, groupBy, mapValues, orderBy, sumBy } from 'lodash-es';
-import { gameStatus } from '@/types';
+import { filter, groupBy, mapValues, orderBy, sumBy } from 'lodash-es';
+import { completionStatus } from '@/types';
 import { percent } from '@/util';
 import ChecksBar from './ChecksBar.vue';
 import UsernameDisplay from './UsernameDisplay.vue';
@@ -40,20 +40,20 @@ const summaryTypes = {
 
 const summaryType = computed(() => summaryTypes[props.summarizeBy]);
 
-const STATUSES = ['unknown', 'unblocked', 'bk', 'open', 'all_checks', 'goal', 'done'];
-
 const summaryData = computed(() => {
     return mapValues(
         groupBy(
             filter(
                 (props.trackerData || {}).games,
-                g => includes(STATUSES, g.status)
+                g => g.completion_status !== 'released'
             ),
             summaryType.value.key
         ),
         games => ({
             count: games.length,
-            byStatus: groupBy(games, 'status'),
+            byStatus: groupBy(games, g =>
+                g.completion_status === 'incomplete' && g.progression_status === 'bk' ? 'bk' : g.completion_status
+            ),
             checksDone: sumBy(games, 'checks_done'),
             checksTotal: sumBy(games, 'checks_total'),
         })
@@ -71,7 +71,7 @@ const sumKeys = computed(() => {
             <tr>
                 <th class="text-end">{{ summaryType.label }}</th>
                 <th></th>
-                <th class="text-center">Games</th>
+                <th class="text-center">Slots</th>
                 <th class="text-center">Checks</th>
             </tr>
         </thead>
@@ -86,9 +86,11 @@ const sumKeys = computed(() => {
                 <td class="text-end shrink-column">{{ summaryData[key].count }}</td>
                 <td class="align-middle">
                     <div class="progress">
-                        <div v-for="status in STATUSES" class="progress-bar"
-                            :class="[`bg-${gameStatus.byId[status].color}`]"
-                            :style="{ width: `${percent(summaryData[key].byStatus[status]?.length, summaryData[key].count)}%` }">
+                        <div class="progress-bar bg-danger"
+                            :style="{ width: `${percent(summaryData[key].byStatus['bk']?.length, summaryData[key].count)}%` }">
+                        </div>
+                        <div v-for="status in completionStatus" class="progress-bar" :class="[`bg-${status.color}`]"
+                            :style="{ width: `${percent(summaryData[key].byStatus[status.id]?.length, summaryData[key].count)}%` }">
                         </div>
                     </div>
                 </td>
