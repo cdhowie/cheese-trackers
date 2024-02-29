@@ -901,12 +901,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listen = config.http_listen;
     let cors = config.cors_permissive;
 
-    let api_router = create_router_from_config(config).await?;
-    let api_router = if cors {
-        api_router.layer(CorsLayer::permissive())
-    } else {
-        api_router
-    };
+    let mut api_router = create_router_from_config(config).await?;
+    if cors {
+        api_router = api_router.layer(CorsLayer::permissive());
+    }
 
     let router = axum::Router::new()
         .nest("/api", api_router)
