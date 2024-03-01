@@ -1,6 +1,8 @@
 <script setup>
+// This view could use some refactoring to break stuff out into components.
+
 import { computed, onUnmounted, ref, watch } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, isEqual, fromPairs, every } from 'lodash-es';
+import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, isEqual, fromPairs, every, omit } from 'lodash-es';
 import moment from 'moment';
 import { settings } from '@/settings';
 import { now } from '@/time';
@@ -22,6 +24,7 @@ const hintsByFinder = ref(undefined);
 const hintsByReceiver = ref(undefined);
 const gameById = ref(undefined);
 
+// Hack that should probably exist as a global service.
 watch(
     () => trackerData.value?.title,
     title => {
@@ -36,6 +39,55 @@ watch(
 onUnmounted(() => {
     document.title = 'Cheese Trackers';
 });
+
+const trackerOwner = computed(() =>
+    trackerData.value.owner_ct_user_id && {
+        id: trackerData.value.owner_ct_user_id,
+        discordUsername: trackerData.value.owner_discord_username,
+    }
+);
+
+function updateTracker(data) {
+    if (loading.value) {
+        return;
+    }
+
+    loading.value = true;
+
+    apiUpdateTracker(Object.assign(
+        omit(trackerData.value, 'games', 'hints'),
+        data
+    ))
+        .then(
+            ({ status }) => status >= 200 && status < 300,
+            e => {
+                console.error(`Failed to update tracker: ${e}`);
+                return false;
+            }
+        )
+        .then(saved => {
+            loading.value = false;
+            if (saved) {
+                Object.assign(trackerData.value, data);
+            }
+        })
+}
+
+function claimTracker() {
+    updateTracker({
+        owner_ct_user_id: currentUser.value.id,
+        // This will be ignored by the server, but is used to update our local
+        // state after the request.
+        owner_discord_username: currentUser.value.discordUsername,
+    });
+}
+
+function disclaimTracker() {
+    updateTracker({
+        owner_ct_user_id: undefined,
+        owner_discord_username: undefined,
+    });
+}
 
 const hintsColors = [
     { max: 0, color: 'secondary' },
@@ -114,6 +166,7 @@ const uniqueGames = computed(() =>
 
 const gameFilter = ref(undefined);
 
+// TODO: Make these configurable by the room owner.
 const lastCheckedThresholds = [
     { days: 2, color: 'danger' },
     { days: 1, color: 'warning' },
@@ -498,28 +551,7 @@ function saveTitle() {
     editingTitle.value = false;
 
     if ((trackerData.value.title || '') !== editedTitle.value) {
-        if (loading.value) {
-            return;
-        }
-
-        loading.value = true;
-
-        const newTitle = editedTitle.value;
-        apiUpdateTracker({
-            tracker_id: trackerData.value.tracker_id,
-            title: newTitle,
-        })
-            .then(({ status }) => status >= 200 && status < 300,
-                e => {
-                    console.error(`Failed to update tracker: ${e}`);
-                    return false;
-                })
-            .then(saved => {
-                loading.value = false;
-                if (saved) {
-                    trackerData.value.title = newTitle;
-                }
-            })
+        updateTracker({ title: editedTitle.value });
     }
 }
 
@@ -546,6 +578,13 @@ loadTracker();
                 trackerData.title : 'Untitled tracker' }}</h2>
         <input v-if="editingTitle" ref="editTitleInput" class="form-control text-center" placeholder="Title"
             v-model="editedTitle" @blur="saveTitle" @keyup.enter="saveTitle" @keyup.esc="cancelEditTitle">
+        <div class="text-center">
+            Organizer: <UsernameDisplay :user="trackerOwner"></UsernameDisplay> <button v-if="currentUser && !trackerOwner"
+                class="btn btn-sm btn-outline-secondary" :disabled="loading" @click="claimTracker">Claim</button>
+
+            <button v-if="currentUser?.id !== undefined && currentUser.id === trackerOwner?.id"
+                class="btn btn-sm btn-outline-warning" :disabled="loading" @click="disclaimTracker">Disclaim</button>
+        </div>
         <button class="btn btn-primary refresh-button" @click="loadTracker()" :disabled="loading">Refresh</button>
         <table class="table table-sm table-hover text-center tracker-table">
             <thead style="position: sticky; top: 0; z-index: 100">

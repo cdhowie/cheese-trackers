@@ -176,6 +176,7 @@ impl<D> AppState<D> {
                         tracker_id,
                         updated_at: now,
                         title: "".to_owned(),
+                        owner_ct_user_id: None,
                     }])
                     .try_next()
                     .await?
@@ -470,6 +471,8 @@ where
     struct GetTrackerResponse {
         #[serde(flatten)]
         pub tracker: ApTracker,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub owner_discord_username: Option<String>,
         pub games: Vec<ApGame>,
         pub hints: Vec<ApHint>,
     }
@@ -498,6 +501,28 @@ where
         .unexpected()?
         .ok_or(StatusCode::NOT_FOUND)?;
 
+    // TODO: Convert this to a join.
+    let owner_discord_username = match tracker.owner_ct_user_id {
+        None => None,
+        Some(uid) => {
+            Some(
+                tx.get_ct_user_by_id(uid)
+                    .await
+                    .unexpected()?
+                    .ok_or_else(|| {
+                        // This should not be possible due to the foreign key
+                        // constraint, and we are running in a transaction.
+                        eprintln!(
+                            "Owner of tracker {} user ID {} doesn't exist",
+                            tracker.id, uid
+                        );
+                        StatusCode::INTERNAL_SERVER_ERROR
+                    })?
+                    .discord_username,
+            )
+        }
+    };
+
     let games = tx
         .get_ap_games_by_tracker_id(tracker.id)
         .try_collect()
@@ -515,6 +540,7 @@ where
 
     Ok(Json(GetTrackerResponse {
         tracker,
+        owner_discord_username,
         games,
         hints,
     }))
@@ -523,11 +549,13 @@ where
 #[derive(Debug, serde::Deserialize)]
 struct UpdateTrackerRequest {
     pub title: String,
+    pub owner_ct_user_id: Option<i32>,
 }
 
 async fn update_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
     Path(tracker_id): Path<String>,
+    user: Option<AuthenticatedUser>,
     Json(tracker_update): Json<UpdateTrackerRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
 where
@@ -538,6 +566,7 @@ where
         .create_data_access()
         .await
         .unexpected()?;
+
     let mut tx = db.begin().await.unexpected()?;
 
     let mut tracker = tx
@@ -546,11 +575,29 @@ where
         .unexpected()?
         .ok_or(StatusCode::NOT_FOUND)?;
 
+    if tracker_update.owner_ct_user_id != tracker.owner_ct_user_id {
+        // A change in ownership requires authentication.
+        let user = user.ok_or(StatusCode::UNAUTHORIZED)?;
+
+        // The only valid changes are claiming or disclaiming ownership, and the
+        // user ID must match the authenticated user.
+        tracker.owner_ct_user_id = match (tracker.owner_ct_user_id, tracker_update.owner_ct_user_id)
+        {
+            (None, Some(uid)) | (Some(uid), None) if uid == user.0.id => {
+                tracker_update.owner_ct_user_id
+            }
+            _ => return Err(StatusCode::FORBIDDEN),
+        };
+    }
+
     tracker.title = tracker_update.title;
 
-    tx.update_ap_tracker(tracker, &[ApTrackerIden::Title])
-        .await
-        .unexpected()?;
+    tx.update_ap_tracker(
+        tracker,
+        &[ApTrackerIden::Title, ApTrackerIden::OwnerCtUserId],
+    )
+    .await
+    .unexpected()?;
 
     tx.commit().await.unexpected()?;
 

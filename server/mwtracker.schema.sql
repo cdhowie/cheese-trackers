@@ -389,3 +389,15 @@ UPDATE ap_game SET progression_status = CASE
 END::progression_status;
 
 ALTER TABLE public.ap_game DROP COLUMN status;
+
+ALTER TABLE public.ap_tracker
+    ADD COLUMN owner_ct_user_id integer;
+
+ALTER TABLE public.ap_tracker
+    ADD CONSTRAINT ap_tracker_owner_ct_user_id_fkey FOREIGN KEY (owner_ct_user_id)
+    REFERENCES public.ct_user (id) MATCH SIMPLE
+    ON UPDATE CASCADE
+    ON DELETE SET NULL;
+
+CREATE INDEX fki_ap_tracker_owner_ct_user_id_fkey
+    ON public.ap_tracker(owner_ct_user_id);
