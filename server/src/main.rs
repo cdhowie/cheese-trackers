@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use arrayvec::ArrayVec;
 use auth::token::AuthenticatedUser;
@@ -16,15 +16,12 @@ use db::{
     },
     DataAccess, DataAccessProvider, Transactable, Transaction,
 };
-use futures::{
-    future::{BoxFuture, Shared},
-    FutureExt, TryFutureExt, TryStreamExt,
-};
+use futures::TryStreamExt;
 use jsonwebtoken::Header;
 use oauth2::TokenResponse;
 use state::{GetDataAccessProvider, GetTokenProcessor};
 use stream::try_into_grouping_map_by;
-use tokio::{net::TcpListener, signal::unix::SignalKind, sync::RwLock};
+use tokio::{net::TcpListener, signal::unix::SignalKind};
 use tower_http::{
     cors::CorsLayer,
     services::{ServeDir, ServeFile},
@@ -80,15 +77,13 @@ enum TrackerUpdateError {
     TrackerNotFound,
 }
 
-type InflightTrackerUpdateFuture = BoxFuture<'static, Result<(), Arc<TrackerUpdateError>>>;
-
 struct AppState<D> {
     reqwest_client: reqwest::Client,
     data_provider: D,
     tracker_base_url: Url,
     ui_settings: UiSettings,
 
-    inflight_tracker_updates: RwLock<HashMap<String, Shared<InflightTrackerUpdateFuture>>>,
+    inflight_tracker_updates: moka::future::Cache<String, ()>,
     tracker_update_interval: chrono::Duration,
 
     auth_client: auth::discord::AuthClient,
@@ -136,7 +131,9 @@ impl<D> AppState<D> {
                     .filter(|s| !s.is_empty())
                     .unwrap_or("dev"),
             },
-            inflight_tracker_updates: RwLock::default(),
+            inflight_tracker_updates: moka::future::Cache::builder()
+                .time_to_live(Duration::from_secs(5))
+                .build(),
             tracker_update_interval: config.tracker_update_interval,
             auth_client: auth::discord::AuthClient::new(
                 config.discord.client_id,
@@ -414,103 +411,51 @@ impl<D> AppState<D> {
         Ok(())
     }
 
-    async fn update_tracker(
-        self: &Arc<Self>,
-        tracker_id: String,
-    ) -> Result<(), Arc<TrackerUpdateError>>
+    async fn update_tracker(&self, tracker_id: &str) -> Result<(), Arc<TrackerUpdateError>>
     where
         D: DataAccessProvider + Send + Sync + 'static,
     {
-        // This is broken out into a separate statement to ensure the lock guard
-        // is dropped as soon as possible.
-        let existing = self
-            .inflight_tracker_updates
-            .read()
-            .await
-            .get(&tracker_id)
-            .cloned();
+        let fut = async {
+            let mut db = self.data_provider.create_data_access().await?;
+            let mut tx = db.begin().await?;
 
-        if let Some(f) = existing {
-            return f.await;
-        }
-
-        let mut guard = self.inflight_tracker_updates.write().await;
-
-        // Check again because a concurrent thread could've inserted the task
-        // before we acquired the write lock.
-        if let Some(f) = guard.get(&tracker_id).cloned() {
-            drop(guard);
-            return f.await;
-        }
-
-        let fut = {
-            let this = Arc::clone(self);
-            let tracker_id = tracker_id.clone();
-
-            async move {
-                let mut db = this.data_provider.create_data_access().await?;
-                let mut tx = db.begin().await?;
-
-                if tx
-                    .get_tracker_by_ap_tracker_id(&tracker_id)
-                    .await?
-                    .is_some_and(|r| Utc::now() < r.updated_at + this.tracker_update_interval)
-                {
-                    // The tracker was updated within the last
-                    // tracker_update_interval, so don't update it now.
-                    tx.rollback().await?;
-                    return Ok(());
-                }
-
-                let url = this.tracker_base_url.join(&tracker_id)?;
-                let html = this
-                    .reqwest_client
-                    .get(url)
-                    .send()
-                    .await?
-                    .error_for_status()
-                    .map_err(|e| match e.status() {
-                        Some(reqwest::StatusCode::NOT_FOUND) => TrackerUpdateError::TrackerNotFound,
-                        _ => TrackerUpdateError::Http(e),
-                    })?
-                    .text()
-                    .await?;
-
-                let (games, hints) = tracker::parse_tracker_html(&html)?;
-
-                Self::synchronize_tracker(&mut tx, tracker_id, games, hints).await?;
-
-                tx.commit().await?;
-
-                Ok(())
+            if tx
+                .get_tracker_by_ap_tracker_id(tracker_id)
+                .await?
+                .is_some_and(|r| Utc::now() < r.updated_at + self.tracker_update_interval)
+            {
+                // The tracker was updated within the last
+                // tracker_update_interval, so don't update it now.
+                tx.rollback().await?;
+                return Ok(());
             }
-            .map_err(Arc::new)
-            .boxed()
-            .shared()
+
+            let url = self.tracker_base_url.join(tracker_id)?;
+            let html = self
+                .reqwest_client
+                .get(url)
+                .send()
+                .await?
+                .error_for_status()
+                .map_err(|e| match e.status() {
+                    Some(reqwest::StatusCode::NOT_FOUND) => TrackerUpdateError::TrackerNotFound,
+                    _ => TrackerUpdateError::Http(e),
+                })?
+                .text()
+                .await?;
+
+            let (games, hints) = tracker::parse_tracker_html(&html)?;
+
+            Self::synchronize_tracker(&mut tx, tracker_id.to_owned(), games, hints).await?;
+
+            tx.commit().await?;
+
+            Ok(())
         };
 
-        guard.insert(tracker_id.clone(), fut.clone());
-        drop(guard);
-
-        // Spawn a task that will drive the future, and will remove it from
-        // the inflight map upon completion.
-        tokio::spawn({
-            let this = Arc::clone(self);
-            let fut = fut.clone();
-
-            async move {
-                // We don't care what the result is here, we just want to
-                // clean up.
-                fut.await.ok();
-
-                this.inflight_tracker_updates
-                    .write()
-                    .await
-                    .remove(&tracker_id);
-            }
-        });
-
-        fut.await
+        self.inflight_tracker_updates
+            .try_get_with_by_ref(tracker_id, fut)
+            .await
     }
 }
 
@@ -530,7 +475,7 @@ where
     }
 
     {
-        let r = state.update_tracker(tracker_id.clone()).await;
+        let r = state.update_tracker(&tracker_id).await;
         if r.as_ref()
             .is_err_and(|e| matches!(**e, TrackerUpdateError::TrackerNotFound))
         {
