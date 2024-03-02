@@ -203,6 +203,29 @@ pub trait DataAccess {
         's: 'f,
         'v: 'f;
 
+    /// Updates an existing [`CtUser`].
+    ///
+    /// If an existing user is found, this function will return `true`;
+    /// otherwise, it will return `false`.
+    ///
+    /// If `columns` is empty, all columns (except the primary key) will be
+    /// updated.
+    ///
+    /// # Panics
+    ///
+    /// This function may panic if `columns` contains duplicate identifiers or
+    /// contains the primary key for the table.  (Implementations may also
+    /// ignore the presence of duplicates and/or the primary key, but this is
+    /// not guaranteed.)
+    fn update_ct_user<'f, 's, 'c>(
+        &'s mut self,
+        user: CtUser,
+        columns: &'c [CtUserIden],
+    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    where
+        's: 'f,
+        'c: 'f;
+
     /// Creates one or more new [`JsError`]s in the database.
     ///
     /// The `id` field of the value is ignored.  It will be populated with the
@@ -570,6 +593,18 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         'v: 'f,
     {
         pg_insert(self.0.as_mut(), users).boxed()
+    }
+
+    fn update_ct_user<'f, 's, 'c>(
+        &'s mut self,
+        user: CtUser,
+        columns: &'c [CtUserIden],
+    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    where
+        's: 'f,
+        'c: 'f,
+    {
+        pg_update(self.0.as_mut(), user, columns).boxed()
     }
 
     fn create_js_errors<'s, 'v, 'f>(
