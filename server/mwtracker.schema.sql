@@ -401,3 +401,6 @@ ALTER TABLE public.ap_tracker
 
 CREATE INDEX fki_ap_tracker_owner_ct_user_id_fkey
     ON public.ap_tracker(owner_ct_user_id);
+
+ALTER TYPE public.progression_status
+    ADD VALUE 'go' AFTER 'bk';

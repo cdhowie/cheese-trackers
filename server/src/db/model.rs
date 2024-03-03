@@ -134,6 +134,7 @@ db_enum! {
         Unknown,
         Unblocked,
         Bk,
+        Go,
     }
 }
 

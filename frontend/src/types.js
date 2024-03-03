@@ -9,6 +9,7 @@ export const progressionStatus = keyed([
     { id: 'unknown', label: 'Unknown', color: 'secondary' },
     { id: 'unblocked', label: 'Unblocked', color: 'light' },
     { id: 'bk', label: 'BK', color: 'danger' },
+    { id: 'go', label: 'Go mode', color: 'success' },
 ]);
 
 export const completionStatus = keyed([
