@@ -229,8 +229,7 @@ import YesNo from '@/components/ShouldPing.vue';
             </li>
             <li>
                 <span class="fw-bold text-light">Unblocked</span>: This slot has
-                available progression. The owner may or may not be playing it at
-                this moment, but they are aware that progression is available.
+                available progression.
             </li>
             <li>
                 <span class="fw-bold text-danger">BK</span>: This slot has no
