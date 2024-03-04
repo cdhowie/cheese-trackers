@@ -774,7 +774,7 @@ where
 
     // Try to insert the user.  If the user already exists, we'll fetch it
     // below.
-    let ct_user = match tx
+    let r = tx
         .create_ct_users([CtUser {
             id: 0,
             discord_access_token: token.access_token().secret().to_owned(),
@@ -789,12 +789,17 @@ where
             discord_username: user_info.name.clone(),
         }])
         .try_next()
-        .await
-    {
+        .await;
+
+    let ct_user = match r {
         Err(e)
             if e.as_database_error()
                 .is_some_and(|dbe| dbe.is_unique_violation()) =>
         {
+            // Restart failed transaction.
+            tx.rollback().await.unexpected()?;
+            tx = db.begin().await.unexpected()?;
+
             Ok(None)
         }
         v => v,
