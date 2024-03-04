@@ -236,6 +236,10 @@ import YesNo from '@/components/ShouldPing.vue';
                 <span class="fw-bold text-danger">BK</span>: This slot has no
                 available progression, and is waiting on items from other slots.
             </li>
+            <li>
+                <span class="fw-bold text-success">Go mode</span>: This slot's
+                goal can be completed.
+            </li>
         </ul>
         <p>
             Completion status communicates how complete the slot is.
