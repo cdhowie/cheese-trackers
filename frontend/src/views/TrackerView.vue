@@ -40,12 +40,27 @@ onUnmounted(() => {
     document.title = 'Cheese Trackers';
 });
 
+const currentUser = computed(() =>
+    settings.value.auth?.token ? {
+        id: settings.value.auth.userId,
+        discordUsername: settings.value.auth.discordUsername,
+    } : settings.value.unauthenticatedDiscordUsername ? {
+        discordUsername: settings.value.unauthenticatedDiscordUsername,
+    } : undefined
+);
+
 const trackerOwner = computed(() =>
     trackerData.value.owner_ct_user_id && {
         id: trackerData.value.owner_ct_user_id,
         discordUsername: trackerData.value.owner_discord_username,
     }
 );
+
+const currentUserIsTrackerOwner = computed(() => {
+    const uid = currentUser.value?.id;
+
+    return uid !== undefined && uid === trackerOwner.value?.id;
+});
 
 function updateTracker(data) {
     if (loading.value) {
@@ -109,15 +124,6 @@ function hintsClass(game) {
         }
     }
 }
-
-const currentUser = computed(() =>
-    settings.value.auth?.token ? {
-        id: settings.value.auth.userId,
-        discordUsername: settings.value.auth.discordUsername,
-    } : settings.value.unauthenticatedDiscordUsername ? {
-        discordUsername: settings.value.unauthenticatedDiscordUsername,
-    } : undefined
-);
 
 function getClaimingUser(game) {
     if (game.claimed_by_ct_user_id !== undefined) {
@@ -579,11 +585,12 @@ loadTracker();
         <input v-if="editingTitle" ref="editTitleInput" class="form-control text-center" placeholder="Title"
             v-model="editedTitle" @blur="saveTitle" @keyup.enter="saveTitle" @keyup.esc="cancelEditTitle">
         <div class="text-center">
-            Organizer: <UsernameDisplay :user="trackerOwner"></UsernameDisplay> <button v-if="currentUser && !trackerOwner"
-                class="btn btn-sm btn-outline-secondary" :disabled="loading" @click="claimTracker">Claim</button>
+            Organizer: <UsernameDisplay :user="trackerOwner"></UsernameDisplay> <button
+                v-if="currentUser?.id !== undefined && !trackerOwner" class="btn btn-sm btn-outline-secondary"
+                :disabled="loading" @click="claimTracker">Claim</button>
 
-            <button v-if="currentUser?.id !== undefined && currentUser.id === trackerOwner?.id"
-                class="btn btn-sm btn-outline-warning" :disabled="loading" @click="disclaimTracker">Disclaim</button>
+            <button v-if="currentUserIsTrackerOwner" class="btn btn-sm btn-outline-warning" :disabled="loading"
+                @click="disclaimTracker">Disclaim</button>
         </div>
         <button class="btn btn-primary refresh-button" @click="loadTracker()" :disabled="loading">Refresh</button>
         <table class="table table-sm table-hover text-center tracker-table">
