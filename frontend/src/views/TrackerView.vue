@@ -294,9 +294,17 @@ function makeStatusFilter(type, gameKey) {
     return { types, isActive, showGame, toggle, classes };
 }
 
-const progressionFilter = makeStatusFilter(progressionStatus, 'progression_status');
 const completionFilter = makeStatusFilter(completionStatus, 'completion_status');
 const availabilityFilter = makeStatusFilter(availabilityStatus, 'availability_status');
+
+// Progression filters do not apply to completed games.  To keep
+// makeStatusFilter simple, we'll just patch that function for this one filter.
+const progressionFilter = (() => {
+    const f = makeStatusFilter(progressionStatus, 'progression_status');
+    const showGame = f.showGame;
+    f.showGame = g => isGameCompleted(g) || showGame(g);
+    return f;
+})();
 
 const filteredGames = computed(() =>
     filter(trackerData.value?.games, g => {
