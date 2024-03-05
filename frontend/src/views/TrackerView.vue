@@ -781,7 +781,7 @@ loadTracker();
             </thead>
             <tbody>
                 <tr v-if="sortedAndFilteredGames.length === 0">
-                    <td colspan="12" class="text-center text-muted">
+                    <td :colspan="showLastActivity ? 13 : 12" class="text-center text-muted">
                         No slots match the selected filters.
                     </td>
                 </tr>
@@ -870,7 +870,7 @@ loadTracker();
                         </td>
                     </tr>
                     <tr v-if="gameExpanded[game.id]">
-                        <td colspan="12" class="container-fluid">
+                        <td :colspan="showLastActivity ? 13 : 12" class="container-fluid">
                             <div class="row">
                                 <div class="col-12 col-xl-6">
                                     <div>
