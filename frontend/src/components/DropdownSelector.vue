@@ -10,9 +10,12 @@ const props = defineProps(['options', 'value', 'disabled']);
     </button>
     <ul class="dropdown-menu">
         <li v-for="option in props.options">
-            <button class="dropdown-item" :class="[`text-${option.color}`]"
-                :disabled="props.loading || props.value === option" @click="$emit('selected', option)">{{ option.label
-                }}</button>
+            <button class="dropdown-item" :class="{
+                [`text-${option.color}`]: props.value !== option,
+                active: props.value === option,
+                [`bg-${option.color}`]: props.value === option,
+                [`text-bg-${option.color}`]: props.value === option,
+            }" :disabled="props.loading || props.value === option" @click="$emit('selected', option)">{{ option.label }}</button>
         </li>
     </ul>
 </template>
