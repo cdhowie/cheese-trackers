@@ -172,6 +172,8 @@ const uniqueGames = computed(() =>
 
 const gameFilter = ref(undefined);
 
+const showLastActivity = ref(false);
+
 // TODO: Make these configurable by the room owner.
 const lastCheckedThresholds = [
     { days: 2, color: 'danger' },
@@ -179,7 +181,7 @@ const lastCheckedThresholds = [
     { color: 'success' }
 ];
 
-function gameLastUpdated(game) {
+function getLastCheckedOrLastActivity(game) {
     return reduce(
         map(
             filter([game.last_checked, game.last_activity]),
@@ -189,10 +191,18 @@ function gameLastUpdated(game) {
     );
 }
 
-function gameDaysSinceLastChecked(game) {
-    const lastUpdated = gameLastUpdated(game);
+function gameDaysSinceLastCheckedOrLastActivity(game) {
+    const lastUpdated = getLastCheckedOrLastActivity(game);
 
-    return lastUpdated && Math.max(0, moment.duration(moment.utc(now.value).diff(lastUpdated)).asDays());
+    return lastUpdated && Math.max(0, dateToDays(lastUpdated));
+}
+
+function dateToDays(d) {
+    if (!moment.isMoment(d)) {
+        d = moment.utc(d);
+    }
+
+    return moment.duration(moment.utc(now.value).diff(d)).asDays();
 }
 
 function isGameCompleted(game) {
@@ -204,7 +214,7 @@ function lastCheckedClass(game) {
         return 'text-success';
     }
 
-    const sinceDays = gameDaysSinceLastChecked(game);
+    const sinceDays = gameDaysSinceLastCheckedOrLastActivity(game);
 
     if (sinceDays === undefined) {
         return 'text-danger';
@@ -217,10 +227,16 @@ function lastCheckedClass(game) {
     }
 }
 
-function displayLastChecked(game) {
-    const days = gameDaysSinceLastChecked(game);
+function displayLastCheckedOrLastActivity(game) {
+    const days = gameDaysSinceLastCheckedOrLastActivity(game);
 
     return days === undefined ? 'Never' : days.toFixed(1);
+}
+
+function displayLastActivity(game) {
+    const d = game.last_activity;
+
+    return d === undefined ? 'Never' : Math.max(0, dateToDays(d)).toFixed(1);
 }
 
 const statGames = computed(() =>
@@ -308,7 +324,7 @@ function sortByGame(g) {
 }
 
 function sortByActivity(g) {
-    const days = gameDaysSinceLastChecked(g);
+    const days = gameDaysSinceLastCheckedOrLastActivity(g);
     return days === undefined ? Number.POSITIVE_INFINITY : days;
 }
 
@@ -726,12 +742,27 @@ loadTracker();
                             </ul>
                         </div>
                     </th>
-                    <th colspan="2" @click="setSort(sortByActivity, true)">
-                        <span class="sorter">
-                            Last Activity (Days)
-                            <i v-if="activeSort[0] === sortByActivity"
-                                :class="{ 'bi-sort-numeric-down': !activeSort[1], 'bi-sort-numeric-up': activeSort[1] }"></i>
-                        </span>
+                    <th :colspan="showLastActivity ? 3 : 2">
+                        <div class="dropdown">
+                            <span class="sorter" @click="setSort(sortByActivity, true)">
+                                Last Activity (Days)
+                                <i v-if="activeSort[0] === sortByActivity" class="me-1"
+                                    :class="{ 'bi-sort-numeric-down': !activeSort[1], 'bi-sort-numeric-up': activeSort[1] }"></i>
+                            </span>
+                            <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown" data-bs-auto-close="outside">
+                                <i class="bi-gear"></i>
+                            </button>
+                            <form class="dropdown-menu dropdown-menu-end p-4">
+                                <div>
+                                    <div class="form-check">
+                                        <input type="checkbox" class="form-check-input" id="showLastActivityCheck" v-model="showLastActivity">
+                                        <label class="form-check-label" for="showLastActivityCheck">
+                                            Show last activity if before last checked
+                                        </label>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
                     </th>
                     <th>Checks</th>
                     <th>
@@ -804,9 +835,15 @@ loadTracker();
                                 @selected="s => setGameCompletionStatus(game, s)">
                             </DropdownSelector>
                         </td>
-                        <td :class="[lastCheckedClass(game)]" class="text-end">
-                            <span :title="displayDateTime(gameLastUpdated(game))">{{
-                                displayLastChecked(game) }}</span>
+                        <td class="text-end">
+                            <span :class="[lastCheckedClass(game)]" :title="displayDateTime(getLastCheckedOrLastActivity(game))">{{
+                                displayLastCheckedOrLastActivity(game) }}
+                            </span>
+                        </td>
+                        <td v-if="showLastActivity">
+                            <span v-if="game.last_activity < game.last_checked" :title="displayDateTime(game.last_activity)">
+                                ({{ displayLastActivity(game) }})
+                            </span>
                         </td>
                         <td class="text-start p-0">
                             <button class=" btn btn-sm btn-outline-secondary"
