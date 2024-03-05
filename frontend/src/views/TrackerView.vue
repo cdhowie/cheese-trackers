@@ -620,6 +620,15 @@ loadTracker();
         <form class="container mb-4" v-if="showTools">
             <div class="row">
                 <div class="col-12 col-lg-6">
+                    <label class="form-label">Title</label>
+                    <input type="text" :disabled="loading"
+                        class="form-control" v-model="editedTitle"
+                        placeholder="Title"
+                        @blur="saveTitle"
+                        @keyup.enter.prevent="saveTitle"
+                        @keyup.esc="cancelEditTitle">
+                </div>
+                <div class="col-12 col-lg-6">
                     <label class="form-label">Organizer</label>
                     <div class="input-group">
                         <button v-if="currentUser?.id !== undefined && !trackerOwner"
@@ -637,15 +646,6 @@ loadTracker();
                             placeholder="(Unclaimed)"
                             :value="trackerOwner?.discordUsername">
                     </div>
-                </div>
-                <div class="col-12 col-lg-6">
-                    <label class="form-label">Title</label>
-                    <input type="text" :disabled="loading"
-                        class="form-control" v-model="editedTitle"
-                        placeholder="Title"
-                        @blur="saveTitle"
-                        @keyup.enter.prevent="saveTitle"
-                        @keyup.esc="cancelEditTitle">
                 </div>
             </div>
         </form>
