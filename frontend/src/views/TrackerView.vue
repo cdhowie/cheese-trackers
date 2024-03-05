@@ -855,7 +855,7 @@ loadTracker();
                         </td>
                         <td class="text-start p-0">
                             <button class=" btn btn-sm btn-outline-secondary"
-                                :class="{ invisible: game.progression_status !== 'bk' }" :disabled="loading"
+                                :class="{ invisible: game.progression_status !== 'bk' || isGameCompleted(game) }" :disabled="loading"
                                 @click="updateLastChecked(game)">Still BK</button>
                         </td>
                         <td>
