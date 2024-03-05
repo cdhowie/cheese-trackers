@@ -19,6 +19,7 @@ const props = defineProps(['aptrackerid']);
 
 const loading = ref(false);
 const error = ref(undefined);
+const showTools = ref(false);
 const trackerData = ref(undefined);
 const hintsByFinder = ref(undefined);
 const hintsByReceiver = ref(undefined);
@@ -569,13 +570,15 @@ function clipboardCopy(text) {
 
 const editedTitle = ref('');
 const editingTitle = ref(false);
-const editTitleInput = ref(undefined);
 
-function editTitle() {
-    editedTitle.value = trackerData.value.title || '';
-    editingTitle.value = true;
-    setTimeout(() => { editTitleInput.value?.focus(); });
-}
+watch(
+    () => trackerData.value?.title,
+    () => {
+        if (!editingTitle.value) {
+            editedTitle.value = trackerData.value?.title || '';
+        }
+    }
+);
 
 function saveTitle() {
     editingTitle.value = false;
@@ -586,7 +589,7 @@ function saveTitle() {
 }
 
 function cancelEditTitle() {
-    editedTitle.value = trackerData.value.title;
+    editedTitle.value = trackerData.value?.title || '';
     editingTitle.value = false;
 }
 
@@ -595,27 +598,57 @@ loadTracker();
 
 <template>
     <div v-if="loading && !trackerData" class="text-center">Loading tracker data...</div>
-    <div v-if="error && !trackerData" class="text-center text-danger">Failed to load tracker data ({{ error.message }})
+    <div v-if="error && !trackerData" class="text-center text-danger">
+        Failed to load tracker data ({{ error.message }})
     </div>
     <template v-if="trackerData">
         <div v-if="!currentUser" class="alert alert-info text-center">
             You will be unable to claim slots until you either sign in with Discord or set your Discord username in the
             <router-link to="/settings">settings</router-link>.
         </div>
-        <h2 v-if="!editingTitle" @click="editTitle" class="text-center mb-4"
-            :class="{ 'text-muted': !trackerData.title.length, 'fst-italic': !trackerData.title.length }">{{
+        <h2 class="text-center mb-4">
+            <span :class="{ 'text-muted': !trackerData.title, 'fst-italic': !trackerData.title }">{{
                 trackerData.title.length ?
-                trackerData.title : 'Untitled tracker' }}</h2>
-        <input v-if="editingTitle" ref="editTitleInput" class="form-control text-center" placeholder="Title"
-            v-model="editedTitle" @blur="saveTitle" @keyup.enter="saveTitle" @keyup.esc="cancelEditTitle">
-        <div class="text-center">
-            Organizer: <UsernameDisplay :user="trackerOwner"></UsernameDisplay> <button
-                v-if="currentUser?.id !== undefined && !trackerOwner" class="btn btn-sm btn-outline-secondary"
-                :disabled="loading" @click="claimTracker">Claim</button>
-
-            <button v-if="currentUserIsTrackerOwner" class="btn btn-sm btn-outline-warning" :disabled="loading"
-                @click="disclaimTracker">Disclaim</button>
-        </div>
+                trackerData.title : 'Untitled tracker' }}
+            </span>
+            <template v-if="trackerOwner">
+                by <UsernameDisplay :user="trackerOwner"></UsernameDisplay>
+            </template> <button class="btn btn-sm btn-outline-light" :class="{ active: showTools }" @click="showTools = !showTools">
+                <i :class="showTools ? 'bi-gear-fill' : 'bi-gear'"></i>
+            </button>
+        </h2>
+        <form class="container mb-4" v-if="showTools">
+            <div class="row">
+                <div class="col-12 col-lg-6">
+                    <label class="form-label">Organizer</label>
+                    <div class="input-group">
+                        <button v-if="currentUser?.id !== undefined && !trackerOwner"
+                            type="button"
+                            class="btn btn-outline-secondary"
+                            :disabled="loading"
+                            @click="claimTracker">Claim</button>
+                        <button v-if="currentUserIsTrackerOwner"
+                            type="button"
+                            class="btn btn-outline-warning"
+                            :disabled="loading"
+                            @click="disclaimTracker">Disclaim</button>
+                        <input type="text" disabled="disabled"
+                            class="form-control"
+                            placeholder="(Unclaimed)"
+                            :value="trackerOwner?.discordUsername">
+                    </div>
+                </div>
+                <div class="col-12 col-lg-6">
+                    <label class="form-label">Title</label>
+                    <input type="text" :disabled="loading"
+                        class="form-control" v-model="editedTitle"
+                        placeholder="Title"
+                        @blur="saveTitle"
+                        @keyup.enter.prevent="saveTitle"
+                        @keyup.esc="cancelEditTitle">
+                </div>
+            </div>
+        </form>
         <button class="btn btn-primary refresh-button" @click="loadTracker()" :disabled="loading">Refresh</button>
         <table class="table table-sm table-hover text-center tracker-table">
             <thead style="position: sticky; top: 0; z-index: 100">
