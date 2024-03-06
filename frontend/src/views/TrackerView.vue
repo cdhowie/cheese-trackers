@@ -14,6 +14,7 @@ import ChecksBar from '@/components/ChecksBar.vue';
 import UsernameDisplay from '@/components/UsernameDisplay.vue';
 import GameDisplay from '@/components/GameDisplay.vue';
 import DropdownSelector from '@/components/DropdownSelector.vue';
+import LockButton from '@/components/LockButton.vue';
 
 const props = defineProps(['aptrackerid']);
 
@@ -102,6 +103,7 @@ function disclaimTracker() {
     updateTracker({
         owner_ct_user_id: undefined,
         owner_discord_username: undefined,
+        lock_title: false,
     });
 }
 
@@ -621,12 +623,20 @@ loadTracker();
             <div class="row">
                 <div class="col-12 col-lg-6">
                     <label class="form-label">Title</label>
-                    <input type="text" :disabled="loading"
-                        class="form-control" v-model="editedTitle"
-                        placeholder="Title"
-                        @blur="saveTitle"
-                        @keyup.enter.prevent="saveTitle"
-                        @keyup.esc="cancelEditTitle">
+                    <div class="input-group">
+                        <input type="text"
+                            :disabled="loading || (!currentUserIsTrackerOwner && trackerData.lock_title)"
+                            class="form-control" v-model="editedTitle"
+                            placeholder="Title"
+                            @blur="saveTitle"
+                            @keyup.enter.prevent="saveTitle"
+                            @keyup.esc="cancelEditTitle">
+                        <LockButton
+                            :loading="loading"
+                            :is-owner="currentUserIsTrackerOwner"
+                            :locked="trackerData.lock_title"
+                            @click="updateTracker({ lock_title: !trackerData.lock_title })"></LockButton>
+                    </div>
                 </div>
                 <div class="col-12 col-lg-6">
                     <label class="form-label">Organizer</label>

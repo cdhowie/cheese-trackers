@@ -404,3 +404,6 @@ CREATE INDEX fki_ap_tracker_owner_ct_user_id_fkey
 
 ALTER TYPE public.progression_status
     ADD VALUE 'go' AFTER 'bk';
+
+ALTER TABLE public.ap_tracker
+    ADD COLUMN lock_title boolean NOT NULL DEFAULT FALSE;

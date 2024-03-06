@@ -177,6 +177,7 @@ impl<D> AppState<D> {
                         updated_at: now,
                         title: "".to_owned(),
                         owner_ct_user_id: None,
+                        lock_title: false,
                     }])
                     .try_next()
                     .await?
@@ -550,6 +551,7 @@ where
 struct UpdateTrackerRequest {
     pub title: String,
     pub owner_ct_user_id: Option<i32>,
+    pub lock_title: bool,
 }
 
 async fn update_tracker<D>(
@@ -577,7 +579,7 @@ where
 
     if tracker_update.owner_ct_user_id != tracker.owner_ct_user_id {
         // A change in ownership requires authentication.
-        let user = user.ok_or(StatusCode::UNAUTHORIZED)?;
+        let user = user.as_ref().ok_or(StatusCode::UNAUTHORIZED)?;
 
         // The only valid changes are claiming or disclaiming ownership, and the
         // user ID must match the authenticated user.
@@ -590,11 +592,46 @@ where
         };
     }
 
-    tracker.title = tracker_update.title;
+    match (tracker.owner_ct_user_id, user) {
+        // There is no current owner.  Force everything unlocked, and allow
+        // updating all settings.
+        (None, _) => {
+            tracker.title = tracker_update.title;
+
+            if tracker_update.lock_title {
+                return Err(StatusCode::FORBIDDEN);
+            }
+            tracker.lock_title = false;
+        }
+
+        // The current user is the owner.  They can change all settings.
+        (Some(uid), Some(u)) if uid == u.0.id => {
+            tracker.title = tracker_update.title;
+            tracker.lock_title = tracker_update.lock_title;
+        }
+
+        // The current user is not the owner.  They can only change unlocked
+        // settings, and cannot configure any locks.
+        _ => {
+            if !tracker.lock_title {
+                if tracker_update.lock_title {
+                    return Err(StatusCode::FORBIDDEN);
+                }
+
+                tracker.title = tracker_update.title;
+            } else if tracker.title != tracker_update.title {
+                return Err(StatusCode::FORBIDDEN);
+            }
+        }
+    };
 
     tx.update_ap_tracker(
         tracker,
-        &[ApTrackerIden::Title, ApTrackerIden::OwnerCtUserId],
+        &[
+            ApTrackerIden::Title,
+            ApTrackerIden::OwnerCtUserId,
+            ApTrackerIden::LockTitle,
+        ],
     )
     .await
     .unexpected()?;
