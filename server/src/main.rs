@@ -844,7 +844,15 @@ where
     .unexpected()?;
 
     let ct_user = match ct_user {
-        Some(mut u) => {
+        Some(u) => u,
+        None => {
+            let mut u = tx
+                .get_ct_user_by_discord_user_id(discord_user_id)
+                .await
+                .unexpected()?
+                .ok_or(MissingUserError(user_info.id.get()))
+                .unexpected()?;
+
             // The user already existed.  Update their token and username.
             u.discord_access_token = token.access_token().secret().to_owned();
             u.discord_access_token_expires_at = expires_at;
@@ -870,12 +878,6 @@ where
 
             u
         }
-        None => tx
-            .get_ct_user_by_discord_user_id(discord_user_id)
-            .await
-            .unexpected()?
-            .ok_or(MissingUserError(user_info.id.get()))
-            .unexpected()?,
     };
 
     tx.commit().await.unexpected()?;
