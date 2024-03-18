@@ -200,6 +200,7 @@ db_enum! {
     pub enum TrackerGameStatus as "tracker_game_status" {
         Disconnected,
         Connected,
+        Ready,
         Playing,
         GoalCompleted,
     }

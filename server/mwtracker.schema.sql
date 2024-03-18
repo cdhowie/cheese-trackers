@@ -407,3 +407,6 @@ ALTER TYPE public.progression_status
 
 ALTER TABLE public.ap_tracker
     ADD COLUMN lock_title boolean NOT NULL DEFAULT FALSE;
+
+ALTER TYPE public.tracker_game_status
+    ADD VALUE 'ready' AFTER 'playing';
