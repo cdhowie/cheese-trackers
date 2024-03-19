@@ -410,3 +410,122 @@ ALTER TABLE public.ap_tracker
 
 ALTER TYPE public.tracker_game_status
     ADD VALUE 'ready' AFTER 'playing';
+
+BEGIN;
+
+    ALTER TABLE public.ap_game
+        RENAME TO ap_game_store;
+
+    -- This constraint should have used the CASCADE action already.
+    ALTER TABLE public.ap_hint
+        DROP CONSTRAINT ap_hint_receiver_game_id_fkey,
+        ADD CONSTRAINT ap_hint_receiver_game_id_fkey FOREIGN KEY (receiver_game_id)
+            REFERENCES public.ap_game_store (id) MATCH SIMPLE
+            ON UPDATE CASCADE
+            ON DELETE CASCADE;
+
+    CREATE VIEW public.ap_game
+        WITH (security_invoker=true)
+    AS
+        SELECT
+            g.*,
+            COALESCE(u.discord_username, g.discord_username) AS effective_discord_username
+        FROM ap_game_store g
+        LEFT JOIN ct_user u ON u.id = g.claimed_by_ct_user_id;
+
+    CREATE RULE ap_game_insert_store AS
+        ON INSERT TO public.ap_game
+        DO INSTEAD
+    (
+        INSERT INTO ap_game_store (
+            id,
+            tracker_id,
+            name,
+            game,
+            checks_done,
+            checks_total,
+            last_activity,
+            discord_username,
+            last_checked,
+            position,
+            tracker_status,
+            notes,
+            discord_ping,
+            claimed_by_ct_user_id,
+            availability_status,
+            completion_status,
+            progression_status
+        )
+        VALUES (
+            NEW.id,
+            NEW.tracker_id,
+            NEW.name,
+            NEW.game,
+            NEW.checks_done,
+            NEW.checks_total,
+            NEW.last_activity,
+            NEW.discord_username,
+            NEW.last_checked,
+            NEW.position,
+            NEW.tracker_status,
+            NEW.notes,
+            NEW.discord_ping,
+            NEW.claimed_by_ct_user_id,
+            NEW.availability_status,
+            NEW.completion_status,
+            NEW.progression_status
+        )
+        RETURNING
+            *,
+            COALESCE(
+                (SELECT discord_username FROM ct_user u WHERE u.id = claimed_by_ct_user_id),
+                discord_username
+            ) AS effective_discord_username
+    );
+
+    CREATE RULE ap_game_update_store AS
+        ON UPDATE TO public.ap_game
+        DO INSTEAD
+    (
+        UPDATE ap_game_store SET
+            id = NEW.id,
+            tracker_id = NEW.tracker_id,
+            name = NEW.name,
+            game = NEW.game,
+            checks_done = NEW.checks_done,
+            checks_total = NEW.checks_total,
+            last_activity = NEW.last_activity,
+            discord_username = NEW.discord_username,
+            last_checked = NEW.last_checked,
+            position = NEW.position,
+            tracker_status = NEW.tracker_status,
+            notes = NEW.notes,
+            discord_ping = NEW.discord_ping,
+            claimed_by_ct_user_id = NEW.claimed_by_ct_user_id,
+            availability_status = NEW.availability_status,
+            completion_status = NEW.completion_status,
+            progression_status = NEW.progression_status
+        WHERE id = OLD.id
+        RETURNING
+            *,
+            COALESCE(
+                (SELECT u.discord_username FROM ct_user u WHERE u.id = claimed_by_ct_user_id),
+                discord_username
+            ) AS effective_discord_username
+    );
+
+    CREATE RULE ap_game_delete_store AS
+        ON DELETE TO public.ap_game
+        DO INSTEAD
+    (
+        DELETE FROM ap_game_store
+        WHERE id = OLD.id
+        RETURNING
+            *,
+            COALESCE(
+                (SELECT discord_username FROM ct_user u WHERE u.id = claimed_by_ct_user_id),
+                discord_username
+            ) AS effective_discord_username
+    );
+
+COMMIT;

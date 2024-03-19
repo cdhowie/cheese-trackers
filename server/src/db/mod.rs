@@ -69,8 +69,8 @@ pub trait DataAccess {
 
     /// Updates an existing [`ApTracker`].
     ///
-    /// If an existing tracker is found, this function will return `true`;
-    /// otherwise, it will return `false`.
+    /// If an existing tracker is found, this function will return the new record
+    /// in `Some`, otherwise it will return `None`.
     ///
     /// If `columns` is empty, all columns (except the primary key) will be
     /// updated.
@@ -85,7 +85,7 @@ pub trait DataAccess {
         &'s mut self,
         tracker: ApTracker,
         columns: &'c [ApTrackerIden],
-    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    ) -> BoxFuture<'f, sqlx::Result<Option<ApTracker>>>
     where
         's: 'f,
         'c: 'f;
@@ -123,8 +123,8 @@ pub trait DataAccess {
 
     /// Updates an existing [`ApGame`].
     ///
-    /// If an existing game is found, this function will return `true`;
-    /// otherwise, it will return `false`.
+    /// If an existing game is found, this function will return the new record
+    /// in `Some`, otherwise it will return `None`.
     ///
     /// If `columns` is empty, all columns (except the primary key) will be
     /// updated.
@@ -132,13 +132,14 @@ pub trait DataAccess {
     /// # Panics
     ///
     /// This function may panic if `columns` contains duplicate identifiers or
-    /// contains the primary key for the table.  (Implementations may also ignore
-    /// the presence of duplicates and/or the primary key, but this is not guaranteed.)
+    /// contains the primary key for the table.  (Implementations may also
+    /// ignore the presence of duplicates and/or the primary key, but this is
+    /// not guaranteed.)
     fn update_ap_game<'f, 's, 'c>(
         &'s mut self,
         game: ApGame,
         columns: &'c [ApGameIden],
-    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    ) -> BoxFuture<'f, sqlx::Result<Option<ApGame>>>
     where
         's: 'f,
         'c: 'f;
@@ -157,8 +158,8 @@ pub trait DataAccess {
 
     /// Updates an existing [`ApHint`].
     ///
-    /// If an existing hint is found, this function will return `true`;
-    /// otherwise, it will return `false`.
+    /// If an existing hint is found, this function will return the new record
+    /// in `Some`, otherwise it will return `None`.
     ///
     /// If `columns` is empty, all columns (except the primary key) will be
     /// updated.
@@ -166,13 +167,14 @@ pub trait DataAccess {
     /// # Panics
     ///
     /// This function may panic if `columns` contains duplicate identifiers or
-    /// contains the primary key for the table.  (Implementations may also ignore
-    /// the presence of duplicates and/or the primary key, but this is not guaranteed.)
+    /// contains the primary key for the table.  (Implementations may also
+    /// ignore the presence of duplicates and/or the primary key, but this is
+    /// not guaranteed.)
     fn update_ap_hint<'f, 's, 'c>(
         &'s mut self,
         hint: ApHint,
         columns: &'c [ApHintIden],
-    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    ) -> BoxFuture<'f, sqlx::Result<Option<ApHint>>>
     where
         's: 'f,
         'c: 'f;
@@ -205,8 +207,8 @@ pub trait DataAccess {
 
     /// Updates an existing [`CtUser`].
     ///
-    /// If an existing user is found, this function will return `true`;
-    /// otherwise, it will return `false`.
+    /// If an existing user is found, this function will return the new record
+    /// in `Some`, otherwise it will return `None`.
     ///
     /// If `columns` is empty, all columns (except the primary key) will be
     /// updated.
@@ -221,7 +223,7 @@ pub trait DataAccess {
         &'s mut self,
         user: CtUser,
         columns: &'c [CtUserIden],
-    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    ) -> BoxFuture<'f, sqlx::Result<Option<CtUser>>>
     where
         's: 'f,
         'c: 'f;
@@ -374,9 +376,9 @@ async fn pg_update<T>(
     executor: &mut PgConnection,
     value: T,
     columns: &[T::Iden],
-) -> sqlx::Result<bool>
+) -> sqlx::Result<Option<T>>
 where
-    T: Model,
+    T: Model + for<'a> FromRow<'a, PgRow> + Send + Unpin,
 {
     // Would be nice to avoid converting to a map here, but this simplifies a
     // lot of the code below.
@@ -409,13 +411,12 @@ where
             ))
         }))
         .and_where(Expr::col(T::primary_key()).eq(pkey))
-        .returning(Query::returning().column(T::primary_key()))
+        .returning_all()
         .build_sqlx(PostgresQueryBuilder);
 
-    sqlx::query_with(&sql, values)
+    sqlx::query_as_with(&sql, values)
         .fetch_optional(executor)
         .await
-        .map(|r| r.is_some())
 }
 
 impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for PgDataAccess<T> {
@@ -449,7 +450,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         &'s mut self,
         tracker: ApTracker,
         columns: &'c [ApTrackerIden],
-    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    ) -> BoxFuture<'f, sqlx::Result<Option<ApTracker>>>
     where
         's: 'f,
         'c: 'f,
@@ -534,7 +535,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         &'s mut self,
         game: ApGame,
         columns: &'c [ApGameIden],
-    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    ) -> BoxFuture<'f, sqlx::Result<Option<ApGame>>>
     where
         's: 'f,
         'c: 'f,
@@ -557,7 +558,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         &'s mut self,
         hint: ApHint,
         columns: &'c [ApHintIden],
-    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    ) -> BoxFuture<'f, sqlx::Result<Option<ApHint>>>
     where
         's: 'f,
         'c: 'f,
@@ -599,7 +600,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         &'s mut self,
         user: CtUser,
         columns: &'c [CtUserIden],
-    ) -> BoxFuture<'f, sqlx::Result<bool>>
+    ) -> BoxFuture<'f, sqlx::Result<Option<CtUser>>>
     where
         's: 'f,
         'c: 'f,

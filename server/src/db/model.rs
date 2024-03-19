@@ -253,6 +253,11 @@ db_struct! {
         pub availability_status: AvailabilityStatus,
         pub completion_status: CompletionStatus,
         pub progression_status: ProgressionStatus,
+
+        // The following columns are computed in the ap_game view and can't be
+        // changed.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub effective_discord_username: Option<String>,
     }
 }
 

@@ -214,6 +214,7 @@ impl<D> AppState<D> {
                         last_checked: None,
                         notes: String::new(),
                         claimed_by_ct_user_id: None,
+                        effective_discord_username: None,
                     };
 
                     update_game_completion_status(&mut game);
@@ -696,17 +697,12 @@ where
     }
 
     // Update the username.
-    game.discord_username = match (game_update.claimed_by_ct_user_id, user) {
-        // If already claimed by the same user, this should be a no-op.
-        // Otherwise, sets the display name.
-        (Some(id), Some(u)) if id == u.0.id => Some(u.0.discord_username),
-        // No-op. The slot remains claimed by someone else, so keep the current
-        // username.
-        (Some(_), _) => game.discord_username,
-        // No claiming user means the display name can be whatever was in the
-        // request, which is either None for an unclaimed slot, or Some for an
-        // unauthenticated claim.
-        (None, _) => game_update.discord_username,
+    game.discord_username = match game_update.claimed_by_ct_user_id {
+        // If claimed by an authenticated user, this username is not needed and
+        // can be set to NULL.
+        Some(_) => None,
+        // Otherwise, take the unauthenticated username from the update.
+        None => game_update.discord_username,
     };
 
     game.claimed_by_ct_user_id = game_update.claimed_by_ct_user_id;
@@ -719,21 +715,27 @@ where
 
     update_game_completion_status(&mut game);
 
-    tx.update_ap_game(
-        game.clone(),
-        &[
-            ApGameIden::ClaimedByCtUserId,
-            ApGameIden::DiscordUsername,
-            ApGameIden::DiscordPing,
-            ApGameIden::AvailabilityStatus,
-            ApGameIden::CompletionStatus,
-            ApGameIden::ProgressionStatus,
-            ApGameIden::LastChecked,
-            ApGameIden::Notes,
-        ],
-    )
-    .await
-    .unexpected()?;
+    let game_id = game.id;
+    let game = tx
+        .update_ap_game(
+            game,
+            &[
+                ApGameIden::ClaimedByCtUserId,
+                ApGameIden::DiscordUsername,
+                ApGameIden::DiscordPing,
+                ApGameIden::AvailabilityStatus,
+                ApGameIden::CompletionStatus,
+                ApGameIden::ProgressionStatus,
+                ApGameIden::LastChecked,
+                ApGameIden::Notes,
+            ],
+        )
+        .await
+        .unexpected()?
+        // There should be no way this is None since we're in a transaction and
+        // already fetched the record.
+        .ok_or_else(|| format!("ApGame {game_id} did not exist on update"))
+        .unexpected()?;
 
     tx.commit().await.unexpected()?;
 

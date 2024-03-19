@@ -22,7 +22,7 @@ const summaryTypes = {
     },
     owner: {
         label: 'Player',
-        key: g => JSON.stringify([g.discord_username, g.claimed_by_ct_user_id]),
+        key: g => JSON.stringify([g.effective_discord_username, g.claimed_by_ct_user_id]),
         sortKey: key => (JSON.parse(key)[0] || '').toLowerCase(),
         keyDisplay: {
             component: UsernameDisplay,

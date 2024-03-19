@@ -132,12 +132,12 @@ function getClaimingUser(game) {
     if (game.claimed_by_ct_user_id !== undefined) {
         return {
             id: game.claimed_by_ct_user_id,
-            discordUsername: game.discord_username,
+            discordUsername: game.effective_discord_username,
         };
     }
 
-    if (game.discord_username?.length) {
-        return { discordUsername: game.discord_username };
+    if (game.effective_discord_username?.length) {
+        return { discordUsername: game.effective_discord_username };
     }
 
     return undefined;
@@ -340,7 +340,7 @@ function sortByActivity(g) {
 }
 
 function sortByOwner(g) {
-    return (g.discord_username || '').toLowerCase();
+    return (g.effective_discord_username || '').toLowerCase();
 }
 
 const activeSort = ref([sortByName, false]);
@@ -836,8 +836,8 @@ loadTracker();
                                     game.name }}</a>
                         </td>
                         <td>
-                            <span v-if="game.discord_username && isGameCompleted(game)" class="text-danger">Never</span>
-                            <DropdownSelector v-else-if="game.discord_username" :options="pingPreference"
+                            <span v-if="game.effective_discord_username && isGameCompleted(game)" class="text-danger">Never</span>
+                            <DropdownSelector v-else-if="game.effective_discord_username" :options="pingPreference"
                                 :value="pingPreference.byId[game.discord_ping]" :disabled="loading"
                                 @selected="s => setPing(game, s)"></DropdownSelector>
                         </td>
@@ -849,10 +849,10 @@ loadTracker();
                         </td>
                         <td>
                             <template v-if="currentUser">
-                                <button v-if="!game.discord_username" class="btn btn-sm btn-outline-secondary"
+                                <button v-if="!game.effective_discord_username" class="btn btn-sm btn-outline-secondary"
                                     :disabled="loading" @click="claimGame(game)">Claim</button>
 
-                                <template v-if="game.discord_username && !isEqual(getClaimingUser(game), currentUser)">
+                                <template v-if="game.effective_discord_username && !isEqual(getClaimingUser(game), currentUser)">
                                     <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
                                         data-bs-toggle="dropdown">Claim</button>
                                     <div class="dropdown-menu text-warning p-3">
