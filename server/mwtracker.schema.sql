@@ -529,3 +529,5 @@ BEGIN;
     );
 
 COMMIT;
+
+ALTER VIEW ap_game ALTER COLUMN id SET DEFAULT nextval('ap_tracker_game_id_seq');
