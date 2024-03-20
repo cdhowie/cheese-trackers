@@ -10,7 +10,7 @@ const percent = computed(() => {
 </script>
 
 <template>
-    <div class="progress" style="position: relative;">
+    <div class="progress mw-checks-bar" style="position: relative;">
         <div style="position: absolute; width: 100%; height: 100%; text-align: center">
             {{ done }} / {{ total }}<template v-if="props.showPercent"> ({{ percent }}%)</template>
         </div>
@@ -19,3 +19,9 @@ const percent = computed(() => {
         </div>
     </div>
 </template>
+
+<style scoped>
+.mw-checks-bar {
+    min-width: 6.5em;
+}
+</style>
