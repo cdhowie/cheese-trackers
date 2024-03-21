@@ -576,6 +576,7 @@ AS $BODY$
                 CASE completion_status
                     WHEN 'done' THEN 1
                     WHEN 'goal' THEN 1
+                    WHEN 'released' THEN 1
                     ELSE 0
                 END
             ) = 1 AS all_done
