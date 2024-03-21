@@ -15,6 +15,7 @@ import UsernameDisplay from '@/components/UsernameDisplay.vue';
 import GameDisplay from '@/components/GameDisplay.vue';
 import DropdownSelector from '@/components/DropdownSelector.vue';
 import LockButton from '@/components/LockButton.vue';
+import Repeat from '@/components/Repeat.vue';
 
 const props = defineProps(['aptrackerid']);
 
@@ -599,7 +600,31 @@ loadTracker();
 </script>
 
 <template>
-    <div v-if="loading && !trackerData" class="text-center">Loading tracker data...</div>
+    <div v-if="loading && !trackerData" class="placeholder-wave">
+        <div class="text-center">
+            <h2 class="placeholder me-1" style="width: 10em"></h2>
+            <h2 class="placeholder me-1" style="width: 2em"></h2>
+            <h2 class="placeholder" style="width: 4em"></h2>
+        </div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <Repeat times="9">
+                        <th><div class="placeholder w-100"></div></th>
+                    </Repeat>
+                </tr>
+            </thead>
+            <tbody>
+                <Repeat times="10">
+                    <tr>
+                        <Repeat times="9">
+                            <td><div class="placeholder bg-secondary w-100"></div></td>
+                        </Repeat>
+                    </tr>
+                </Repeat>
+            </tbody>
+        </table>
+    </div>
     <div v-if="error && !trackerData" class="text-center text-danger">
         Failed to load tracker data ({{ error.message }})
     </div>

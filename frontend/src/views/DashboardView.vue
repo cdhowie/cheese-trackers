@@ -7,6 +7,8 @@ import { getDashboardTrackers } from '@/api';
 import moment from 'moment';
 import { orderBy } from 'lodash-es';
 
+import Repeat from '@/components/Repeat.vue';
+
 const trackerLinkRegexp = /^https:\/\/archipelago\.gg\/tracker\/([^/]+)/;
 
 const trackerLink = ref('');
@@ -88,10 +90,12 @@ watch(
                 </tr>
             </thead>
             <tbody>
-                <tr v-for="i in [1,2,3]">
-                    <td><div class="placeholder bg-secondary w-100"></div></td>
-                    <td><div class="placeholder bg-secondary w-100"></div></td>
-                </tr>
+                <Repeat times="3">
+                    <tr>
+                        <td><div class="placeholder bg-secondary w-100"></div></td>
+                        <td><div class="placeholder bg-secondary w-100"></div></td>
+                    </tr>
+                </Repeat>
             </tbody>
         </table>
         <table v-if="myTrackers" class="table">
