@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
-import OpenTrackerView from '@/views/OpenTrackerView.vue';
+import DashboardView from '@/views/DashboardView.vue';
 import TrackerView from '@/views/TrackerView.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import HelpView from '@/views/HelpView.vue';
@@ -10,8 +10,8 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'opentracker',
-      component: OpenTrackerView,
+      name: 'dashboard',
+      component: DashboardView,
     },
     {
       path: '/settings',

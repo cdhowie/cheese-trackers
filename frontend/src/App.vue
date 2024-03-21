@@ -57,7 +57,7 @@ function logout() {
             <span class="navbar-brand">Cheese Trackers</span>
             <ul class="navbar-nav me-auto">
                 <li class="nav-item">
-                    <RouterLink class="nav-link" active-class="active" to="/">Open tracker</RouterLink>
+                    <RouterLink class="nav-link" active-class="active" to="/">Dashboard</RouterLink>
                 </li>
                 <li class="nav-item">
                     <RouterLink class="nav-link" active-class="active" to="/settings">Settings</RouterLink>

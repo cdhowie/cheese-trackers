@@ -31,6 +31,10 @@ export async function getTracker(id) {
     return api_http.get(`tracker/${id}`);
 }
 
+export async function getDashboardTrackers() {
+    return api_http.get('/dashboard/tracker');
+}
+
 export async function updateGame(tracker_id, game) {
     return api_http.request({
         method: 'put',

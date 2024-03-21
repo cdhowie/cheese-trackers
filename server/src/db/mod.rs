@@ -8,7 +8,7 @@ use std::collections::HashMap;
 
 use async_stream::stream;
 use futures::{future::BoxFuture, stream::BoxStream, FutureExt, Stream, StreamExt};
-use sea_query::{Asterisk, Expr, PostgresQueryBuilder, Query, SimpleExpr};
+use sea_query::{Alias, Asterisk, Expr, Func, PostgresQueryBuilder, Query, SimpleExpr};
 use sea_query_binder::SqlxBinder;
 use sqlx::{pool::PoolConnection, postgres::PgRow, FromRow, PgConnection, PgPool, Postgres};
 
@@ -239,6 +239,11 @@ pub trait DataAccess {
     where
         's: 'f,
         'v: 'f;
+
+    fn get_dashboard_trackers(
+        &mut self,
+        user_id: i32,
+    ) -> BoxStream<'_, sqlx::Result<ApTrackerDashboard>>;
 }
 
 impl DataAccessProvider for PgPool {
@@ -617,6 +622,26 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         'v: 'f,
     {
         pg_insert(self.0.as_mut(), errors).boxed()
+    }
+
+    fn get_dashboard_trackers(
+        &mut self,
+        user_id: i32,
+    ) -> BoxStream<'_, sqlx::Result<ApTrackerDashboard>> {
+        let (sql, values) = Query::select()
+            .column(Asterisk)
+            .from_function(
+                Func::cust(Alias::new("get_dashboard_trackers")).arg(user_id),
+                Alias::new("t"),
+            )
+            .build_sqlx(PostgresQueryBuilder);
+
+        stream! {
+            for await r in sqlx::query_as_with(&sql, values).fetch(self.0.as_mut()) {
+                yield r;
+            }
+        }
+        .boxed()
     }
 }
 

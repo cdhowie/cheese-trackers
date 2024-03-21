@@ -642,6 +642,27 @@ where
     Ok(StatusCode::NO_CONTENT)
 }
 
+async fn get_dashboard_trackers<D>(
+    State(state): State<Arc<AppState<D>>>,
+    user: AuthenticatedUser,
+) -> Result<impl IntoResponse, StatusCode>
+where
+    D: DataAccessProvider + Send + Sync + 'static,
+{
+    let mut db = state
+        .data_provider
+        .create_data_access()
+        .await
+        .unexpected()?;
+
+    Ok(Json(
+        db.get_dashboard_trackers(user.0.id)
+            .try_collect::<Vec<_>>()
+            .await
+            .unexpected()?,
+    ))
+}
+
 #[derive(Debug, serde::Deserialize)]
 struct UpdateGameRequest {
     pub claimed_by_ct_user_id: Option<i32>,
@@ -945,6 +966,7 @@ where
     axum::Router::new()
         .route("/auth/begin", get(begin_discord_auth))
         .route("/auth/complete", post(complete_discord_auth))
+        .route("/dashboard/tracker", get(get_dashboard_trackers))
         .route("/tracker/:tracker_id", get(get_tracker))
         .route("/tracker/:tracker_id", put(update_tracker))
         .route("/tracker/:tracker_id/game/:game_id", put(update_game))

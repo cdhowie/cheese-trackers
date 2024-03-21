@@ -231,6 +231,20 @@ db_struct! {
 
 db_struct! {
     #[derive(Debug, Clone)]
+    pub struct ApTrackerDashboard {
+        pub id: i32,
+        pub tracker_id: String,
+        pub title: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub owner_ct_user_id: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub owner_discord_username: Option<String>,
+        pub last_activity: Option<DateTime<Utc>>,
+    }
+}
+
+db_struct! {
+    #[derive(Debug, Clone)]
     pub struct ApGame {
         pub id: i32,
         pub tracker_id: i32,
