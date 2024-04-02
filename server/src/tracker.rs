@@ -97,6 +97,7 @@ fn de_status<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TrackerGameSt
     Ok(match String::deserialize(deserializer)?.as_str() {
         "Disconnected" => TrackerGameStatus::Disconnected,
         "Connected" => TrackerGameStatus::Connected,
+        "Ready" => TrackerGameStatus::Ready,
         "Playing" => TrackerGameStatus::Playing,
         "Goal Completed" => TrackerGameStatus::GoalCompleted,
         s => {
