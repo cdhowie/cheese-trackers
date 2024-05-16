@@ -902,8 +902,11 @@ loadTracker();
                                 @selected="s => setPing(game, s)"></DropdownSelector>
                         </td>
                         <td>
-                            <DropdownSelector :options="availabilityStatus"
-                                :value="availabilityStatus.byId[game.availability_status]" :disabled="loading"
+                            <DropdownSelector
+                                :options="availabilityStatus"
+                                :value="availabilityStatus.byId[game.availability_status]"
+                                :disabled="loading"
+                                :icons="true"
                                 @selected="s => setGameAvailabilityStatus(game, s)">
                             </DropdownSelector>
                         </td>
@@ -936,13 +939,21 @@ loadTracker();
                             <GameDisplay :game="game.game"></GameDisplay>
                         </td>
                         <td>
-                            <DropdownSelector v-if="!includes(['done', 'released'], game.completion_status)"
-                                :options="progressionStatus" :value="progressionStatus.byId[game.progression_status]"
-                                :disabled="loading" @selected="s => setGameProgressionStatus(game, s)"></DropdownSelector>
+                            <DropdownSelector
+                                v-if="!includes(['done', 'released'], game.completion_status)"
+                                :options="progressionStatus"
+                                :value="progressionStatus.byId[game.progression_status]"
+                                :disabled="loading"
+                                :icons="true"
+                                @selected="s => setGameProgressionStatus(game, s)"
+                            ></DropdownSelector>
                         </td>
                         <td>
-                            <DropdownSelector :options="completionStatus"
-                                :value="completionStatus.byId[game.completion_status]" :disabled="loading"
+                            <DropdownSelector
+                                :options="completionStatus"
+                                :value="completionStatus.byId[game.completion_status]"
+                                :disabled="loading"
+                                :icons="true"
                                 @selected="s => setGameCompletionStatus(game, s)">
                             </DropdownSelector>
                         </td>

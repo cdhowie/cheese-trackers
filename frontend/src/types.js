@@ -6,25 +6,25 @@ function keyed(v) {
 }
 
 export const progressionStatus = keyed([
-    { id: 'unknown', label: 'Unknown', color: 'secondary' },
-    { id: 'unblocked', label: 'Unblocked', color: 'light' },
-    { id: 'bk', label: 'BK', color: 'danger' },
-    { id: 'go', label: 'Go mode', color: 'success' },
+    { id: 'unknown', label: 'Unknown', color: 'secondary', icon: 'question-lg' },
+    { id: 'unblocked', label: 'Unblocked', color: 'light', icon: 'person-walking' },
+    { id: 'bk', label: 'BK', color: 'danger', icon: 'octagon-fill' },
+    { id: 'go', label: 'Go mode', color: 'success', icon: 'flag' },
 ]);
 
 export const completionStatus = keyed([
-    { id: 'incomplete', label: 'Incomplete', color: 'light' },
-    { id: 'all_checks', label: 'All checks', color: 'info' },
-    { id: 'goal', label: 'Goal', color: 'info' },
-    { id: 'done', label: 'Done', color: 'success' },
-    { id: 'released', label: 'Released', color: 'secondary' },
+    { id: 'incomplete', label: 'Incomplete', color: 'light', icon: 'square' },
+    { id: 'all_checks', label: 'All checks', color: 'info', icon: 'check-square' },
+    { id: 'goal', label: 'Goal', color: 'info', icon: 'flag' },
+    { id: 'done', label: 'Done', color: 'success', icon: 'flag-fill' },
+    { id: 'released', label: 'Released', color: 'secondary', icon: 'escape' },
 ]);
 
 export const availabilityStatus = keyed([
-    { id: 'unknown', label: 'Unknown', color: 'secondary' },
-    { id: 'open', label: 'Open', color: 'success' },
-    { id: 'claimed', label: 'Claimed', color: 'light' },
-    { id: 'public', label: 'Public', color: 'info' },
+    { id: 'unknown', label: 'Unknown', color: 'secondary', icon: 'question-lg' },
+    { id: 'open', label: 'Open', color: 'success', icon: 'person' },
+    { id: 'claimed', label: 'Claimed', color: 'light', icon: 'person-fill' },
+    { id: 'public', label: 'Public', color: 'info', icon: 'people-fill' },
 ]);
 
 export const hintClassification = keyed([
