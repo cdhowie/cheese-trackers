@@ -1,4 +1,4 @@
-import { keyBy } from "lodash-es";
+import { findIndex, keyBy, map } from "lodash-es";
 
 function keyed(v) {
     v.byId = keyBy(v, 'id');
@@ -8,7 +8,8 @@ function keyed(v) {
 export const progressionStatus = keyed([
     { id: 'unknown', label: 'Unknown', color: 'secondary', icon: 'question-lg' },
     { id: 'unblocked', label: 'Unblocked', color: 'light', icon: 'person-walking' },
-    { id: 'bk', label: 'BK', color: 'danger', icon: 'octagon-fill' },
+    { id: 'bk', isBk: true, label: 'BK', color: 'danger', icon: 'octagon-fill' },
+    { id: 'soft_bk', isBk: true, label: 'Soft BK', color: 'warning', icon: 'octagon-half' },
     { id: 'go', label: 'Go mode', color: 'success', icon: 'flag' },
 ]);
 
@@ -41,3 +42,34 @@ export const pingPreference = keyed([
     { id: 'see_notes', label: 'See notes', color: 'info' },
     { id: 'never', label: 'Never', color: 'danger' },
 ]);
+
+// A few views show a unified game status which is a combination of the
+// completion status and progression status.  If the completion status is
+// incomplete, then we use the progression status only if it's a BK type.
+//
+// Here we wrap up that logic and hybrid data type so it doesn't have to be
+// reiterated in every component that needs it.
+
+// We use this instead of deriving from isBk to control the order.
+const INCOMPLETE_PROGRESSION_OVERRIDES = ['soft_bk', 'bk'];
+
+export const unifiedGameStatus = keyed((() => {
+    const statuses = [...completionStatus];
+    statuses.splice(
+        findIndex(completionStatus, i => i.id === 'incomplete') + 1,
+        0,
+        ...map(
+            INCOMPLETE_PROGRESSION_OVERRIDES,
+            k => progressionStatus.byId[k]
+        )
+    );
+    return statuses;
+})());
+
+unifiedGameStatus.forGame = (game) =>
+    (
+        game.completion_status === 'incomplete' &&
+        progressionStatus.byId[game.progression_status].isBk
+    ) ?
+        progressionStatus.byId[game.progression_status] :
+        completionStatus.byId[game.completion_status];

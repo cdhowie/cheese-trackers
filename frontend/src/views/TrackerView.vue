@@ -2,12 +2,12 @@
 // This view could use some refactoring to break stuff out into components.
 
 import { computed, onUnmounted, ref, watch } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, isEqual, fromPairs, every, omit, pick, findIndex } from 'lodash-es';
+import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, isEqual, fromPairs, every, omit, findIndex } from 'lodash-es';
 import moment from 'moment';
 import { settings } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker, updateHint as apiUpdateHint } from '@/api';
-import { progressionStatus, completionStatus, availabilityStatus, pingPreference, hintClassification } from '@/types';
+import { progressionStatus, completionStatus, availabilityStatus, pingPreference, hintClassification, unifiedGameStatus } from '@/types';
 import { percent, synchronize } from '@/util';
 import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
@@ -233,14 +233,8 @@ const statTotalChecks = computed(() =>
     sumBy(statGames.value, 'checks_total')
 );
 
-const statGamesByCompletionStatus = computed(() =>
-    groupBy(
-        filter(
-            statGames.value,
-            g => g.completion_status !== 'incomplete' || g.progression_status !== 'bk'
-        ),
-        'completion_status'
-    )
+const statGamesByUnifiedStatus = computed(() =>
+    groupBy(statGames.value, g => unifiedGameStatus.forGame(g).id)
 );
 
 const statGamesByProgressionStatus = computed(() =>
@@ -490,7 +484,7 @@ function setGameProgressionStatus(game, status) {
         g.progression_status = status;
 
         // If setting to BK then also update "last checked."
-        if (status === 'bk') {
+        if (progressionStatus.byId[status].isBk) {
             g.last_checked = nowStr;
         }
     }));
@@ -973,8 +967,9 @@ loadTracker();
                             </span>
                         </td>
                         <td class="text-start p-0">
-                            <button class=" btn btn-sm btn-outline-secondary"
-                                :class="{ invisible: game.progression_status !== 'bk' || isGameCompleted(game) }" :disabled="loading"
+                            <button class="btn btn-sm btn-outline-secondary"
+                                :class="{ invisible: !progressionStatus.byId[game.progression_status].isBk || isGameCompleted(game) }"
+                                :disabled="loading"
                                 @click="updateLastChecked(game)">Still BK</button>
                         </td>
                         <td>
@@ -1123,12 +1118,9 @@ loadTracker();
                                 <th class="text-end shrink-column">Completion</th>
                                 <td class="align-middle">
                                     <div class="progress">
-                                        <div class="progress-bar bg-danger"
-                                            :style="{ width: `${percent(filter(statGames, g => g.completion_status === 'incomplete' && g.progression_status === 'bk').length, statGames.length)}%` }">
-                                        </div>
-                                        <div v-for="status in completionStatus" class="progress-bar"
+                                        <div v-for="status in unifiedGameStatus" class="progress-bar"
                                             :class="[`bg-${status.color}`]"
-                                            :style="{ width: `${percent(statGamesByCompletionStatus[status.id]?.length || 0, statGames.length)}%` }">
+                                            :style="{ width: `${percent(statGamesByUnifiedStatus[status.id]?.length || 0, statGames.length)}%` }">
                                         </div>
                                     </div>
                                 </td>

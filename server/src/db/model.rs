@@ -135,6 +135,7 @@ db_enum! {
         Unblocked,
         Bk,
         Go,
+        SoftBk,
     }
 }
 

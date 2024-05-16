@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import { filter, groupBy, mapValues, orderBy, sumBy } from 'lodash-es';
-import { completionStatus } from '@/types';
+import { unifiedGameStatus } from '@/types';
 import { percent } from '@/util';
 import ChecksBar from './ChecksBar.vue';
 import UsernameDisplay from './UsernameDisplay.vue';
@@ -51,9 +51,7 @@ const summaryData = computed(() => {
         ),
         games => ({
             count: games.length,
-            byStatus: groupBy(games, g =>
-                g.completion_status === 'incomplete' && g.progression_status === 'bk' ? 'bk' : g.completion_status
-            ),
+            byStatus: groupBy(games, g => unifiedGameStatus.forGame(g).id),
             checksDone: sumBy(games, 'checks_done'),
             checksTotal: sumBy(games, 'checks_total'),
         })
@@ -86,10 +84,7 @@ const sumKeys = computed(() => {
                 <td class="text-end shrink-column">{{ summaryData[key].count }}</td>
                 <td class="align-middle">
                     <div class="progress">
-                        <div class="progress-bar bg-danger"
-                            :style="{ width: `${percent(summaryData[key].byStatus['bk']?.length, summaryData[key].count)}%` }">
-                        </div>
-                        <div v-for="status in completionStatus" class="progress-bar" :class="[`bg-${status.color}`]"
+                        <div v-for="status in unifiedGameStatus" class="progress-bar" :class="[`bg-${status.color}`]"
                             :style="{ width: `${percent(summaryData[key].byStatus[status.id]?.length, summaryData[key].count)}%` }">
                         </div>
                     </div>

@@ -600,3 +600,6 @@ BEGIN;
         ADD COLUMN classification hint_classification NOT NULL DEFAULT 'unknown';
 
 COMMIT;
+
+ALTER TYPE public.progression_status
+    ADD VALUE 'soft_bk' AFTER 'go';
