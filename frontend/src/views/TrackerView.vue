@@ -740,7 +740,7 @@ loadTracker();
                             <li v-for="status in availabilityStatus">
                                 <button class="dropdown-item" :class="availabilityFilter.classes(status)"
                                     @click="availabilityFilter.toggle(status)">
-                                    {{ status.label }}
+                                    <i :class="`bi-${status.icon}`"></i> {{ status.label }}
                                 </button>
                             </li>
                         </ul>
@@ -838,7 +838,7 @@ loadTracker();
                                 <li v-for="status in progressionStatus">
                                     <button class="dropdown-item" :class="progressionFilter.classes(status)"
                                         @click="progressionFilter.toggle(status)">
-                                        {{ status.label }}
+                                        <i :class="`bi-${status.icon}`"></i> {{ status.label }}
                                     </button>
                                 </li>
                                 <li>
@@ -847,7 +847,7 @@ loadTracker();
                                 <li v-for="status in completionStatus">
                                     <button class="dropdown-item" :class="completionFilter.classes(status)"
                                         @click="completionFilter.toggle(status)">
-                                        {{ status.label }}
+                                        <i :class="`bi-${status.icon}`"></i> {{ status.label }}
                                     </button>
                                 </li>
                             </ul>
