@@ -906,7 +906,7 @@ loadTracker();
                                 :options="availabilityStatus"
                                 :value="availabilityStatus.byId[game.availability_status]"
                                 :disabled="loading"
-                                :icons="true"
+                                :icons="settings.statusIcons"
                                 @selected="s => setGameAvailabilityStatus(game, s)">
                             </DropdownSelector>
                         </td>
@@ -944,7 +944,7 @@ loadTracker();
                                 :options="progressionStatus"
                                 :value="progressionStatus.byId[game.progression_status]"
                                 :disabled="loading"
-                                :icons="true"
+                                :icons="settings.statusIcons"
                                 @selected="s => setGameProgressionStatus(game, s)"
                             ></DropdownSelector>
                         </td>
@@ -953,7 +953,7 @@ loadTracker();
                                 :options="completionStatus"
                                 :value="completionStatus.byId[game.completion_status]"
                                 :disabled="loading"
-                                :icons="true"
+                                :icons="settings.statusIcons"
                                 @selected="s => setGameCompletionStatus(game, s)">
                             </DropdownSelector>
                         </td>

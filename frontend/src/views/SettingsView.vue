@@ -18,13 +18,7 @@ function saveSettings() {
 <template>
     <form class="container" @submit.prevent="saveSettings">
         <div class="row">
-            <div v-if="!editSettings.auth?.token" class="col-12 col-lg-6">
-                <label for="discordUsernameEntry" class="form-label">Your Discord
-                    username</label>
-                <input id="discordUsernameEntry" class="form-control" type="text" placeholder="Discord username"
-                    v-model="editSettings.unauthenticatedDiscordUsername">
-            </div>
-            <div class="col-12" :class="{ 'col-lg-6': !editSettings.auth?.token }">
+            <div class="col-12 col-lg-6">
                 <label class="form-label">Default ping preference</label>
                 <div class="btn-group form-control border-0 p-0">
                     <template v-for="pref of pingPreference">
@@ -34,6 +28,24 @@ function saveSettings() {
                             pref.label }}</label>
                     </template>
                 </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <label class="form-label">Status selectors</label>
+                <div class="btn-group form-control border-0 p-0">
+                    <template v-for="v in [false, true]">
+                        <input type="radio" class="btn-check" name="statusIcons" :id="`status-icons-${v}`"
+                            v-model="editSettings.statusIcons" :value="v">
+                        <label class="btn btn-outline-secondary" :for="`status-icons-${v}`">
+                            {{ v ? 'Icons' : 'Text' }}
+                        </label>
+                    </template>
+                </div>
+            </div>
+            <div v-if="!editSettings.auth?.token" class="col-12">
+                <label for="discordUsernameEntry" class="form-label">Your Discord
+                    username</label>
+                <input id="discordUsernameEntry" class="form-control" type="text" placeholder="Discord username"
+                    v-model="editSettings.unauthenticatedDiscordUsername">
             </div>
         </div>
         <div class="row mt-2">
