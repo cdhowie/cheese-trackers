@@ -4,7 +4,7 @@ use base64::prelude::*;
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305};
 use config::ConfigError;
 use jsonwebtoken::Algorithm;
-use serde::{de::Error, Deserialize, Deserializer};
+use serde::{de::Error, Deserialize, Deserializer, Serialize};
 use url::Url;
 
 #[derive(Deserialize)]
@@ -14,7 +14,7 @@ pub struct Config {
     #[serde(default)]
     pub cors_permissive: bool,
     #[serde(default)]
-    pub is_staging: bool,
+    pub banners: Vec<Banner>,
     #[serde(rename = "tracker_update_interval_mins")]
     #[serde(deserialize_with = "de_duration_mins")]
     pub tracker_update_interval: chrono::Duration,
@@ -22,6 +22,21 @@ pub struct Config {
     pub token: Token,
     pub database: Database,
     pub discord: Discord,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct Banner {
+    pub message: String,
+    pub kind: BannerKind,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum BannerKind {
+    Danger,
+    Warning,
+    Success,
+    Info,
 }
 
 #[derive(Deserialize)]

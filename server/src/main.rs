@@ -134,7 +134,7 @@ impl<D> AppState<D> {
             data_provider,
             tracker_base_url: "https://archipelago.gg/tracker/".parse().unwrap(),
             ui_settings: UiSettings {
-                is_staging: config.is_staging,
+                banners: config.banners,
                 build_version: option_env!("GIT_COMMIT")
                     .filter(|s| !s.is_empty())
                     .unwrap_or("dev"),
@@ -980,8 +980,8 @@ where
 
 #[derive(Debug, Clone, serde::Serialize)]
 struct UiSettings {
-    pub is_staging: bool,
     pub build_version: &'static str,
+    pub banners: Vec<conf::Banner>,
 }
 
 async fn get_settings<D>(State(state): State<Arc<AppState<D>>>) -> Json<UiSettings> {

@@ -74,11 +74,12 @@ function logout() {
         </div>
     </nav>
 
-    <div v-if="serverSettings.is_staging" class="alert alert-warning text-center">
-        This is the staging server. The staging database will be periodically
-        reset to facilitate testing. <b>Do not use this server as the
-            authoritative tracker for your games.</b>
-    </div>
+    <div
+        v-for="banner in serverSettings.banners"
+        class="alert text-center"
+        :class="`alert-${banner.kind}`"
+        v-html="banner.message"
+    ></div>
 
     <RouterView />
 
