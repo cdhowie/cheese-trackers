@@ -1034,6 +1034,14 @@ where
         .route("/settings", get(get_settings))
         .route("/jserror", post(create_js_error))
         .with_state(Arc::new(state))
+        .layer(axum::middleware::from_fn(
+            |req: axum::extract::Request, next: axum::middleware::Next| async move {
+                let mut res = next.run(req).await;
+                res.headers_mut()
+                    .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+                res
+            },
+        ))
 }
 
 async fn create_router_from_config(
@@ -1047,7 +1055,7 @@ async fn create_router_from_config(
     })
 }
 
-async fn set_cache_headers(
+async fn set_asset_cache_headers(
     request: axum::extract::Request,
     next: axum::middleware::Next,
 ) -> axum::response::Response {
@@ -1058,12 +1066,14 @@ async fn set_cache_headers(
         .get(header::CONTENT_TYPE)
         .map_or(false, |v| v == "application/javascript" || v == "text/css");
 
-    if cacheable {
-        response.headers_mut().insert(
-            header::CACHE_CONTROL,
-            HeaderValue::from_static("public, max-age=2592000"),
-        );
-    }
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static(if cacheable {
+            "public, max-age=2592000, immutable"
+        } else {
+            "no-store"
+        }),
+    );
 
     response
 }
@@ -1082,7 +1092,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let router = axum::Router::new()
         .nest("/api", api_router)
         .fallback_service(
-            axum::middleware::from_fn(set_cache_headers)
+            axum::middleware::from_fn(set_asset_cache_headers)
                 .layer(ServeDir::new("dist").fallback(ServeFile::new("dist/index.html"))),
         );
 
