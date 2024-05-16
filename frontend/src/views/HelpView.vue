@@ -324,9 +324,56 @@ import YesNo from '@/components/ShouldPing.vue';
             column, which always shows received hints.)
         </p>
         <p>
-            Note that only hints for items not yet found are displayed. A hint
-            will be removed once its item has been found, as there is no longer
-            any use for the hint.
+            Each hint can be classified, which communicates how important the
+            item is to the receiving slot:
+        </p>
+        <ul>
+            <li>
+                <span class="fw-bold text-danger">Critical</span>: The item is
+                required. This could be because it's necessary for the receiving
+                slot to be able to goal, or because the receiving slot needs it
+                to obtain a critical item for another slot.
+            </li>
+            <li>
+                <span class="fw-bold text-warning">Helpful</span>: The item is
+                not required but would be helpful in some capacity, so the item
+                may be worth obtaining if it is not too difficult or out of the
+                way.
+            </li>
+            <li>
+                <span class="fw-bold text-secondary">Trash</span>: The item is
+                worthless to the receiving slot and no effort should be spent on
+                obtaining it.
+            </li>
+        </ul>
+        <p>
+            There is some potential ambiguity where it's critical that a slot
+            needs one out of a set of items, but not all of them.  This
+            situation is best handled by communicating with the other players on
+            Discord or by using the notes field.  For example, if you need one
+            of two items to goal but you don't need both, you could ask the
+            sending slots' players how difficult it would be to get each item
+            and choose which one to mark critical based on which is easier to
+            obtain.  Another approach would be to mark both critical and then
+            downgrade one to helpful or trash when the other one is obtained.
+        </p>
+        <p>
+            By default, hints are shown only if all of the following are true.
+            Additionally, only hints matching these criteria are considered for
+            the count shown in the hints column.
+        </p>
+        <ul>
+            <li>The item has not been found yet.</li>
+            <li>
+                The slot that receives the item does not have the <span
+                class="fw-bold text-success">done</span> completion status.
+            </li>
+            <li>The hint is not classified as trash.</li>
+        </ul>
+        <p>
+            You can toggle the "include found and useless hints" option to
+            display all hints.  This will not change the count shown in the hint
+            column.
         </p>
         <p>
             On the right side of the pane, you will see a notes field. This is
