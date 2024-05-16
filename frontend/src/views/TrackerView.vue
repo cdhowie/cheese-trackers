@@ -415,7 +415,12 @@ function sortedDisplayHintsByGame(id) {
 }
 
 function countUnfoundReceivedHints(game) {
-    return (hintsByFinder.value[game.id] || []).filter(h => hintStatus(h) === 'notfound').length;
+    return (hintsByFinder.value[game.id] || [])
+        .filter(h =>
+            h.classification !== 'trash' &&
+            hintStatus(h) === 'notfound'
+        )
+        .length;
 }
 
 function patchGame(game) {
