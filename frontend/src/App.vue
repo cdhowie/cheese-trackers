@@ -4,6 +4,7 @@ import { RouterLink, RouterView, useRoute } from 'vue-router';
 import { getSettings, authBegin } from '@/api.js';
 import { BUILD_VERSION } from './build';
 import * as settings from '@/settings';
+import { filter, includes } from 'lodash-es';
 
 const route = useRoute();
 
@@ -49,6 +50,19 @@ function logout() {
     s.auth = {};
     settings.save(s);
 }
+
+const banners = computed(() =>
+    filter(
+        serverSettings.value.banners,
+        (banner) => !includes(localSettings.value.dismissedBanners, banner.id)
+    )
+);
+
+function dismissBanner(id) {
+    const s = settings.load();
+    s.dismissedBanners.push(id);
+    settings.save(s);
+}
 </script>
 
 <template>
@@ -75,11 +89,16 @@ function logout() {
     </nav>
 
     <div
-        v-for="banner in serverSettings.banners"
+        v-for="banner in banners"
         class="alert text-center"
-        :class="`alert-${banner.kind}`"
-        v-html="banner.message"
-    ></div>
+        :class="{
+            [`alert-${banner.kind}`]: true,
+            'alert-dismissible': banner.id,
+        }"
+    >
+        <span v-html="banner.message"></span>
+        <button v-if="banner.id" type="button" class="btn-close" @click="dismissBanner(banner.id)"></button>
+    </div>
 
     <RouterView />
 

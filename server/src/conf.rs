@@ -26,6 +26,10 @@ pub struct Config {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Banner {
+    // If an ID is present, the frontend allows the banner to be dismissed by
+    // the user.  The ID will be persisted in local storage and used to filter
+    // out dismissed banners.
+    pub id: Option<String>,
     pub message: String,
     pub kind: BannerKind,
 }

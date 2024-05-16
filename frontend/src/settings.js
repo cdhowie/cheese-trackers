@@ -8,6 +8,7 @@ const SETTINGS_SCHEMA = Joi.object().keys({
     unauthenticatedDiscordUsername: Joi.string().empty(""),
 
     statusIcons: Joi.boolean().default(false),
+    dismissedBanners: Joi.array().items(Joi.string()).default([]),
 
     auth: Joi.object().keys({
         token: Joi.string(),
