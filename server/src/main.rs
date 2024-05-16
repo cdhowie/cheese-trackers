@@ -1,3 +1,9 @@
+// This lint is partially broken, so we'll disable it until it doesn't have
+// false positives.
+//
+// See https://github.com/rust-lang/rust-clippy/pull/12756
+#![allow(clippy::assigning_clones)]
+
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use arrayvec::ArrayVec;
