@@ -229,7 +229,8 @@ import YesNo from '@/components/ShouldPing.vue';
             </li>
             <li>
                 <span class="fw-bold text-light">Unblocked</span>: This slot has
-                available in-logic progression.
+                available in-logic progression, or out-of-logic progression that
+                the player is not currently pursuing.
             </li>
             <li>
                 <span class="fw-bold text-danger">BK</span>: This slot has no
@@ -237,13 +238,20 @@ import YesNo from '@/components/ShouldPing.vue';
                 other slots.
             </li>
             <li>
-                <span class="fw-bold text-warning">Soft BK</span>: This slot has
-                remaining in-logic progression that is either very difficult or
-                would be tedious (e.g. farming money).  The player is able to
-                obtain those checks if necessary but would prefer to wait until
-                they are sent items that would reduce the difficulty or tedium
-                of obtaining the remaining checks.  When using this status,
-                consider explaining the situation in the slot's notes.
+                <p>
+                    <span class="fw-bold text-warning">Soft BK</span>: This slot
+                    has remaining in-logic progression that is very difficult or
+                    tedious (e.g. farming money), or has out-of-logic
+                    progression that the player knows how to obtain but has
+                    chosen not to pursue for the moment.
+                </p>
+                <p>
+                    The player is able to obtain those checks if necessary but
+                    would prefer to wait until they are sent items that would
+                    reduce the difficulty or tedium of obtaining the remaining
+                    checks.  When using this status, consider explaining the
+                    situation in the slot's notes.
+                </p>
             </li>
             <li>
                 <span class="fw-bold text-success">Go mode</span>: This slot's
