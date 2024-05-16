@@ -4,7 +4,7 @@ use arrayvec::ArrayVec;
 use auth::token::AuthenticatedUser;
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
+    http::{header, HeaderValue, StatusCode},
     response::IntoResponse,
     Json,
 };
@@ -27,6 +27,7 @@ use tower_http::{
     cors::CorsLayer,
     services::{ServeDir, ServeFile},
 };
+use tower_layer::Layer;
 use url::Url;
 
 use crate::{db::model::CtUserIden, logging::UnexpectedResultExt};
@@ -1046,6 +1047,27 @@ async fn create_router_from_config(
     })
 }
 
+async fn set_cache_headers(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let mut response = next.run(request).await;
+
+    let cacheable = response
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .map_or(false, |v| v == "application/javascript" || v == "text/css");
+
+    if cacheable {
+        response.headers_mut().insert(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("public, max-age=2592000"),
+        );
+    }
+
+    response
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = conf::load()?;
@@ -1059,7 +1081,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let router = axum::Router::new()
         .nest("/api", api_router)
-        .fallback_service(ServeDir::new("dist").fallback(ServeFile::new("dist/index.html")));
+        .fallback_service(
+            axum::middleware::from_fn(set_cache_headers)
+                .layer(ServeDir::new("dist").fallback(ServeFile::new("dist/index.html"))),
+        );
 
     axum::serve(TcpListener::bind(listen).await?, router)
         .with_graceful_shutdown(async {
