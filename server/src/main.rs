@@ -12,7 +12,8 @@ use chrono::{DateTime, Utc};
 use db::{
     model::{
         ApGame, ApGameIden, ApHint, ApHintIden, ApTracker, ApTrackerIden, AvailabilityStatus,
-        CompletionStatus, CtUser, JsError, PingPreference, ProgressionStatus, TrackerGameStatus,
+        CompletionStatus, CtUser, HintClassification, JsError, PingPreference, ProgressionStatus,
+        TrackerGameStatus,
     },
     DataAccess, DataAccessProvider, Transactable, Transaction,
 };
@@ -246,6 +247,7 @@ impl<D> AppState<D> {
                                 location: hint.location,
                                 entrance: hint.entrance,
                                 found: hint.found,
+                                classification: HintClassification::Unknown,
                             })
                         })
                         .collect::<Result<Vec<_>, _>>()?,
@@ -388,6 +390,7 @@ impl<D> AppState<D> {
                                 location: tracker_hint.location,
                                 entrance: tracker_hint.entrance,
                                 found: tracker_hint.found,
+                                classification: HintClassification::Unknown,
                             });
                         }
                     }
@@ -640,6 +643,62 @@ where
     tx.commit().await.unexpected()?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct UpdateHintRequest {
+    pub classification: HintClassification,
+}
+
+async fn update_hint<D>(
+    State(state): State<Arc<AppState<D>>>,
+    Path((tracker_id, hint_id)): Path<(String, i32)>,
+    Json(hint_update): Json<UpdateHintRequest>,
+) -> Result<impl IntoResponse, StatusCode>
+where
+    D: DataAccessProvider + Send + Sync + 'static,
+{
+    let mut db = state
+        .data_provider
+        .create_data_access()
+        .await
+        .unexpected()?;
+
+    let mut tx = db.begin().await.unexpected()?;
+
+    let tracker = tx
+        .get_tracker_by_ap_tracker_id(&tracker_id)
+        .await
+        .unexpected()?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let mut hint = tx
+        .get_ap_hint(hint_id)
+        .await
+        .unexpected()?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let game = tx
+        .get_ap_game(hint.finder_game_id)
+        .await
+        .unexpected()?
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    if game.tracker_id != tracker.id {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    hint.classification = hint_update.classification;
+
+    let hint = tx
+        .update_ap_hint(hint, &[ApHintIden::Classification])
+        .await
+        .unexpected()?
+        .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    tx.commit().await.unexpected()?;
+
+    Ok(Json(hint))
 }
 
 async fn get_dashboard_trackers<D>(
@@ -970,6 +1029,7 @@ where
         .route("/tracker/:tracker_id", get(get_tracker))
         .route("/tracker/:tracker_id", put(update_tracker))
         .route("/tracker/:tracker_id/game/:game_id", put(update_game))
+        .route("/tracker/:tracker_id/hint/:hint_id", put(update_hint))
         .route("/settings", get(get_settings))
         .route("/jserror", post(create_js_error))
         .with_state(Arc::new(state))

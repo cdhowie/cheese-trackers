@@ -216,6 +216,15 @@ db_enum! {
     }
 }
 
+db_enum! {
+    pub enum HintClassification as "hint_classification" {
+        Unknown,
+        Critical,
+        Useful,
+        Trash,
+    }
+}
+
 db_struct! {
     #[derive(Debug, Clone)]
     pub struct ApTracker {
@@ -286,6 +295,7 @@ db_struct! {
         pub location: String,
         pub entrance: String,
         pub found: bool,
+        pub classification: HintClassification,
     }
 }
 

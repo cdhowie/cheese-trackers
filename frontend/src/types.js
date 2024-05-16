@@ -27,6 +27,13 @@ export const availabilityStatus = keyed([
     { id: 'public', label: 'Public', color: 'info' },
 ]);
 
+export const hintClassification = keyed([
+    { id: 'unknown', label: 'Unknown', color: 'light', icon: 'question-lg' },
+    { id: 'critical', label: 'Critical', color: 'danger', icon: 'exclamation-triangle-fill' },
+    { id: 'useful', label: 'Useful', color: 'warning', icon: 'person-raised-hand' },
+    { id: 'trash', label: 'Trash', color: 'secondary', icon: 'trash-fill' },
+]);
+
 export const pingPreference = keyed([
     { id: 'liberally', label: 'Liberally', color: 'success' },
     { id: 'sparingly', label: 'Sparingly', color: 'warning' },

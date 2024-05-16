@@ -2,12 +2,12 @@
 // This view could use some refactoring to break stuff out into components.
 
 import { computed, onUnmounted, ref, watch } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, isEqual, fromPairs, every, omit } from 'lodash-es';
+import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, isEqual, fromPairs, every, omit, pick, findIndex } from 'lodash-es';
 import moment from 'moment';
 import { settings } from '@/settings';
 import { now } from '@/time';
-import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker } from '@/api';
-import { progressionStatus, completionStatus, availabilityStatus, pingPreference } from '@/types';
+import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker, updateHint as apiUpdateHint } from '@/api';
+import { progressionStatus, completionStatus, availabilityStatus, pingPreference, hintClassification } from '@/types';
 import { percent, synchronize } from '@/util';
 import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
@@ -64,32 +64,6 @@ const currentUserIsTrackerOwner = computed(() => {
 
     return uid !== undefined && uid === trackerOwner.value?.id;
 });
-
-function updateTracker(data) {
-    if (loading.value) {
-        return;
-    }
-
-    loading.value = true;
-
-    apiUpdateTracker(Object.assign(
-        omit(trackerData.value, 'games', 'hints'),
-        data
-    ))
-        .then(
-            ({ status }) => status >= 200 && status < 300,
-            e => {
-                console.error(`Failed to update tracker: ${e}`);
-                return false;
-            }
-        )
-        .then(saved => {
-            loading.value = false;
-            if (saved) {
-                Object.assign(trackerData.value, data);
-            }
-        })
-}
 
 function claimTracker() {
     updateTracker({
@@ -385,7 +359,7 @@ const showFoundHints = ref(false);
 
 const hintsByGame = computed(() => {
     return sentHints.value ? hintsByReceiver.value : hintsByFinder.value;
-})
+});
 
 function hintStatus(hint) {
     return hint.found ? 'found' :
@@ -415,7 +389,29 @@ const HINT_STATUS_UI = {
 }
 
 function displayHintsByGame(id) {
-    return (hintsByGame.value?.[id] || []).filter(h => showFoundHints.value || hintStatus(h) === 'notfound');
+    return (hintsByGame.value?.[id] || []).filter(h =>
+        showFoundHints.value || (
+            hintStatus(h) === 'notfound' &&
+            h.classification !== 'trash'
+        )
+    );
+}
+
+const HINT_STATUS_ORDER = {
+    notfound: 0,
+    useless: 1,
+    found: 2,
+}
+
+function sortedDisplayHintsByGame(id) {
+    return orderBy(
+        displayHintsByGame(id),
+        [
+            h => HINT_STATUS_ORDER[hintStatus(h)],
+            h => findIndex(hintClassification, c => c.id === h.classification),
+            'id',
+        ]
+    );
 }
 
 function countUnfoundReceivedHints(game) {
@@ -447,33 +443,6 @@ async function loadTracker() {
     } finally {
         loading.value = false;
     }
-}
-
-async function updateGame(game, mutator) {
-    if (loading.value) {
-        return;
-    }
-
-    loading.value = true;
-
-    const data = { ...game };
-    mutator(data);
-
-    return apiUpdateGame(props.aptrackerid, data)
-        .then(
-            ({ status, data }) => status >= 200 && status < 300 ? data : undefined,
-            e => {
-                console.error(`Failed to update game: ${e}`);
-                return undefined;
-            }
-        )
-        .then(savedGame => {
-            if (savedGame) {
-                synchronize(game, savedGame);
-                patchGame(game);
-            }
-            loading.value = false;
-        });
 }
 
 function claimGame(game) {
@@ -540,6 +509,12 @@ function setPing(game, preference) {
     }));
 }
 
+function setHintClassification(hint, classification) {
+    setTimeout(() => updateHint(hint, h => {
+        h.classification = classification.id || classification;
+    }));
+}
+
 function updateLastChecked(game) {
     const now = new Date();
     updateGame(game, g => { g.last_checked = now.toISOString(); });
@@ -594,6 +569,66 @@ function saveTitle() {
 function cancelEditTitle() {
     editedTitle.value = trackerData.value?.title || '';
     editingTitle.value = false;
+}
+
+async function updateObject(data, updater, mutator, patcher) {
+    if (loading.value) {
+        return;
+    }
+
+    loading.value = true;
+
+    const newData = { ...data };
+    if (mutator) {
+        mutator(newData);
+    }
+
+    return updater(newData)
+        .then(
+            ({ status, data }) => status >= 200 && status < 300 ? data : undefined,
+            e => {
+                console.error(`Failed to update: ${e}`);
+                return undefined;
+            }
+        )
+        .then(saved => {
+            loading.value = false;
+            if (saved) {
+                synchronize(data, saved);
+            }
+            if (patcher) {
+                patcher(data);
+            }
+        });
+}
+
+async function updateTracker(data) {
+    return updateObject(
+        Object.assign(
+            omit(trackerData.value, 'games', 'hints'),
+            data
+        ),
+        apiUpdateTracker,
+        undefined,
+        () => { Object.assign(trackerData.value, data); }
+    );
+}
+
+async function updateGame(game, mutator) {
+    return updateObject(
+        game,
+        g => apiUpdateGame(props.aptrackerid, g),
+        mutator,
+        patchGame
+    );
+}
+
+async function updateHint(hint, mutator) {
+    return updateObject(
+        hint,
+        h => apiUpdateHint(props.aptrackerid, h),
+        mutator
+    );
 }
 
 loadTracker();
@@ -966,35 +1001,46 @@ loadTracker();
                                     </div>
                                     <div v-else class="row justify-content-center">
                                         <div class="col-auto">
-                                            <table class="table table-responsive">
-                                                <tr v-for="hint in displayHintsByGame(game.id)">
-                                                    <td class="text-end pe-0">
-                                                        <template v-if="!sentHints">
-                                                            <span class="bg-transparent p-0"
-                                                                :class="{ 'text-info': !!gameById[hint.receiver_game_id], 'text-primary': !gameById[hint.receiver_game_id] }">{{
-                                                                    gameById[hint.receiver_game_id]?.name || '(Item link)'
+                                            <table class="table table-responsive table-borderless table-sm hint-table">
+                                                <tbody>
+                                                    <tr class="bg-transparent" v-for="hint in sortedDisplayHintsByGame(game.id)">
+                                                        <td class="bg-transparent text-end pe-0">
+                                                            <template v-if="!sentHints">
+                                                                <span class=""
+                                                                    :class="{ 'text-info': !!gameById[hint.receiver_game_id], 'text-primary': !gameById[hint.receiver_game_id] }">{{
+                                                                        gameById[hint.receiver_game_id]?.name || '(Item link)'
+                                                                    }}</span>'s
+                                                            </template>
+                                                            <span class="text-info bg-transparent p-0">{{ hint.item }}</span>
+                                                            <span class="ps-1">
+                                                                <DropdownSelector
+                                                                    :options="hintClassification"
+                                                                    :value="hintClassification.byId[hint.classification]"
+                                                                    :disabled="loading"
+                                                                    :icons="true"
+                                                                    @selected="s => setHintClassification(hint, s)"
+                                                                ></DropdownSelector>
+                                                            </span>
+                                                        </td>
+                                                        <td class="bg-transparent ps-0 pe-0">&nbsp;is&nbsp;at&nbsp;</td>
+                                                        <td class="bg-transparent text-start ps-0">
+                                                            <template v-if="sentHints">
+                                                                <span class="text-info">{{
+                                                                    gameById[hint.finder_game_id].name
                                                                 }}</span>'s
-                                                        </template>
-                                                        <span class="text-info bg-transparent p-0">{{ hint.item }}</span>
-                                                    </td>
-                                                    <td class="ps-0 pe-0">&nbsp;is&nbsp;at&nbsp;</td>
-                                                    <td class="text-start ps-0">
-                                                        <template v-if="sentHints">
-                                                            <span class="text-info bg-transparent p-0">{{
-                                                                gameById[hint.finder_game_id].name
-                                                            }}</span>'s
-                                                        </template>
-                                                        <span class="text-info bg-transparent p-0">{{ hint.location
-                                                        }}</span>
-                                                        <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance
-                                                        }})</template> <i v-if="showFoundHints" class="bg-transparent"
-                                                            :class="HINT_STATUS_UI[hintStatus(hint)].iconclasses"
-                                                            :title="HINT_STATUS_UI[hintStatus(hint)].icontooltip"></i> <a
-                                                            href="#" class="bg-transparent p-0 mw-copy-hint"
-                                                            @click.prevent="clipboardCopy(hintToString(hint))"
-                                                            title="Copy to clipboard"><i class="bi-copy"></i></a>
-                                                    </td>
-                                                </tr>
+                                                            </template>
+                                                            <span class="text-info">{{ hint.location
+                                                            }}</span>
+                                                            <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance
+                                                            }})</template> <i v-if="showFoundHints"
+                                                                :class="HINT_STATUS_UI[hintStatus(hint)].iconclasses"
+                                                                :title="HINT_STATUS_UI[hintStatus(hint)].icontooltip"></i> <a
+                                                                href="#" class="text-light mw-copy-hint"
+                                                                @click.prevent="clipboardCopy(hintToString(hint))"
+                                                                title="Copy to clipboard"><i class="bi-copy"></i></a>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
                                             </table>
                                         </div>
                                     </div>
@@ -1115,7 +1161,7 @@ tr tr:hover .mw-copy-hint {
 
 .tracker-table th,
 .tracker-table td {
-    vertical-align: middle;
+    vertical-align: baseline;
 }
 
 .shrink-column {
@@ -1138,5 +1184,11 @@ tr tr:hover .mw-copy-hint {
 .dropdown-menu {
     max-height: 50vh;
     overflow-y: auto;
+}
+</style>
+
+<style>
+.hint-table button:not(.dropdown-item) {
+    padding: 0.125em 0.25em;
 }
 </style>

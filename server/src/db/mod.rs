@@ -102,6 +102,9 @@ pub trait DataAccess {
         tracker_id: i32,
     ) -> BoxStream<'_, sqlx::Result<ApHint>>;
 
+    /// Gets an [`ApHint`] by its database ID.
+    fn get_ap_hint(&mut self, hint_id: i32) -> BoxFuture<'_, sqlx::Result<Option<ApHint>>>;
+
     /// Deletes all of the [`ApHint`]s for a tracker by the tracker's ID.
     fn delete_ap_hints_by_tracker_id(&mut self, tracker_id: i32)
         -> BoxFuture<'_, sqlx::Result<()>>;
@@ -495,6 +498,10 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
             }
         }
         .boxed()
+    }
+
+    fn get_ap_hint(&mut self, hint_id: i32) -> BoxFuture<'_, sqlx::Result<Option<ApHint>>> {
+        pg_select_one(self.0.as_mut(), Expr::col(ApHintIden::Id).eq(hint_id)).boxed()
     }
 
     fn delete_ap_hints_by_tracker_id(

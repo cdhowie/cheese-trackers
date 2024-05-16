@@ -590,3 +590,13 @@ AS $BODY$
     WHERE t.id IN (SELECT id FROM ut)
         AND NOT gs.all_done
 $BODY$;
+
+BEGIN;
+
+    CREATE TYPE public.hint_classification AS ENUM
+        ('unknown', 'critical', 'useful', 'trash');
+
+    ALTER TABLE IF EXISTS public.ap_hint
+        ADD COLUMN classification hint_classification NOT NULL DEFAULT 'unknown';
+
+COMMIT;

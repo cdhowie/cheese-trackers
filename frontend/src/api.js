@@ -43,6 +43,14 @@ export async function updateGame(tracker_id, game) {
     });
 }
 
+export async function updateHint(tracker_id, hint) {
+    return api_http.request({
+        method: 'put',
+        url: `tracker/${tracker_id}/hint/${hint.id}`,
+        data: hint,
+    });
+}
+
 export async function updateTracker(tracker) {
     return api_http.request({
         method: 'put',
