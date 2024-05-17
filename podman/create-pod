@@ -12,7 +12,6 @@ podman run \
     --pod mwtracker \
     --name mwtracker_db \
     --detach \
-    --volume "$(pwd)/../server/mwtracker.schema.sql:/docker-entrypoint-initdb.d/mwtracker.schema.sql:ro" \
     --env POSTGRES_USER=mwtracker \
     --env POSTGRES_PASSWORD=mwtracker \
     --env POSTGRES_DB=mwtracker \

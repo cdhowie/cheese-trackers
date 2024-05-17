@@ -10,7 +10,10 @@ use async_stream::stream;
 use futures::{future::BoxFuture, stream::BoxStream, FutureExt, Stream, StreamExt};
 use sea_query::{Alias, Asterisk, Expr, Func, PostgresQueryBuilder, Query, SimpleExpr};
 use sea_query_binder::SqlxBinder;
-use sqlx::{pool::PoolConnection, postgres::PgRow, FromRow, PgConnection, PgPool, Postgres};
+use sqlx::{
+    migrate::MigrateError, pool::PoolConnection, postgres::PgRow, FromRow, PgConnection, PgPool,
+    Postgres,
+};
 
 pub mod model;
 
@@ -19,6 +22,9 @@ use model::*;
 /// Provides access to the database.
 pub trait DataAccessProvider {
     type DataAccess: DataAccess + Transactable + Send;
+
+    /// Apply migrations to the database.
+    fn migrate(&self) -> BoxFuture<'_, Result<(), MigrateError>>;
 
     /// Creates a new data access value, such as by acquiring a connection from
     /// a pool.
@@ -251,6 +257,20 @@ pub trait DataAccess {
 
 impl DataAccessProvider for PgPool {
     type DataAccess = PgDataAccess<PoolConnection<Postgres>>;
+
+    fn migrate(&self) -> BoxFuture<'_, Result<(), MigrateError>> {
+        async move {
+            // To avoid options in the migration scripts from interfering with
+            // subsequent usage, we acquire a connection and detach it from the
+            // pool.  This way, when we drop it, the connection is discarded
+            // instead of being returned to the pool.
+            let mut conn = self.acquire().await?.detach();
+            sqlx::migrate!("migrations/psql")
+                .run_direct(&mut conn)
+                .await
+        }
+        .boxed()
+    }
 
     fn create_data_access(&self) -> BoxFuture<'_, Result<Self::DataAccess, sqlx::Error>> {
         Box::pin(async { self.acquire().await.map(PgDataAccess) })

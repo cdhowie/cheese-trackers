@@ -1056,6 +1056,8 @@ async fn create_router_from_config(
     Ok(match &config.database {
         conf::Database::Postgres { connection_string } => {
             let data_provider = sqlx::PgPool::connect(connection_string).await?;
+            data_provider.migrate().await?;
+            println!("Migrations completed successfully.");
             create_api_router(AppState::new(config, data_provider))
         }
     })
