@@ -1,7 +1,7 @@
 <script setup>
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed } from 'vue';
 import { RouterLink, RouterView, useRoute } from 'vue-router';
-import { getSettings, authBegin } from '@/api.js';
+import { authBegin, ping, uiSettings as serverSettings } from '@/api.js';
 import { BUILD_VERSION } from './build';
 import * as settings from '@/settings';
 import { filter, includes } from 'lodash-es';
@@ -9,28 +9,13 @@ import { filter, includes } from 'lodash-es';
 const route = useRoute();
 
 const localSettings = settings.settings;
-const serverSettings = ref({});
 
 const newVersionAvailable = computed(() =>
     serverSettings.value.build_version && serverSettings.value.build_version !== BUILD_VERSION
 );
 
-async function updateSettings() {
-    try {
-        const { data } = await getSettings();
-        serverSettings.value = data;
-    } catch (e) {
-        console.log(`Failed to update settings: ${e}`);
-    }
-}
-
-const interval = setInterval(updateSettings, 60 * 1000);
-
-updateSettings();
-
-onBeforeUnmount(() => {
-    clearInterval(interval);
-});
+// Get the UI settings by making a no-op requset.
+ping();
 
 async function login() {
     const { data } = await authBegin();

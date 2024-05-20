@@ -4,13 +4,17 @@
 // See https://github.com/rust-lang/rust-clippy/pull/12756
 #![allow(clippy::assigning_clones)]
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, future::ready, sync::Arc, time::Duration};
 
 use arrayvec::ArrayVec;
 use auth::token::AuthenticatedUser;
 use axum::{
-    extract::{Path, State},
-    http::{header, HeaderValue, StatusCode},
+    extract::{self, Path, State},
+    http::{
+        header::{self, CONTENT_TYPE},
+        HeaderValue, StatusCode,
+    },
+    middleware,
     response::IntoResponse,
     Json,
 };
@@ -89,7 +93,7 @@ struct AppState<D> {
     reqwest_client: reqwest::Client,
     data_provider: D,
     tracker_base_url: Url,
-    ui_settings: UiSettings,
+    ui_settings_header: HeaderValue,
 
     inflight_tracker_updates: moka::future::Cache<String, ()>,
     tracker_update_interval: chrono::Duration,
@@ -133,12 +137,15 @@ impl<D> AppState<D> {
             reqwest_client: reqwest::Client::builder().build().unwrap(),
             data_provider,
             tracker_base_url: "https://archipelago.gg/tracker/".parse().unwrap(),
-            ui_settings: UiSettings {
+            ui_settings_header: serde_json::to_string(&UiSettings {
                 banners: config.banners,
                 build_version: option_env!("GIT_COMMIT")
                     .filter(|s| !s.is_empty())
                     .unwrap_or("dev"),
-            },
+            })
+            .unwrap()
+            .parse()
+            .unwrap(),
             inflight_tracker_updates: moka::future::Cache::builder()
                 .time_to_live(Duration::from_secs(5))
                 .build(),
@@ -981,11 +988,18 @@ where
 #[derive(Debug, Clone, serde::Serialize)]
 struct UiSettings {
     pub build_version: &'static str,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub banners: Vec<conf::Banner>,
 }
 
-async fn get_settings<D>(State(state): State<Arc<AppState<D>>>) -> Json<UiSettings> {
-    Json(state.ui_settings.clone())
+// Deprecated; replaced with x-ct-settings header added in middleware.  Remove
+// this after enough time has passed for all users to refresh their local CT
+// version.
+async fn get_settings<D>(State(state): State<Arc<AppState<D>>>) -> impl IntoResponse {
+    (
+        [(CONTENT_TYPE, "application/json")],
+        state.ui_settings_header.as_bytes().to_owned(),
+    )
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -1023,11 +1037,24 @@ where
     StatusCode::ACCEPTED
 }
 
+async fn add_uisettings_header<D>(
+    state: State<Arc<AppState<D>>>,
+    req: extract::Request,
+    next: middleware::Next,
+) -> axum::response::Response {
+    let mut res = next.run(req).await;
+    res.headers_mut()
+        .insert("x-ct-settings", state.ui_settings_header.clone());
+    res
+}
+
 fn create_api_router<D>(state: AppState<D>) -> axum::Router<()>
 where
     D: DataAccessProvider + Send + Sync + 'static,
 {
     use axum::routing::*;
+
+    let state = Arc::new(state);
 
     axum::Router::new()
         .route("/auth/begin", get(begin_discord_auth))
@@ -1039,9 +1066,17 @@ where
         .route("/tracker/:tracker_id/hint/:hint_id", put(update_hint))
         .route("/settings", get(get_settings))
         .route("/jserror", post(create_js_error))
-        .with_state(Arc::new(state))
-        .layer(axum::middleware::from_fn(
-            |req: axum::extract::Request, next: axum::middleware::Next| async move {
+        // Since UI settings are in a header added by middleware, this no-op
+        // endpoint allows fetching the UI settings without having to make a
+        // dummy request to another endpoint.
+        .route("/ping", get(|| ready(StatusCode::NO_CONTENT)))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            add_uisettings_header,
+        ))
+        .with_state(state)
+        .layer(middleware::from_fn(
+            |req: extract::Request, next: middleware::Next| async move {
                 let mut res = next.run(req).await;
                 res.headers_mut()
                     .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));

@@ -1,10 +1,23 @@
 import axios from 'axios';
+import { ref } from 'vue';
 
 import * as settings from './settings';
 
 const api_http = axios.create({
     baseURL: import.meta.env.DEV ? 'http://127.0.0.1:3000/api/' : '/api/',
 });
+
+export const uiSettings = ref({});
+
+function updateUiSettings(response) {
+    const settingsJson = response.headers?.['x-ct-settings'];
+
+    try {
+        uiSettings.value = JSON.parse(settingsJson);
+    } catch (e) {
+        console.log("Could not parse x-ct-settings", e);
+    }
+}
 
 api_http.interceptors.request.use(config => {
     const token = settings.settings.value.auth?.token;
@@ -15,9 +28,18 @@ api_http.interceptors.request.use(config => {
 });
 
 api_http.interceptors.response.use(
-    r => r,
     r => {
-        if (r.status === 401) {
+        updateUiSettings(r);
+        return r;
+    },
+    r => {
+        if (r.response) {
+            updateUiSettings(r.response);
+        } else if (r.headers) {
+            updateUiSettings(r);
+        }
+
+        if ((r.status || r.response?.status) === 401) {
             const s = settings.load();
             s.auth = {};
             settings.save(s);
@@ -59,8 +81,8 @@ export async function updateTracker(tracker) {
     });
 }
 
-export async function getSettings() {
-    return api_http.get('settings');
+export async function ping() {
+    return api_http.get('ping');
 }
 
 export async function authBegin() {

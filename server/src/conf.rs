@@ -29,6 +29,7 @@ pub struct Banner {
     // If an ID is present, the frontend allows the banner to be dismissed by
     // the user.  The ID will be persisted in local storage and used to filter
     // out dismissed banners.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     pub message: String,
     pub kind: BannerKind,
