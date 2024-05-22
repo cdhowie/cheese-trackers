@@ -496,14 +496,10 @@ where
         pub hints: Vec<ApHint>,
     }
 
-    {
-        let r = state.update_tracker(&tracker_id).await;
-        if r.as_ref()
-            .is_err_and(|e| matches!(**e, TrackerUpdateError::TrackerNotFound))
-        {
-            return Err(StatusCode::NOT_FOUND);
-        }
-        r.unexpected()?;
+    if let Err(err) = state.update_tracker(&tracker_id).await {
+        // Log this error but do not fail the overall operation; if we have old
+        // data in the database then we can still use it.
+        println!("Failed to update tracker {tracker_id}: {err}");
     }
 
     let mut db = state
