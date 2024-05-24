@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use axum::{
     extract::FromRequestParts,
@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     db::{model::CtUser, DataAccess, DataAccessProvider},
     logging::UnexpectedResultExt,
-    state::{GetDataAccessProvider, GetTokenProcessor},
+    state::AppState,
 };
 
 pub type Result<T, E = jsonwebtoken::errors::Error> = std::result::Result<T, E>;
@@ -77,14 +77,15 @@ pub struct TokenPayload<'a> {
 #[derive(Debug, Clone)]
 pub struct AuthenticatedUser(pub CtUser);
 
-impl<S: GetTokenProcessor + GetDataAccessProvider + Sync> FromRequestParts<S>
-    for AuthenticatedUser
+impl<D> FromRequestParts<Arc<AppState<D>>> for AuthenticatedUser
+where
+    D: DataAccessProvider + Send + Sync,
 {
     type Rejection = StatusCode;
 
     fn from_request_parts<'p, 's, 'f>(
         parts: &'p mut axum::http::request::Parts,
-        state: &'s S,
+        state: &'s Arc<AppState<D>>,
     ) -> BoxFuture<'f, Result<Self, Self::Rejection>>
     where
         'p: 'f,
@@ -97,11 +98,11 @@ impl<S: GetTokenProcessor + GetDataAccessProvider + Sync> FromRequestParts<S>
                 .get(AUTHORIZATION)
                 .and_then(|v| v.to_str().ok())
                 .and_then(|v| v.strip_prefix("Bearer "))
-                .and_then(|v| state.get_token_processor().decode(v).ok())
+                .and_then(|v| state.token_processor.decode(v).ok())
                 .ok_or(StatusCode::UNAUTHORIZED)?;
 
             let user = state
-                .get_data_provider()
+                .data_provider
                 .create_data_access()
                 .await
                 .unexpected()?

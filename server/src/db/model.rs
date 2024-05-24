@@ -5,7 +5,10 @@ use std::{fmt::Debug, hash::Hash};
 
 use chrono::{DateTime, Utc};
 use sea_query::{Alias, Iden, SimpleExpr};
-use sqlx::{postgres::PgRow, FromRow, Row};
+use sqlx::{FromRow, Row};
+
+#[cfg(feature = "postgres")]
+use sqlx::postgres::PgRow;
 
 /// Database model.
 pub trait Model {
@@ -82,6 +85,7 @@ macro_rules! db_struct {
                 }
             }
 
+            #[cfg(feature = "postgres")]
             impl<'r> FromRow<'r, PgRow> for $n {
                 fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
                     Ok(Self {
@@ -282,6 +286,27 @@ db_struct! {
         // changed.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub effective_discord_username: Option<String>,
+    }
+}
+
+/// Force-upgrades the completion status based on whether all checks are complete
+/// and whether the goal is complete.
+///
+/// Returns true if the completion status was changed.
+impl ApGame {
+    pub fn update_completion_status(&mut self) -> bool {
+        let auto_status = match (self.checks_done == self.checks_total, self.tracker_status) {
+            (true, TrackerGameStatus::GoalCompleted) => CompletionStatus::Done,
+            (true, _) => CompletionStatus::AllChecks,
+            (false, TrackerGameStatus::GoalCompleted) => CompletionStatus::Goal,
+            (false, _) => CompletionStatus::Incomplete,
+        };
+
+        let new_status = auto_status.merge_with(self.completion_status);
+
+        let r = new_status != self.completion_status;
+        self.completion_status = new_status;
+        r
     }
 }
 

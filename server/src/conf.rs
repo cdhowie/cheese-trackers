@@ -59,6 +59,7 @@ pub struct Token {
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum Database {
+    #[cfg(feature = "postgres")]
     Postgres { connection_string: String },
 }
 
