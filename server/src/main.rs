@@ -26,6 +26,7 @@ mod state;
 mod stream;
 mod tracker;
 
+/// Creates the service router from the service configuration.
 async fn create_router_from_config(
     config: conf::Config,
 ) -> Result<axum::Router<()>, Box<dyn std::error::Error>> {
@@ -40,6 +41,7 @@ async fn create_router_from_config(
     })
 }
 
+/// Middleware function to set `cache-control` headers on static assets.
 async fn set_asset_cache_headers(
     request: axum::extract::Request,
     next: axum::middleware::Next,
@@ -63,6 +65,7 @@ async fn set_asset_cache_headers(
     response
 }
 
+/// Service entry point.
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = conf::load()?;
