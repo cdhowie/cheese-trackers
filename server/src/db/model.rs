@@ -1,3 +1,5 @@
+//! Database model types.
+
 // Not all generated *Iden variants are used.
 #![allow(unused)]
 
@@ -39,6 +41,8 @@ pub trait Model {
 
 // This is a hack that should be replaced with a proper proc macro.  For
 // example, it assumes the primary key will always be called "id".
+
+/// Automatically implements several traits useful for database model structs.
 macro_rules! db_struct {
     (
         $( #[ $nm:meta ] )*
@@ -53,6 +57,9 @@ macro_rules! db_struct {
             #[sea_query::enum_def]
             #[derive(serde::Serialize, serde::Deserialize)]
             $( #[ $nm ] )*
+            #[doc = "Model for the database table `"]
+            #[doc = stringify!([< $n:snake >])]
+            #[doc = "`."]
             $nv struct $n {
                 $(
                     $( #[ $fm ] )*
@@ -97,6 +104,7 @@ macro_rules! db_struct {
     };
 }
 
+/// Automatically implements several traits useful for database model enums.
 macro_rules! db_enum {
     (
         $( #[ $nm:meta ] )*
@@ -111,6 +119,9 @@ macro_rules! db_enum {
             #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type, serde::Serialize, serde::Deserialize)]
             #[sqlx(type_name = $dbn, rename_all = "snake_case")]
             #[serde(rename_all = "snake_case")]
+            #[doc = "Model for the database enum `"]
+            #[doc = $dbn]
+            #[doc = "`."]
             $nv enum $n {
                 $(
                     $( #[ $fm:meta ] )*
@@ -243,6 +254,11 @@ db_struct! {
     }
 }
 
+// This is the result of a database function call.  There is no table backing
+// this model.
+//
+// TODO: Don't generate docs in db_struct for this type, because they refer to a
+// table that doesn't exist.
 db_struct! {
     #[derive(Debug, Clone)]
     pub struct ApTrackerDashboard {

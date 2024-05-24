@@ -12,7 +12,7 @@ use serde::{
 
 use crate::db::model::TrackerGameStatus;
 
-/// Refers to a specific tracker table.
+/// Refers to a specific table in the tracker response.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TrackerTable {
     Checks,
@@ -20,6 +20,7 @@ pub enum TrackerTable {
 }
 
 impl TrackerTable {
+    /// Returns the selector for a given table.
     fn selector(self) -> &'static Selector {
         match self {
             TrackerTable::Checks => checks_table_selector(),
@@ -80,19 +81,39 @@ pub fn parse_tracker_html(html: &str) -> Result<(Vec<Game>, Vec<Hint>), ParseTra
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Game {
+    /// Position of the slot.
+    ///
+    /// A tracker should contain slots with sequential integers starting with 1,
+    /// but this is not statically enforced.
     #[serde(rename = "#")]
     #[serde(deserialize_with = "de_parsed")]
     pub position: u32,
+    /// The name of the slot.
     pub name: String,
+    /// The game being played in the slot.
     pub game: String,
+    /// The status of the slot.
     #[serde(deserialize_with = "de_status")]
     pub status: TrackerGameStatus,
+    /// The completed and total checks of the slot.
     #[serde(deserialize_with = "de_parsed")]
     pub checks: Checks<u32>,
+    /// Duration since the last check sent by this slot.
+    ///
+    /// Note that this value is not exact; the upstream tracker provides this
+    /// value with second granularity, but the value is not updated on
+    /// subsequent requests to the upstream tracker until all of the data is
+    /// updated, so this value can vary by several minutes in either direction
+    /// until the upstream tracker regenerates the data snapshot it uses to
+    /// populate the table.
     #[serde(deserialize_with = "de_last_activity")]
     pub last_activity: Option<chrono::Duration>,
 }
 
+/// Deserialize a [`TrackerGameStatus`] from an HTML table.
+///
+/// `Deserialize` is already implemented on `TrackerGameStatus` with a different
+/// representation, so this function handles parsing from HTML tables.
 fn de_status<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TrackerGameStatus, D::Error> {
     Ok(match String::deserialize(deserializer)?.as_str() {
         "Disconnected" => TrackerGameStatus::Disconnected,
@@ -113,7 +134,7 @@ fn de_status<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TrackerGameSt
 #[error("failed to parse checks")]
 pub struct CheckParseError;
 
-/// Completed and total checks counts.
+/// Completed and total check counts.
 #[derive(Debug, Clone, Copy)]
 pub struct Checks<T> {
     pub completed: T,
@@ -162,6 +183,10 @@ impl<T: FromStr> FromStr for Checks<T> {
     }
 }
 
+/// Deserialize a value that can be parsed from a string.
+///
+/// This function deserializes a string and then attempts to convert it to `T`
+/// by invoking `T`'s [`FromStr`] implementation.
 fn de_parsed<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,
@@ -174,6 +199,9 @@ where
         .map_err(|e| D::Error::custom(format!("unable to parse value {s:?}: {e}")))
 }
 
+/// Deserializes Last Activity column values.
+///
+/// In the raw HTML, this value is an integer number of seconds.
 fn de_last_activity<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<chrono::Duration>, D::Error> {
@@ -192,19 +220,31 @@ fn de_last_activity<'de, D: Deserializer<'de>>(
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct Hint {
+    /// The name of the slot that has the item.
     pub finder: String,
+    /// The name of the slot that will receive the item.
     pub receiver: String,
+    /// The name of the item.
     pub item: String,
+    /// The name of the check in the finder slot that contains the item.
     pub location: String,
+    /// The location of the check in the finder slot.
+    ///
+    /// This will be "Vanilla" if the slot does not have entrance randomization
+    /// enabled.
     pub entrance: String,
+    /// Indicates if the check has been sent.
     #[serde(deserialize_with = "de_found")]
     pub found: bool,
 }
 
+/// Deserializes values in the Found column.
 fn de_found<'de, D: Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
     String::deserialize(deserializer).map(|s| !s.is_empty())
 }
 
+/// Deserialization error caused when not all rows are consumed from the table
+/// before deserialization ends.
 struct ExpectedElements(usize);
 
 impl Expected for ExpectedElements {
@@ -213,12 +253,14 @@ impl Expected for ExpectedElements {
     }
 }
 
+/// Removes leading and trailing whitespace from a string.
 fn trimmed(mut s: String) -> String {
     s.truncate(s.trim_end().len());
     s.drain(..(s.len() - s.trim_start().len()));
     s
 }
 
+/// Error type indicating that the header row is missing from the table.
 #[derive(Debug, thiserror::Error)]
 #[error("missing table header row")]
 struct MissingHeaderRowError;
@@ -238,6 +280,8 @@ struct TableDeserializer<'a> {
 }
 
 impl<'a> TableDeserializer<'a> {
+    /// Create a new table deserializer for the given element reference, which
+    /// must refer to a table.
     fn new(table: ElementRef<'a>) -> Result<Self, MissingHeaderRowError> {
         Ok(Self {
             columns: table
@@ -252,6 +296,7 @@ impl<'a> TableDeserializer<'a> {
         })
     }
 
+    /// Ends deserialization, returning an error if not all rows were consumed.
     fn end(self) -> Result<(), DeError> {
         let remaining = self.rows.count();
         if remaining == 0 {
@@ -306,8 +351,12 @@ impl<'a, 'de> SeqAccess<'de> for TableDeserializer<'a> {
     }
 }
 
+/// Creates a function that returns a static reference to a [`Selector`].
 macro_rules! selector {
     ( $fn:ident -> $sel:literal ) => {
+        #[doc = "Selector: `"]
+        #[doc = $sel]
+        #[doc = "`"]
         fn $fn() -> &'static Selector {
             static SELECTOR: OnceLock<Selector> = OnceLock::new();
             SELECTOR.get_or_init(|| Selector::parse($sel).unwrap())

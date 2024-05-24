@@ -1,3 +1,5 @@
+//! Dashboard endpoints.
+
 use std::sync::Arc;
 
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
@@ -10,6 +12,7 @@ use crate::{
     state::AppState,
 };
 
+/// `GET /dashboard/tracker`: Get trackers to display on the dashboard.
 pub async fn get_dashboard_trackers<D>(
     State(state): State<Arc<AppState<D>>>,
     user: AuthenticatedUser,

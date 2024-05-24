@@ -36,10 +36,16 @@ impl DataAccessProvider for PgPool {
 /// Provides access to PostgreSQL databases.
 ///
 /// Access to the inner database connection is intentionally omitted.  All
-/// database access should happen in an implementation of [`DataAccess`].
+/// database access should happen by using this type's implementation of
+/// [`DataAccess`].
 #[derive(Debug)]
 pub struct PgDataAccess<T>(T);
 
+/// Returns a string describing the error case where a type's [`Model::columns`]
+/// implementation omits the primary key.
+///
+/// This function is used in a few places to ensure a consistent panic message
+/// for this situation.
 fn missing_primary_key<T>() -> String {
     format!(
         "{0}::columns() does not contain {0}::primary_key()",
@@ -47,6 +53,9 @@ fn missing_primary_key<T>() -> String {
     )
 }
 
+/// Performs an insert of the specified values into the database.
+///
+/// Returns a stream of the values that were inserted.
 fn pg_insert<'a, T>(
     executor: &'a mut PgConnection,
     values: impl IntoIterator<Item = T> + 'a,
@@ -102,6 +111,7 @@ where
     }
 }
 
+/// Selects a single row from the database using the specified condition.
 async fn pg_select_one<T>(
     executor: &mut PgConnection,
     condition: SimpleExpr,
@@ -121,6 +131,7 @@ where
         .await
 }
 
+/// Selects many rows from the database using the specified condition.
 fn pg_select_many<'a, T>(
     executor: &'a mut PgConnection,
     condition: SimpleExpr,
@@ -141,6 +152,7 @@ where
     }
 }
 
+/// Deletes a row from the database by its integer primary key.
 async fn pg_delete<T>(executor: &mut PgConnection, id: i32) -> sqlx::Result<Option<T>>
 where
     T: Model + for<'a> FromRow<'a, PgRow> + Send + Unpin,
@@ -156,6 +168,19 @@ where
         .await
 }
 
+/// Updates a row in the database.
+///
+/// `value` should contain the updated state of the row.  The primary key
+/// attribute of `value` is used to locate the existing row in the database.
+///
+/// `columns` is a list of column identifiers for the attributes that have
+/// changed.  This allows building a partial update without needing to include
+/// columns whose values did not change.
+///
+/// If `columns` is empty, all columns (excluding the primary key) are updated.
+///
+/// Note that because the primary key attribute of `value` is used to find the
+/// existing row, you cannot update primary keys using this function.
 async fn pg_update<T>(
     executor: &mut PgConnection,
     value: T,

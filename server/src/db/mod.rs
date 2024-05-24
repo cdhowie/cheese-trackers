@@ -13,6 +13,8 @@ pub mod model;
 // enabled by default, but you can explicitly specify "--no-default-features"
 // and "--features" with a specific backend to "cargo build" in order to build
 // faster and produce a smaller binary if only specific backends are required.
+
+/// PostgreSQL support.
 #[cfg(feature = "postgres")]
 pub mod pg;
 
@@ -74,8 +76,8 @@ pub trait DataAccess {
 
     /// Updates an existing [`ApTracker`].
     ///
-    /// If an existing tracker is found, this function will return the new record
-    /// in `Some`, otherwise it will return `None`.
+    /// If an existing tracker is found, this function will return the new
+    /// record in `Some`, otherwise it will return `None`.
     ///
     /// If `columns` is empty, all columns (except the primary key) will be
     /// updated.
@@ -248,6 +250,7 @@ pub trait DataAccess {
         's: 'f,
         'v: 'f;
 
+    /// Gets a summary of a user's active (incomplete) trackers.
     fn get_dashboard_trackers(
         &mut self,
         user_id: i32,

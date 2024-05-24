@@ -1,8 +1,4 @@
 //! Server state management.
-//!
-//! This module provides traits that can be used to obtain specific
-//! functionality from the global server state.  This allows better separation
-//! of concerns between different server components.
 
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
@@ -28,58 +24,89 @@ use crate::{
     tracker::{parse_tracker_html, Checks, Game, Hint, ParseTrackerError},
 };
 
+/// Errors that may occur when fetching the state of an upstream tracker.
 #[derive(Debug, thiserror::Error)]
 pub enum TrackerUpdateError {
+    /// The tracker URL could not be parsed.
     #[error("failed to parse URL: {0}")]
     ParseUrl(
         #[from]
         #[source]
         url::ParseError,
     ),
+    /// The HTTP request for the upstream tracker data failed.
     #[error("failed to download tracker data: {0}")]
     Http(
         #[from]
         #[source]
         reqwest::Error,
     ),
+    /// The data returned by the upstream tracker could not be parsed.
     #[error("failed to parse tracker response: {0}")]
     Parse(
         #[from]
         #[source]
         ParseTrackerError,
     ),
+    /// An unexpected database error occured while synchronizing the state of
+    /// the database with the state of the upstream trocker.
     #[error("database error: {0}")]
     Database(
         #[from]
         #[source]
         sqlx::Error,
     ),
+    /// The number of slots changed since the last tracker update, which should
+    /// not be possible.
     #[error("game count mismatch (tracker has {tracker}, database has {database})")]
     GameCountMismatch { tracker: usize, database: usize },
+    /// Immutable information about a specific slot's game since the last
+    /// tracker update, which should not be possible.
     #[error("game {0} has mismatching information")]
     GameInformationMismatch(u32),
+    /// A numeric type conversion failed between the data type used by the
+    /// upstream tracker and the type used by the database.
     #[error("numeric conversion failure processing game {0}")]
     NumericConversion(u32),
+    /// A hint exists referencing a slot that does not exist.
     #[error("a hint exists referencing the nonexistent game name {0:?}")]
     HintGameMissing(String),
+    /// The upstream tracker does not exist.
     #[error("tracker not found")]
     TrackerNotFound,
 }
 
+/// Global server state.
 pub struct AppState<D> {
+    /// The server's [data access provider](crate::db::DataAccessProvider).
     pub data_provider: D,
+    /// Cached JSON-serialized [UI settings](crate::api::UiSettings) response
+    /// header value.
     pub ui_settings_header: HeaderValue,
 
+    /// Discord authentication client.
     pub auth_client: AuthClient,
+    /// Authentication token processor.
     pub token_processor: TokenProcessor,
 
+    /// Client used for upstream tracker updates.
     reqwest_client: reqwest::Client,
+    /// Base URL for upstream trackers.
     tracker_base_url: Url,
+    /// Currently-inflight tracker update requests, keyed by the upstream
+    /// tracker ID.
+    ///
+    /// This is used to merge simultaneous update requests for the same tracker
+    /// into a single request to the upstream tracker server.
     inflight_tracker_updates: moka::future::Cache<String, ()>,
+    /// The minimum allowed time between consecutive updates of a single tracker
+    /// from the upstream tracker source.
     tracker_update_interval: chrono::Duration,
 }
 
 impl<D> AppState<D> {
+    /// Create the global state from the given service configuration value and
+    /// data access provider.
     pub fn new(config: Config, data_provider: D) -> Self {
         Self {
             reqwest_client: reqwest::Client::builder().build().unwrap(),
@@ -379,6 +406,17 @@ impl<D> AppState<D> {
         Ok(())
     }
 
+    /// Update the data for the provided upstream tracker ID from the upstream
+    /// tracker.
+    ///
+    /// If the last update was within the [tracker update
+    /// interval](Self::tracker_update_interval) then the update is not
+    /// performed and the operation succeeds immediately.
+    ///
+    /// If there is an existing inflight request for an update of the same
+    /// tracker, that request will be awaited instead of creating a new request.
+    /// This ensures that two simultaneous requests to update the same tracker
+    /// will not result in multiple requests to the upstream tracker server.
     pub async fn update_tracker(&self, tracker_id: &str) -> Result<(), Arc<TrackerUpdateError>>
     where
         D: DataAccessProvider + Send + Sync + 'static,

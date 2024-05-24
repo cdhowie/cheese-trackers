@@ -1,3 +1,5 @@
+//! Tracker endpoints.
+
 use std::sync::Arc;
 
 use axum::{
@@ -22,6 +24,7 @@ use crate::{
     state::AppState,
 };
 
+/// `GET /tracker/:tracker_id`: Get tracker.
 pub async fn get_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
     Path(tracker_id): Path<String>,
@@ -104,6 +107,7 @@ where
     }))
 }
 
+/// Request body for [`update_tracker`].
 #[derive(Debug, serde::Deserialize)]
 pub struct UpdateTrackerRequest {
     pub title: String,
@@ -111,6 +115,7 @@ pub struct UpdateTrackerRequest {
     pub lock_title: bool,
 }
 
+/// `PUT /tracker/:tracker_id`: Update tracker.
 pub async fn update_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
     Path(tracker_id): Path<String>,
@@ -197,11 +202,14 @@ where
 
     Ok(StatusCode::NO_CONTENT)
 }
+
+/// Request body for [`update_hint`].
 #[derive(Debug, serde::Deserialize)]
 pub struct UpdateHintRequest {
     pub classification: HintClassification,
 }
 
+/// `PUT /tracker/:tracker_id/hint/:hint_id`: Update hint.
 pub async fn update_hint<D>(
     State(state): State<Arc<AppState<D>>>,
     Path((tracker_id, hint_id)): Path<(String, i32)>,
@@ -253,6 +261,7 @@ where
     Ok(Json(hint))
 }
 
+/// Request body for [`update_game`].
 #[derive(Debug, serde::Deserialize)]
 pub struct UpdateGameRequest {
     pub claimed_by_ct_user_id: Option<i32>,
@@ -265,6 +274,7 @@ pub struct UpdateGameRequest {
     pub notes: String,
 }
 
+/// `PUT /tracker/:tracker_id/game/:game_id`: Update game.
 pub async fn update_game<D>(
     State(state): State<Arc<AppState<D>>>,
     user: Option<AuthenticatedUser>,

@@ -1,3 +1,5 @@
+//! Authentication endpoints.
+
 use std::sync::Arc;
 
 use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
@@ -14,12 +16,14 @@ use crate::{
     state::AppState,
 };
 
+/// `GET /auth/begin`: Begin Discord authentication.
 pub async fn begin_discord_auth<D>(
     State(state): State<Arc<AppState<D>>>,
 ) -> Result<impl IntoResponse, StatusCode> {
     state.auth_client.begin().unexpected().map(Json)
 }
 
+/// Request body for [`complete_discord_auth`].
 #[derive(serde::Deserialize)]
 pub struct CompleteAuthRequest {
     pub code: String,
@@ -27,6 +31,7 @@ pub struct CompleteAuthRequest {
     pub continuation_token: String,
 }
 
+/// `POST /auth/complete`: Complete Discord authentication.
 pub async fn complete_discord_auth<D>(
     State(state): State<Arc<AppState<D>>>,
     Json(request): Json<CompleteAuthRequest>,

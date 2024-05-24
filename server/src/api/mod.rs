@@ -1,3 +1,5 @@
+//! API endpoints and related facilities.
+
 use std::{future::ready, sync::Arc};
 
 use axum::{
@@ -20,6 +22,7 @@ pub mod auth;
 pub mod dashboard;
 pub mod tracker;
 
+/// Creates a new API router with the provided state.
 pub fn create_router<D>(state: Arc<AppState<D>>) -> axum::Router<()>
 where
     D: DataAccessProvider + Send + Sync + 'static,
@@ -46,11 +49,18 @@ where
         // endpoint allows fetching the UI settings without having to make a
         // dummy request to another endpoint.
         .route("/ping", get(|| ready(StatusCode::NO_CONTENT)))
+        // Add the x-ct-settings header.
         .layer(middleware::from_fn_with_state(
             state.clone(),
-            add_uisettings_header,
+            |state: State<Arc<AppState<D>>>, req: Request, next: middleware::Next| async move {
+                let mut res = next.run(req).await;
+                res.headers_mut()
+                    .insert("x-ct-settings", state.ui_settings_header.clone());
+                res
+            },
         ))
         .with_state(state)
+        // Add the cache-control header.
         .layer(middleware::from_fn(
             |req: Request, next: middleware::Next| async move {
                 let mut res = next.run(req).await;
@@ -61,16 +71,28 @@ where
         ))
 }
 
+/// UI settings.
+///
+/// The API router will encode this as JSON and put it in the `x-ct-settings`
+/// response header for every request.  This allows the frontend to detect when
+/// a new version is available as well as update the displayed banners every
+/// time a request is made.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct UiSettings {
+    /// The Git commit identifier for the current version.
+    ///
+    /// This will be `"dev"` in development environments.
     pub build_version: &'static str,
+    /// Banners that should be displayed in the frontend.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub banners: Vec<Banner>,
 }
 
-// Deprecated; replaced with x-ct-settings header added in middleware.  Remove
-// this after enough time has passed for all users to refresh their local CT
-// version.
+/// `GET /api/settings`: Get the current [UI settings](UiSettings).
+///
+/// Deprecated; replaced with the `x-ct-settings` response header, which is
+/// automatically added in middleware.  This endpoint should be removed after
+/// enough time has passed for all users to refresh their local CT version.
 async fn get_settings<D>(State(state): State<Arc<AppState<D>>>) -> impl IntoResponse {
     (
         [(header::CONTENT_TYPE, "application/json")],
@@ -78,23 +100,19 @@ async fn get_settings<D>(State(state): State<Arc<AppState<D>>>) -> impl IntoResp
     )
 }
 
-async fn add_uisettings_header<D>(
-    state: State<Arc<AppState<D>>>,
-    req: Request,
-    next: middleware::Next,
-) -> axum::response::Response {
-    let mut res = next.run(req).await;
-    res.headers_mut()
-        .insert("x-ct-settings", state.ui_settings_header.clone());
-    res
-}
-
+/// Request body for [`create_js_error`].
 #[derive(Debug, Clone, serde::Deserialize)]
 struct CreateJsErrorRequest {
+    /// The ID of the user that generated the error, if the user is authenticated.
     pub ct_user_id: Option<i32>,
+    /// The error represented as text.
     pub error: String,
 }
 
+/// `POST /jserror`: Log a JavaScript error.
+///
+/// This endpoint allows unhandled errors in the frontend to be captured and
+/// investigated later.
 async fn create_js_error<D>(
     State(state): State<Arc<AppState<D>>>,
     Json(request): Json<CreateJsErrorRequest>,
