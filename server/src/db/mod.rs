@@ -267,7 +267,7 @@ pub trait DataAccess {
 /// Usually an owned query is unnecessary, but in come contexts (e.g.
 /// subselects) it can be required, and the workaround is:
 ///
-/// ```
+/// ```ignore
 /// .in_subquery({
 ///     let mut q = Query::select();
 ///     q.from(...)...;
@@ -277,7 +277,7 @@ pub trait DataAccess {
 ///
 /// This generic wrapper allows building such queries in a more natural syntax:
 ///
-/// ```
+/// ```ignore
 /// .in_subquery(
 ///     Query::select().build_with(|q| {
 ///         q.from(...)...;
