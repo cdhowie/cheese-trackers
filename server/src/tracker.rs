@@ -183,6 +183,12 @@ impl<T: FromStr> FromStr for Checks<T> {
     }
 }
 
+impl<T: Display> Display for Checks<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{}", self.completed, self.total)
+    }
+}
+
 /// Deserialize a value that can be parsed from a string.
 ///
 /// This function deserializes a string and then attempts to convert it to `T`
