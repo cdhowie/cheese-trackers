@@ -437,6 +437,9 @@ impl<D> AppState<D> {
             }
 
             let url = self.tracker_base_url.join(tracker_id)?;
+
+            println!("{} - Requesting AP tracker {url}", Utc::now());
+
             let html = self
                 .reqwest_client
                 .get(url)
