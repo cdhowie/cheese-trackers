@@ -1,12 +1,17 @@
 //! Server state management.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::SystemTime};
 
 use arrayvec::ArrayVec;
 use axum::http::HeaderValue;
 use chrono::{DateTime, Utc};
 use futures::TryStreamExt;
+use httpdate::{fmt_http_date, parse_http_date};
 use jsonwebtoken::Header;
+use reqwest::{
+    header::{IF_MODIFIED_SINCE, LAST_MODIFIED},
+    StatusCode,
+};
 use url::Url;
 
 use crate::{
@@ -426,10 +431,11 @@ impl<D> AppState<D> {
             let mut db = self.data_provider.create_data_access().await?;
             let mut tx = db.begin().await?;
 
-            if tx
-                .get_tracker_by_ap_tracker_id(tracker_id)
-                .await?
-                .is_some_and(|r| now < r.updated_at + self.tracker_update_interval)
+            let tracker = tx.get_tracker_by_ap_tracker_id(tracker_id).await?;
+
+            if tracker
+                .as_ref()
+                .is_some_and(|t| now < t.updated_at + self.tracker_update_interval)
             {
                 // The tracker was updated within the last
                 // tracker_update_interval, so don't update it now.
@@ -441,22 +447,66 @@ impl<D> AppState<D> {
 
             println!("{} - Requesting AP tracker {url}", Utc::now());
 
-            let html = self
-                .reqwest_client
-                .get(url)
-                .send()
-                .await?
-                .error_for_status()
-                .map_err(|e| match e.status() {
-                    Some(reqwest::StatusCode::NOT_FOUND) => TrackerUpdateError::TrackerNotFound,
-                    _ => TrackerUpdateError::Http(e),
-                })?
-                .text()
-                .await?;
+            let mut request = self.reqwest_client.get(url);
 
-            let (games, hints) = parse_tracker_html(&html)?;
+            if let Some(t) = &tracker {
+                request = request.header(IF_MODIFIED_SINCE, fmt_http_date(t.updated_at.into()));
+            }
 
-            Self::synchronize_tracker(&mut tx, now, tracker_id.to_owned(), games, hints).await?;
+            let response =
+                request
+                    .send()
+                    .await?
+                    .error_for_status()
+                    .map_err(|e| match e.status() {
+                        Some(reqwest::StatusCode::NOT_FOUND) => TrackerUpdateError::TrackerNotFound,
+                        _ => TrackerUpdateError::Http(e),
+                    })?;
+
+            // This will be false if there is no existing tracker in the
+            // database, or there is no last-modified header on the response, or
+            // the last-modified header doesn't parse, or the last-modified
+            // header time is before the last updated tracker time in the
+            // database.
+            //
+            // In other words, if this is true then the tracker data is the same
+            // as we saw last time and we can skip actually parsing and
+            // synchronizing it into the database.
+            //
+            // This is kind of a mouthful but allows us to unify the logic for
+            // handling the Not Modified status code and the last-modified
+            // header into the same block below.
+            let last_modified_before_updated_at = response
+                .headers()
+                .get(LAST_MODIFIED)
+                .and_then(|lm| parse_http_date(lm.to_str().ok()?).ok())
+                .zip(tracker.as_ref())
+                .is_some_and(|(lm, t)| lm < SystemTime::from(t.updated_at));
+
+            match (response.status(), last_modified_before_updated_at, tracker) {
+                (StatusCode::NOT_MODIFIED, _, Some(mut tracker))
+                | (StatusCode::OK, true, Some(mut tracker)) => {
+                    // Upstream tracker hasn't changed since we last requested
+                    // an update.  We update the last updated time in the
+                    // database both so that the web application will show that
+                    // the data is current, and so we won't request for another
+                    // tracker_update_interval.
+                    tracker.updated_at = now;
+                    tx.update_ap_tracker(tracker, &[ApTrackerIden::UpdatedAt])
+                        .await?;
+                }
+                (StatusCode::OK, _, _) => {
+                    let html = response.text().await?;
+
+                    let (games, hints) = parse_tracker_html(&html)?;
+
+                    Self::synchronize_tracker(&mut tx, now, tracker_id.to_owned(), games, hints)
+                        .await?;
+                }
+                (status, _, _) => {
+                    eprintln!("Unexpected HTTP status in response fetching tracker {tracker_id}: {status}");
+                }
+            };
 
             tx.commit().await?;
 
