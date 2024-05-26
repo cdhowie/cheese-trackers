@@ -4,7 +4,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use arrayvec::ArrayVec;
 use axum::http::HeaderValue;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use futures::TryStreamExt;
 use jsonwebtoken::Header;
 use url::Url;
@@ -144,6 +144,7 @@ impl<D> AppState<D> {
     /// Archipelago.
     async fn synchronize_tracker(
         db: &mut (impl DataAccess + Send),
+        now: DateTime<Utc>,
         tracker_id: String,
         games: Vec<Game>,
         hints: Vec<Hint>,
@@ -155,8 +156,6 @@ impl<D> AppState<D> {
         //   tracker data into the DB.
         // * If not, make sure the data is consistent and then update any
         //   changed pieces of data.
-
-        let now = Utc::now();
 
         match db.get_tracker_by_ap_tracker_id(&tracker_id).await? {
             None => {
@@ -422,13 +421,15 @@ impl<D> AppState<D> {
         D: DataAccessProvider + Send + Sync + 'static,
     {
         let fut = async {
+            let now = Utc::now();
+
             let mut db = self.data_provider.create_data_access().await?;
             let mut tx = db.begin().await?;
 
             if tx
                 .get_tracker_by_ap_tracker_id(tracker_id)
                 .await?
-                .is_some_and(|r| Utc::now() < r.updated_at + self.tracker_update_interval)
+                .is_some_and(|r| now < r.updated_at + self.tracker_update_interval)
             {
                 // The tracker was updated within the last
                 // tracker_update_interval, so don't update it now.
@@ -455,7 +456,7 @@ impl<D> AppState<D> {
 
             let (games, hints) = parse_tracker_html(&html)?;
 
-            Self::synchronize_tracker(&mut tx, tracker_id.to_owned(), games, hints).await?;
+            Self::synchronize_tracker(&mut tx, now, tracker_id.to_owned(), games, hints).await?;
 
             tx.commit().await?;
 
