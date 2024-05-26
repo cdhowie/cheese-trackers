@@ -16,6 +16,7 @@ import GameDisplay from '@/components/GameDisplay.vue';
 import DropdownSelector from '@/components/DropdownSelector.vue';
 import LockButton from '@/components/LockButton.vue';
 import Repeat from '@/components/Repeat.vue';
+import HintPingIcon from '@/components/HintPingIcon.vue';
 
 const props = defineProps(['aptrackerid']);
 
@@ -545,6 +546,30 @@ function clipboardCopy(text) {
     setTimeout(() => { showCopiedToast.value = false; }, 3000);
 }
 
+const CAN_PING_BY_PREFERENCE = {
+    liberally: 'yes',
+    sparingly: 'yes',
+    hints: 'yes',
+    see_notes: 'notes',
+    never: 'no',
+};
+
+function canPingForHint(hint) {
+    const otherSlot = gameById.value[sentHints.value ? hint.finder_game_id : hint.receiver_game_id];
+
+    if (includes(['done', 'released'], otherSlot.completion_status) || !otherSlot.effective_discord_username) {
+        return 'no';
+    }
+
+    return CAN_PING_BY_PREFERENCE[otherSlot.discord_ping];
+}
+
+function hintToStringWithPing(hint) {
+    const otherSlot = gameById.value[sentHints.value ? hint.finder_game_id : hint.receiver_game_id];
+
+    return `${hintToString(hint)} @${otherSlot.effective_discord_username} `;
+}
+
 const editedTitle = ref('');
 const editingTitle = ref(false);
 
@@ -1045,7 +1070,9 @@ loadTracker();
                                                             <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance
                                                             }})</template> <i v-if="showFoundHints"
                                                                 :class="HINT_STATUS_UI[hintStatus(hint)].iconclasses"
-                                                                :title="HINT_STATUS_UI[hintStatus(hint)].icontooltip"></i> <a
+                                                                :title="HINT_STATUS_UI[hintStatus(hint)].icontooltip"></i> <HintPingIcon
+                                                                :ping="canPingForHint(hint)"
+                                                                @copy="clipboardCopy(hintToStringWithPing(hint))"></HintPingIcon> <a
                                                                 href="#" class="text-light mw-copy-hint"
                                                                 @click.prevent="clipboardCopy(hintToString(hint))"
                                                                 title="Copy to clipboard"><i class="bi-copy"></i></a>
