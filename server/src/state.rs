@@ -1,6 +1,6 @@
 //! Server state management.
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 
 use arrayvec::ArrayVec;
 use axum::http::HeaderValue;
@@ -122,7 +122,7 @@ impl<D> AppState<D> {
             .parse()
             .unwrap(),
             inflight_tracker_updates: moka::future::Cache::builder()
-                .time_to_live(Duration::from_secs(5))
+                .time_to_live(config.tracker_update_interval.to_std().unwrap())
                 .build(),
             tracker_update_interval: config.tracker_update_interval,
             auth_client: AuthClient::new(
