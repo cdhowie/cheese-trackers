@@ -16,7 +16,7 @@ import GameDisplay from '@/components/GameDisplay.vue';
 import DropdownSelector from '@/components/DropdownSelector.vue';
 import LockButton from '@/components/LockButton.vue';
 import Repeat from '@/components/Repeat.vue';
-import HintPingIcon from '@/components/HintPingIcon.vue';
+import HintDisplay from '@/components/HintDisplay.vue';
 
 const props = defineProps(['aptrackerid']);
 
@@ -365,24 +365,6 @@ function hintStatus(hint) {
             'notfound';
 }
 
-const HINT_STATUS_UI = {
-    found: {
-        iconclasses: ['bi-check-circle-fill', 'text-success'],
-        icontooltip: 'Found',
-        rowclasses: ['bg-success-subtle'],
-    },
-    notfound: {
-        iconclasses: ['bi-x-circle-fill', 'text-danger'],
-        icontooltip: 'Not found',
-        rowclasses: ['bg-danger-subtle'],
-    },
-    useless: {
-        iconclasses: ['bi-x-circle-fill', 'text-info'],
-        icontooltip: 'Not found, receiving slot is done',
-        rowclasses: ['bg-info-subtle'],
-    },
-}
-
 function displayHintsByGame(id) {
     return (hintsByGame.value?.[id] || []).filter(h =>
         showFoundHints.value || (
@@ -544,24 +526,6 @@ function clipboardCopy(text) {
 
     showCopiedToast.value = true;
     setTimeout(() => { showCopiedToast.value = false; }, 3000);
-}
-
-const CAN_PING_BY_PREFERENCE = {
-    liberally: 'yes',
-    sparingly: 'yes',
-    hints: 'yes',
-    see_notes: 'notes',
-    never: 'no',
-};
-
-function canPingForHint(hint) {
-    const otherSlot = gameById.value[sentHints.value ? hint.finder_game_id : hint.receiver_game_id];
-
-    if (includes(['done', 'released'], otherSlot.completion_status) || !otherSlot.effective_discord_username) {
-        return 'no';
-    }
-
-    return CAN_PING_BY_PREFERENCE[otherSlot.discord_ping];
 }
 
 function hintToStringWithPing(hint) {
@@ -1039,45 +1003,19 @@ loadTracker();
                                         <div class="col-auto">
                                             <table class="table table-responsive table-borderless table-sm hint-table">
                                                 <tbody>
-                                                    <tr class="bg-transparent" v-for="hint in sortedDisplayHintsByGame(game.id)">
-                                                        <td class="bg-transparent text-end pe-0">
-                                                            <template v-if="!sentHints">
-                                                                <span class=""
-                                                                    :class="{ 'text-info': !!gameById[hint.receiver_game_id], 'text-primary': !gameById[hint.receiver_game_id] }">{{
-                                                                        gameById[hint.receiver_game_id]?.name || '(Item link)'
-                                                                    }}</span>'s
-                                                            </template>
-                                                            <span class="text-info bg-transparent p-0">{{ hint.item }}</span>
-                                                            <span class="ps-1">
-                                                                <DropdownSelector
-                                                                    :options="hintClassification"
-                                                                    :value="hintClassification.byId[hint.classification]"
-                                                                    :disabled="loading"
-                                                                    :icons="true"
-                                                                    @selected="s => setHintClassification(hint, s)"
-                                                                ></DropdownSelector>
-                                                            </span>
-                                                        </td>
-                                                        <td class="bg-transparent ps-0 pe-0">&nbsp;is&nbsp;at&nbsp;</td>
-                                                        <td class="bg-transparent text-start ps-0">
-                                                            <template v-if="sentHints">
-                                                                <span class="text-info">{{
-                                                                    gameById[hint.finder_game_id].name
-                                                                }}</span>'s
-                                                            </template>
-                                                            <span class="text-info">{{ hint.location
-                                                            }}</span>
-                                                            <template v-if="hint.entrance !== 'Vanilla'"> ({{ hint.entrance
-                                                            }})</template> <i v-if="showFoundHints"
-                                                                :class="HINT_STATUS_UI[hintStatus(hint)].iconclasses"
-                                                                :title="HINT_STATUS_UI[hintStatus(hint)].icontooltip"></i> <HintPingIcon
-                                                                :ping="canPingForHint(hint)"
-                                                                @copy="clipboardCopy(hintToStringWithPing(hint))"></HintPingIcon> <a
-                                                                href="#" class="text-light mw-copy-hint"
-                                                                @click.prevent="clipboardCopy(hintToString(hint))"
-                                                                title="Copy to clipboard"><i class="bi-copy"></i></a>
-                                                        </td>
-                                                    </tr>
+                                                    <HintDisplay
+                                                        v-for="hint in sortedDisplayHintsByGame(game.id)"
+                                                        :hint="hint"
+                                                        :status="hintStatus(hint)"
+                                                        :show-status="showFoundHints"
+                                                        :direction="sentHints ? 'sent' : 'received'"
+                                                        :receiver-game="gameById[hint.receiver_game_id]"
+                                                        :finder-game="gameById[hint.finder_game_id]"
+                                                        :disabled="loading"
+                                                        @set-classification="s => setHintClassification(hint, s)"
+                                                        @copy="clipboardCopy(hintToString(hint))"
+                                                        @copy-ping="clipboardCopy(hintToStringWithPing(hint))"
+                                                    ></HintDisplay>
                                                 </tbody>
                                             </table>
                                         </div>
@@ -1183,15 +1121,6 @@ loadTracker();
     bottom: 1rem;
     right: 1.5rem;
     z-index: 1;
-}
-
-.mw-copy-hint {
-    visibility: hidden;
-    text-decoration: none;
-}
-
-tr tr:hover .mw-copy-hint {
-    visibility: visible;
 }
 
 .tracker-table th,
