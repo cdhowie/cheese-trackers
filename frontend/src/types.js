@@ -17,8 +17,8 @@ export const completionStatus = keyed([
     { id: 'incomplete', label: 'Incomplete', color: 'light', icon: 'square' },
     { id: 'all_checks', label: 'All checks', color: 'info', icon: 'check-square' },
     { id: 'goal', label: 'Goal', color: 'info', icon: 'flag' },
-    { id: 'done', label: 'Done', color: 'success', icon: 'flag-fill' },
-    { id: 'released', label: 'Released', color: 'secondary', icon: 'escape' },
+    { id: 'done', label: 'Done', color: 'success', icon: 'flag-fill', complete: true },
+    { id: 'released', label: 'Released', color: 'secondary', icon: 'escape', complete: true },
 ]);
 
 export const availabilityStatus = keyed([

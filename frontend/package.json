@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@floating-ui/vue": "^1.0.6",
     "axios": "1.6.7",
     "joi": "17.12.1",
     "lodash-es": "4.17.21",

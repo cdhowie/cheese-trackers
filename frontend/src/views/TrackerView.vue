@@ -185,7 +185,7 @@ function dateToDays(d) {
 }
 
 function isGameCompleted(game) {
-    return includes(['done', 'released'], game.completion_status);
+    return completionStatus.byId[game.completion_status]?.complete;
 }
 
 function lastCheckedClass(game) {
@@ -928,7 +928,7 @@ loadTracker();
                         </td>
                         <td>
                             <DropdownSelector
-                                v-if="!includes(['done', 'released'], game.completion_status)"
+                                v-if="!isGameCompleted(game)"
                                 :options="progressionStatus"
                                 :value="progressionStatus.byId[game.progression_status]"
                                 :disabled="loading"

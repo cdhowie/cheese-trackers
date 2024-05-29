@@ -1,9 +1,10 @@
 <script setup>
-import { hintClassification } from '@/types';
+import { computed } from 'vue';
+
+import { hintClassification, completionStatus } from '@/types';
 import DropdownSelector from './DropdownSelector.vue';
 import HintPingIcon from './HintPingIcon.vue';
-import { computed } from 'vue';
-import { includes } from 'lodash-es';
+import SlotDisplay from './SlotDisplay.vue';
 
 defineEmits([
     'setClassification',
@@ -50,7 +51,9 @@ const CAN_PING_BY_PREFERENCE = {
 const canPing = computed(() => {
     const otherSlot = props.direction === 'sent' ? props.finderGame : props.receiverGame;
 
-    if (includes(['done', 'released'], otherSlot.completion_status) || !otherSlot.effective_discord_username) {
+    const otherSlotCompletion = completionStatus.byId[otherSlot.completion_status];
+
+    if (otherSlotCompletion?.complete || !otherSlot.effective_discord_username) {
         return 'no';
     }
 
@@ -63,7 +66,7 @@ const canPing = computed(() => {
         <td class="bg-transparent text-end pe-0">
             <template v-if="props.direction === 'received'">
                 <span v-if="props.receiverGame" class="text-info">
-                    {{ props.receiverGame.name }}
+                    <SlotDisplay :game="props.receiverGame"/>
                 </span>
                 <span v-else class="text-primary">(Item link)</span>'s
             </template>
@@ -81,7 +84,9 @@ const canPing = computed(() => {
         <td class="bg-transparent ps-0 pe-0">&nbsp;is&nbsp;at&nbsp;</td>
         <td class="bg-transparent text-start ps-0">
             <template v-if="props.direction === 'sent'" class="text-info">
-                <span class="text-info">{{ props.finderGame.name }}</span>'s
+                <span class="text-info">
+                    <SlotDisplay :game="props.finderGame"/>
+                </span>'s
             </template>
             <span class="text-info">{{ props.hint.location }}</span>
             <template v-if="props.hint.entrance !== 'Vanilla'"> ({{ props.hint.entrance }})</template
