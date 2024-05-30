@@ -29,7 +29,7 @@ const { floatingStyles } = useFloating(reference, floating, {
         @mouseleave="show = false"
     >{{ props.game.name }}</span>
     <Teleport to="body">
-        <div ref="floating" class="popup" :style="floatingStyles" v-show="show">
+        <div ref="floating" class="popup" :style="floatingStyles" v-if="show">
             <SlotSummary :game="props.game"/>
         </div>
     </Teleport>

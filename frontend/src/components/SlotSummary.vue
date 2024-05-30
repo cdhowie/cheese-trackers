@@ -1,9 +1,10 @@
 <script setup>
 import { computed } from 'vue';
 
-import { pingPreference, progressionStatus, completionStatus } from '@/types';
+import { pingPreference, progressionStatus, completionStatus, getClaimingUserForGame } from '@/types';
 import GameDisplay from './GameDisplay.vue';
 import EnumDisplay from './EnumDisplay.vue';
+import UsernameDisplay from './UsernameDisplay.vue';
 
 const props = defineProps(['game']);
 
@@ -16,23 +17,30 @@ const ping = computed(() =>
 );
 
 const progression = computed(() => progressionStatus.byId[props.game.progression_status]);
+
+const owner = computed(() => getClaimingUserForGame(props.game));
 </script>
 
 <template>
-    <div class="card">
+    <div class="card text-center">
         <div class="card-body">
             <h5 class="card-title">
                 {{ props.game.name }}
             </h5>
             <div class="card-text">
-                Playing: <GameDisplay :game="props.game.game"/>
+                <UsernameDisplay :user="owner"/>
+                <span class="text-secondary"> is playing </span>
+                <GameDisplay :game="props.game.game"/>
             </div>
             <div class="card-text">
-                Status: <EnumDisplay :value="completion"/>
-                <template v-if="!completion?.complete"> and <EnumDisplay :value="progression"/></template>
+                <EnumDisplay :value="completion"/>
+                <template v-if="!completion?.complete">
+                    <span class="text-secondary"> and </span>
+                    <EnumDisplay :value="progression"/>
+                </template>
             </div>
-            <div class="card-text">
-                Ping: <EnumDisplay :value="ping"/>
+            <div v-if="owner" class="card-text">
+                Ping <EnumDisplay :value="ping" :label="ping?.pingWhen"/>
             </div>
         </div>
     </div>

@@ -36,11 +36,11 @@ export const hintClassification = keyed([
 ]);
 
 export const pingPreference = keyed([
-    { id: 'liberally', label: 'Liberally', color: 'success' },
-    { id: 'sparingly', label: 'Sparingly', color: 'warning' },
-    { id: 'hints', label: 'Hints', color: 'warning' },
-    { id: 'see_notes', label: 'See notes', color: 'info' },
-    { id: 'never', label: 'Never', color: 'danger' },
+    { id: 'liberally', label: 'Liberally', color: 'success', pingWhen: 'liberally' },
+    { id: 'sparingly', label: 'Sparingly', color: 'warning', pingWhen: 'sparingly' },
+    { id: 'hints', label: 'Hints', color: 'warning', pingWhen: 'for hints' },
+    { id: 'see_notes', label: 'See notes', color: 'info', pingWhen: 'after checking notes' },
+    { id: 'never', label: 'Never', color: 'danger', pingWhen: 'never' },
 ]);
 
 // A few views show a unified game status which is a combination of the
@@ -73,3 +73,18 @@ unifiedGameStatus.forGame = (game) =>
     ) ?
         progressionStatus.byId[game.progression_status] :
         completionStatus.byId[game.completion_status];
+
+export function getClaimingUserForGame(game) {
+    if (game.claimed_by_ct_user_id !== undefined) {
+        return {
+            id: game.claimed_by_ct_user_id,
+            discordUsername: game.effective_discord_username,
+        };
+    }
+
+    if (game.effective_discord_username?.length) {
+        return { discordUsername: game.effective_discord_username };
+    }
+
+    return undefined;
+}

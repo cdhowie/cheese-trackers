@@ -7,7 +7,7 @@ import moment from 'moment';
 import { settings } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker, updateHint as apiUpdateHint } from '@/api';
-import { progressionStatus, completionStatus, availabilityStatus, pingPreference, hintClassification, unifiedGameStatus } from '@/types';
+import { progressionStatus, completionStatus, availabilityStatus, pingPreference, hintClassification, unifiedGameStatus, getClaimingUserForGame as getClaimingUser } from '@/types';
 import { percent, synchronize } from '@/util';
 import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
@@ -102,21 +102,6 @@ function hintsClass(game) {
             return `${prefix}${c.color}`;
         }
     }
-}
-
-function getClaimingUser(game) {
-    if (game.claimed_by_ct_user_id !== undefined) {
-        return {
-            id: game.claimed_by_ct_user_id,
-            discordUsername: game.effective_discord_username,
-        };
-    }
-
-    if (game.effective_discord_username?.length) {
-        return { discordUsername: game.effective_discord_username };
-    }
-
-    return undefined;
 }
 
 const players = computed(() =>
