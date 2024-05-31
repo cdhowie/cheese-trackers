@@ -139,10 +139,37 @@ pub async fn get_tracker<D>(
 where
     D: DataAccessProvider + Send + Sync + 'static,
 {
+    // Same as ApTracker but with tracker_id encoded.
+    #[derive(Debug, Clone, serde::Serialize)]
+    pub struct Tracker {
+        pub id: i32,
+        pub tracker_id: UrlEncodedTrackerId,
+        pub updated_at: DateTime<Utc>,
+        pub title: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub owner_ct_user_id: Option<i32>,
+        pub lock_title: bool,
+        pub upstream_url: String,
+    }
+
+    impl From<ApTracker> for Tracker {
+        fn from(value: ApTracker) -> Self {
+            Self {
+                id: value.id,
+                tracker_id: value.tracker_id.into(),
+                updated_at: value.updated_at,
+                title: value.title,
+                owner_ct_user_id: value.owner_ct_user_id,
+                lock_title: value.lock_title,
+                upstream_url: value.upstream_url,
+            }
+        }
+    }
+
     #[derive(serde::Serialize)]
     struct GetTrackerResponse {
         #[serde(flatten)]
-        pub tracker: ApTracker,
+        pub tracker: Tracker,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub owner_discord_username: Option<String>,
         pub games: Vec<ApGame>,
@@ -223,7 +250,7 @@ where
     drop(db);
 
     Ok(Json(GetTrackerResponse {
-        tracker,
+        tracker: tracker.into(),
         owner_discord_username,
         games,
         hints,

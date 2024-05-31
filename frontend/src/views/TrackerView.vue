@@ -864,9 +864,11 @@ loadTracker();
                 <template v-for="game in sortedAndFilteredGames">
                     <tr>
                         <td>
-                            <a :href="`https://archipelago.gg/tracker/${trackerData.tracker_id}/0/${game.position}`"
-                                target="_blank" class="text-reset mw-underline-hover">{{
-                                    game.name }}</a>
+                            <a
+                                :href="`${trackerData.upstream_url}/0/${game.position}`"
+                                target="_blank"
+                                class="text-reset mw-underline-hover"
+                            >{{ game.name }}</a>
                         </td>
                         <td>
                             <span v-if="game.effective_discord_username && isGameCompleted(game)" class="text-danger">Never</span>
