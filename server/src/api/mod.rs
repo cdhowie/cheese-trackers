@@ -33,6 +33,7 @@ where
         .route("/auth/begin", get(auth::begin_discord_auth))
         .route("/auth/complete", post(auth::complete_discord_auth))
         .route("/dashboard/tracker", get(dashboard::get_dashboard_trackers))
+        .route("/tracker", post(tracker::create_tracker))
         .route("/tracker/:tracker_id", get(tracker::get_tracker))
         .route("/tracker/:tracker_id", put(tracker::update_tracker))
         .route(

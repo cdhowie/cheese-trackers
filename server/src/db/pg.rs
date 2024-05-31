@@ -229,9 +229,20 @@ where
 }
 
 impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for PgDataAccess<T> {
-    fn get_tracker_by_ap_tracker_id<'s, 'r, 'f>(
+    fn get_tracker_by_tracker_id(
+        &mut self,
+        tracker_id: uuid::Uuid,
+    ) -> BoxFuture<'_, sqlx::Result<Option<ApTracker>>> {
+        pg_select_one(
+            self.0.as_mut(),
+            Expr::col(ApTrackerIden::TrackerId).eq(tracker_id),
+        )
+        .boxed()
+    }
+
+    fn get_tracker_by_upstream_url<'s, 'r, 'f>(
         &'s mut self,
-        ap_tracker_id: &'r str,
+        upstream_url: &'r str,
     ) -> BoxFuture<'f, sqlx::Result<Option<ApTracker>>>
     where
         's: 'f,
@@ -239,7 +250,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
     {
         pg_select_one(
             self.0.as_mut(),
-            Expr::col(ApTrackerIden::TrackerId).eq(ap_tracker_id),
+            Expr::col(ApTrackerIden::UpstreamUrl).eq(upstream_url),
         )
         .boxed()
     }

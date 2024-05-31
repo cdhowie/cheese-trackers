@@ -53,6 +53,10 @@ export async function getTracker(id) {
     return api_http.get(`tracker/${id}`);
 }
 
+export async function createTracker(url) {
+    return api_http.post('tracker', { url });
+}
+
 export async function getDashboardTrackers() {
     return api_http.get('/dashboard/tracker');
 }

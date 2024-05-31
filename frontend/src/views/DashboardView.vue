@@ -3,24 +3,27 @@ import { computed, ref, watch } from 'vue';
 import { RouterLink } from 'vue-router';
 import router from '../router';
 import { settings } from '@/settings';
-import { getDashboardTrackers } from '@/api';
+import { getDashboardTrackers, createTracker } from '@/api';
 import moment from 'moment';
 import { orderBy } from 'lodash-es';
 
 import Repeat from '@/components/Repeat.vue';
 
-const trackerLinkRegexp = /^https:\/\/archipelago\.gg\/tracker\/([^/]+)/;
-
+const trackerLoading = ref(false);
+const trackerError = ref(undefined);
 const trackerLink = ref('');
 
-const trackerLinkIsValid = computed(() => {
-    return trackerLinkRegexp.test(trackerLink.value);
-});
+async function goToTracker() {
+    trackerLoading.value = true;
+    trackerError.value = undefined;
 
-function goToTracker() {
-    const m = trackerLinkRegexp.exec(trackerLink.value);
-    if (m) {
-        router.push(`/tracker/${m[1]}`);
+    try {
+        const { data } = await createTracker(trackerLink.value);
+        router.push(`/tracker/${data.tracker_id}`);
+    } catch (e) {
+        trackerError.value = e;
+    } finally {
+        trackerLoading.value = false;
     }
 }
 
@@ -73,11 +76,25 @@ watch(
     <div class="container">
         <h2>Find/create tracker</h2>
         <div class="input-group">
-            <input id="trackerLinkEntry" placeholder="https://archipelago.gg/tracker/..." type="text" class="form-control"
-                v-model="trackerLink" @keyup.enter="goToTracker">
-            <button class="btn btn-primary btn-primary" :disabled="!trackerLinkIsValid" @click="goToTracker">
-                Open
+            <input
+                id="trackerLinkEntry"
+                placeholder="https://archipelago.gg/tracker/..."
+                type="text"
+                class="form-control"
+                v-model="trackerLink"
+                :disabled="trackerLoading"
+                @keyup.enter="goToTracker">
+            <button
+                class="btn btn-primary btn-primary"
+                :disabled="trackerLoading || trackerLink === ''"
+                @click="goToTracker"
+            >
+                <span v-if="trackerLoading" class="spinner-border spinner-border-sm"/>
+                <template v-else>Open</template>
             </button>
+        </div>
+        <div v-if="trackerError" class="text-danger">
+            Failed to load tracker ({{ trackerError.message }})
         </div>
     </div>
     <div v-if="settings.auth?.token" class="container mt-3">

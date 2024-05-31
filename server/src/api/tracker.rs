@@ -1,6 +1,6 @@
 //! Tracker endpoints.
 
-use std::sync::Arc;
+use std::{fmt::Display, str::FromStr, sync::Arc};
 
 use axum::{
     extract::{Path, State},
@@ -8,8 +8,11 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, Utc};
 use futures::TryStreamExt;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::{
     auth::token::AuthenticatedUser,
@@ -21,13 +24,117 @@ use crate::{
         DataAccess, DataAccessProvider, Transactable, Transaction,
     },
     logging::UnexpectedResultExt,
-    state::AppState,
+    state::{AppState, TrackerUpdateError},
 };
+
+const URLSAFE_BASE64_UUID_LEN: usize = 22;
+
+/// URL-safe base64-encoded UUID.
+#[derive(Debug, Clone, Copy)]
+pub struct UrlEncodedTrackerId {
+    /// The UUID value.
+    uuid: Uuid,
+    /// Pre-encoded URL-safe base64 string representation of the UUID.  Storing
+    /// this inline increases the size of the value but allows easily casting
+    /// these values to &str, which means String allocations can be skipped in
+    /// some cases.
+    string: [u8; URLSAFE_BASE64_UUID_LEN],
+}
+
+impl UrlEncodedTrackerId {
+    pub fn as_str(&self) -> &str {
+        std::str::from_utf8(&self.string).unwrap()
+    }
+}
+
+// We can skip the string field because it's derived from the uuid, so this
+// winds up being more efficient.
+impl PartialEq for UrlEncodedTrackerId {
+    fn eq(&self, other: &Self) -> bool {
+        self.uuid == other.uuid
+    }
+}
+
+impl From<Uuid> for UrlEncodedTrackerId {
+    fn from(value: Uuid) -> Self {
+        let mut string = [0; URLSAFE_BASE64_UUID_LEN];
+
+        URL_SAFE_NO_PAD
+            .encode_slice(value.as_bytes(), &mut string)
+            .unwrap();
+
+        Self {
+            uuid: value,
+            string,
+        }
+    }
+}
+
+impl From<UrlEncodedTrackerId> for Uuid {
+    fn from(value: UrlEncodedTrackerId) -> Self {
+        value.uuid
+    }
+}
+
+impl AsRef<str> for UrlEncodedTrackerId {
+    fn as_ref(&self) -> &str {
+        self.as_str()
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum UrlEncodedTrackerIdDecodeError {
+    #[error("could not base64-decode tracker ID: {0}")]
+    Base64Decode(#[from] base64::DecodeError),
+    #[error("could not uuid-decode tracker ID: {0}")]
+    UuidDecode(#[from] uuid::Error),
+}
+
+impl FromStr for UrlEncodedTrackerId {
+    type Err = UrlEncodedTrackerIdDecodeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let uuid = Uuid::from_slice(&URL_SAFE_NO_PAD.decode(s)?)?;
+
+        let mut string = [0u8; URLSAFE_BASE64_UUID_LEN];
+        string.copy_from_slice(s.as_bytes());
+
+        Ok(Self { uuid, string })
+    }
+}
+
+impl Display for UrlEncodedTrackerId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for UrlEncodedTrackerId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(D::Error::custom)
+    }
+}
+
+impl Serialize for UrlEncodedTrackerId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_str().serialize(serializer)
+    }
+}
 
 /// `GET /tracker/:tracker_id`: Get tracker.
 pub async fn get_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
-    Path(tracker_id): Path<String>,
+    Path(tracker_id): Path<UrlEncodedTrackerId>,
 ) -> Result<impl IntoResponse, StatusCode>
 where
     D: DataAccessProvider + Send + Sync + 'static,
@@ -42,10 +149,26 @@ where
         pub hints: Vec<ApHint>,
     }
 
-    if let Err(err) = state.update_tracker(&tracker_id).await {
+    let upstream_url = state
+        .data_provider
+        .create_data_access()
+        .await
+        .unexpected()?
+        .get_tracker_by_tracker_id(tracker_id.into())
+        .await
+        .unexpected()?
+        .ok_or(StatusCode::NOT_FOUND)?
+        .upstream_url;
+
+    if let Err(err) = state.upsert_tracker(&upstream_url).await {
         // Log this error but do not fail the overall operation; if we have old
         // data in the database then we can still use it.
         println!("Failed to update tracker {tracker_id}: {err}");
+
+        // ... unless the upstream isn't whitelisted.
+        if matches!(&*err, &TrackerUpdateError::UpstreamNotWhitelisted) {
+            return Err(StatusCode::FORBIDDEN);
+        }
     }
 
     let mut db = state
@@ -57,7 +180,7 @@ where
     let mut tx = db.begin().await.unexpected()?;
 
     let tracker = tx
-        .get_tracker_by_ap_tracker_id(&tracker_id)
+        .get_tracker_by_tracker_id(tracker_id.into())
         .await
         .unexpected()?
         .ok_or(StatusCode::NOT_FOUND)?;
@@ -107,6 +230,68 @@ where
     }))
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct CreateTrackerRequest {
+    pub url: String,
+}
+
+/// `POST /tracker`: Create/get tracker by upstream URL.
+pub async fn create_tracker<D>(
+    State(state): State<Arc<AppState<D>>>,
+    Json(body): Json<CreateTrackerRequest>,
+) -> Result<impl IntoResponse, StatusCode>
+where
+    D: DataAccessProvider + Send + Sync + 'static,
+{
+    #[derive(serde::Serialize)]
+    struct CreateTrackerResponse {
+        pub tracker_id: UrlEncodedTrackerId,
+    }
+
+    let tracker_id = match state.upsert_tracker(&body.url).await {
+        Ok(v) => v,
+        Err(e) if matches!(&*e, TrackerUpdateError::UpstreamNotWhitelisted) => {
+            return Err(StatusCode::FORBIDDEN);
+        }
+        Err(e) => {
+            // We couldn't get/update the tracker but maybe we have data we've
+            // fetched before.
+            state
+                .data_provider
+                .create_data_access()
+                .await
+                .unexpected()?
+                .get_tracker_by_upstream_url(&body.url)
+                .await
+                .unexpected()?
+                .ok_or_else(|| {
+                    // The database has no record of this URL, so map the
+                    // various tracker fetch errors to reasonable HTTP status
+                    // codes.
+                    use TrackerUpdateError::*;
+                    match &*e {
+                        ParseUrl(_) => StatusCode::BAD_REQUEST,
+                        UpstreamNotWhitelisted => StatusCode::FORBIDDEN,
+                        TrackerNotFound => StatusCode::NOT_FOUND,
+
+                        Http(_)
+                        | Parse(_)
+                        | Database(_)
+                        | GameCountMismatch { .. }
+                        | GameInformationMismatch(_)
+                        | NumericConversion(_)
+                        | HintGameMissing(_) => StatusCode::INTERNAL_SERVER_ERROR,
+                    }
+                })?
+                .tracker_id
+        }
+    };
+
+    Ok(Json(CreateTrackerResponse {
+        tracker_id: tracker_id.into(),
+    }))
+}
+
 /// Request body for [`update_tracker`].
 #[derive(Debug, serde::Deserialize)]
 pub struct UpdateTrackerRequest {
@@ -118,7 +303,7 @@ pub struct UpdateTrackerRequest {
 /// `PUT /tracker/:tracker_id`: Update tracker.
 pub async fn update_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
-    Path(tracker_id): Path<String>,
+    Path(tracker_id): Path<UrlEncodedTrackerId>,
     user: Option<AuthenticatedUser>,
     Json(tracker_update): Json<UpdateTrackerRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
@@ -134,7 +319,7 @@ where
     let mut tx = db.begin().await.unexpected()?;
 
     let mut tracker = tx
-        .get_tracker_by_ap_tracker_id(&tracker_id)
+        .get_tracker_by_tracker_id(tracker_id.into())
         .await
         .unexpected()?
         .ok_or(StatusCode::NOT_FOUND)?;
@@ -212,7 +397,7 @@ pub struct UpdateHintRequest {
 /// `PUT /tracker/:tracker_id/hint/:hint_id`: Update hint.
 pub async fn update_hint<D>(
     State(state): State<Arc<AppState<D>>>,
-    Path((tracker_id, hint_id)): Path<(String, i32)>,
+    Path((tracker_id, hint_id)): Path<(UrlEncodedTrackerId, i32)>,
     Json(hint_update): Json<UpdateHintRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
 where
@@ -227,7 +412,7 @@ where
     let mut tx = db.begin().await.unexpected()?;
 
     let tracker = tx
-        .get_tracker_by_ap_tracker_id(&tracker_id)
+        .get_tracker_by_tracker_id(tracker_id.into())
         .await
         .unexpected()?
         .ok_or(StatusCode::NOT_FOUND)?;
@@ -278,7 +463,7 @@ pub struct UpdateGameRequest {
 pub async fn update_game<D>(
     State(state): State<Arc<AppState<D>>>,
     user: Option<AuthenticatedUser>,
-    Path((tracker_id, game_id)): Path<(String, i32)>,
+    Path((tracker_id, game_id)): Path<(UrlEncodedTrackerId, i32)>,
     Json(game_update): Json<UpdateGameRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
 where
@@ -289,10 +474,11 @@ where
         .create_data_access()
         .await
         .unexpected()?;
+
     let mut tx = db.begin().await.unexpected()?;
 
     let tracker = tx
-        .get_tracker_by_ap_tracker_id(&tracker_id)
+        .get_tracker_by_tracker_id(tracker_id.into())
         .await
         .unexpected()?
         .ok_or(StatusCode::NOT_FOUND)?;

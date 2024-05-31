@@ -7,6 +7,8 @@
 use futures::{future::BoxFuture, stream::BoxStream};
 use sqlx::migrate::MigrateError;
 
+use uuid::Uuid;
+
 pub mod model;
 
 // Individual database backends are enabled with features.  All backends are
@@ -53,10 +55,16 @@ pub trait Transaction<'a> {
 
 /// Database-agnostic data access.
 pub trait DataAccess {
-    /// Gets an [`ApTracker`] by its Archipelago tracker ID.
-    fn get_tracker_by_ap_tracker_id<'s, 'r, 'f>(
+    /// Gets an [`ApTracker`] by its database UUID.
+    fn get_tracker_by_tracker_id(
+        &mut self,
+        tracker_id: Uuid,
+    ) -> BoxFuture<'_, sqlx::Result<Option<ApTracker>>>;
+
+    /// Gets an [`ApTracker`] by its upstream URL.
+    fn get_tracker_by_upstream_url<'s, 'r, 'f>(
         &'s mut self,
-        ap_tracker_id: &'r str,
+        upstream_url: &'r str,
     ) -> BoxFuture<'f, sqlx::Result<Option<ApTracker>>>
     where
         's: 'f,

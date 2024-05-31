@@ -1,6 +1,6 @@
 //! Service configuration.
 
-use std::net::SocketAddr;
+use std::{collections::HashSet, net::SocketAddr};
 
 use base64::prelude::*;
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305};
@@ -22,6 +22,10 @@ pub struct Config {
     /// Banners to display in the frontend.
     #[serde(default)]
     pub banners: Vec<Banner>,
+
+    /// Permitted list of upstream tracker prefixes.
+    pub upstream_trackers: HashSet<String>,
+
     /// The minimum allowed time between consecutive updates of a single tracker
     /// from the upstream tracker source.
     #[serde(rename = "tracker_update_interval_mins")]

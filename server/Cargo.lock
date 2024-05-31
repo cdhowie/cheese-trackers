@@ -367,6 +367,7 @@ dependencies = [
  "tower-http",
  "tower-layer",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -2471,6 +2472,7 @@ dependencies = [
  "inherent",
  "sea-query-attr",
  "sea-query-derive",
+ "uuid",
 ]
 
 [[package]]
@@ -2494,6 +2496,7 @@ dependencies = [
  "chrono",
  "sea-query",
  "sqlx",
+ "uuid",
 ]
 
 [[package]]
@@ -2863,6 +2866,7 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -2944,6 +2948,7 @@ dependencies = [
  "stringprep",
  "thiserror",
  "tracing",
+ "uuid",
  "whoami",
 ]
 
@@ -2983,6 +2988,7 @@ dependencies = [
  "stringprep",
  "thiserror",
  "tracing",
+ "uuid",
  "whoami",
 ]
 
@@ -3008,6 +3014,7 @@ dependencies = [
  "tracing",
  "url",
  "urlencoding",
+ "uuid",
 ]
 
 [[package]]
@@ -3619,6 +3626,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a183cf7feeba97b4dd1c0d46788634f6221d87fa961b305bed08c851829efcc0"
 dependencies = [
  "getrandom",
+ "serde",
 ]
 
 [[package]]

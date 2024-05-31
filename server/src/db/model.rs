@@ -5,9 +5,11 @@
 
 use std::{fmt::Debug, hash::Hash};
 
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, Utc};
 use sea_query::{Alias, Iden, SimpleExpr};
 use sqlx::{FromRow, Row};
+use uuid::Uuid;
 
 #[cfg(feature = "postgres")]
 use sqlx::postgres::PgRow;
@@ -245,12 +247,13 @@ db_struct! {
     #[derive(Debug, Clone)]
     pub struct ApTracker {
         pub id: i32,
-        pub tracker_id: String,
+        pub tracker_id: Uuid,
         pub updated_at: DateTime<Utc>,
         pub title: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub owner_ct_user_id: Option<i32>,
         pub lock_title: bool,
+        pub upstream_url: String,
     }
 }
 
@@ -263,7 +266,7 @@ db_struct! {
     #[derive(Debug, Clone)]
     pub struct ApTrackerDashboard {
         pub id: i32,
-        pub tracker_id: String,
+        pub tracker_id: Uuid,
         pub title: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub owner_ct_user_id: Option<i32>,

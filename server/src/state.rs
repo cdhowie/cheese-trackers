@@ -1,6 +1,10 @@
 //! Server state management.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+    sync::Arc,
+};
 
 use arrayvec::ArrayVec;
 use axum::http::HeaderValue;
@@ -8,9 +12,10 @@ use chrono::{DateTime, Utc};
 use futures::TryStreamExt;
 use jsonwebtoken::Header;
 use url::Url;
+use uuid::Uuid;
 
 use crate::{
-    api::UiSettings,
+    api::{tracker::UrlEncodedTrackerId, UiSettings},
     auth::{discord::AuthClient, token::TokenProcessor},
     conf::Config,
     db::{
@@ -24,6 +29,18 @@ use crate::{
     tracker::{parse_tracker_html, Checks, Game, Hint, ParseTrackerError},
 };
 
+#[derive(Debug, thiserror::Error)]
+pub enum TrackerUrlParseError {
+    #[error("failed to parse URL: {0}")]
+    Url(
+        #[from]
+        #[source]
+        url::ParseError,
+    ),
+    #[error("invalid tracker ID in tracker URL")]
+    TrackerId,
+}
+
 /// Errors that may occur when fetching the state of an upstream tracker.
 #[derive(Debug, thiserror::Error)]
 pub enum TrackerUpdateError {
@@ -32,8 +49,12 @@ pub enum TrackerUpdateError {
     ParseUrl(
         #[from]
         #[source]
-        url::ParseError,
+        TrackerUrlParseError,
     ),
+    /// The provided upstream URL is not whitelisted in the service
+    /// configuration.
+    #[error("the upstream URL is not on the upstream whitelist")]
+    UpstreamNotWhitelisted,
     /// The HTTP request for the upstream tracker data failed.
     #[error("failed to download tracker data: {0}")]
     Http(
@@ -89,16 +110,17 @@ pub struct AppState<D> {
     /// Authentication token processor.
     pub token_processor: TokenProcessor,
 
+    /// Set of valid upstream tracker prefixes.
+    upstream_tracker_prefixes: HashSet<String>,
+
     /// Client used for upstream tracker updates.
     reqwest_client: reqwest::Client,
-    /// Base URL for upstream trackers.
-    tracker_base_url: Url,
     /// Currently-inflight tracker update requests, keyed by the upstream
     /// tracker ID.
     ///
     /// This is used to merge simultaneous update requests for the same tracker
     /// into a single request to the upstream tracker server.
-    inflight_tracker_updates: moka::future::Cache<String, ()>,
+    inflight_tracker_updates: moka::future::Cache<String, Uuid>,
     /// The minimum allowed time between consecutive updates of a single tracker
     /// from the upstream tracker source.
     tracker_update_interval: chrono::Duration,
@@ -111,7 +133,7 @@ impl<D> AppState<D> {
         Self {
             reqwest_client: reqwest::Client::builder().build().unwrap(),
             data_provider,
-            tracker_base_url: "https://archipelago.gg/tracker/".parse().unwrap(),
+            upstream_tracker_prefixes: config.upstream_trackers,
             ui_settings_header: serde_json::to_string(&UiSettings {
                 banners: config.banners,
                 build_version: option_env!("GIT_COMMIT")
@@ -140,15 +162,28 @@ impl<D> AppState<D> {
         }
     }
 
+    fn tracker_is_permitted(&self, url: impl Into<Url>) -> bool {
+        let mut url = url.into();
+        match url.path_segments_mut() {
+            Ok(mut s) => s.pop(),
+            Err(_) => return false,
+        };
+
+        self.upstream_tracker_prefixes.contains(url.as_str())
+    }
+
     /// Synchronize a tracker in the database with fetched state from
     /// Archipelago.
+    ///
+    /// Returns the [`tracker_id`](ApTracker::tracker_id) of the tracker in the
+    /// database.
     async fn synchronize_tracker(
         db: &mut (impl DataAccess + Send),
         now: DateTime<Utc>,
-        tracker_id: String,
+        upstream_url: &str,
         games: Vec<Game>,
         hints: Vec<Hint>,
-    ) -> Result<(), TrackerUpdateError> {
+    ) -> Result<Uuid, TrackerUpdateError> {
         // This function is quite complicated, but basically it boils down to
         // two parts:
         //
@@ -157,12 +192,15 @@ impl<D> AppState<D> {
         // * If not, make sure the data is consistent and then update any
         //   changed pieces of data.
 
-        match db.get_tracker_by_ap_tracker_id(&tracker_id).await? {
+        match db.get_tracker_by_upstream_url(upstream_url).await? {
             None => {
+                let tracker_id = Uuid::new_v4();
+
                 let tracker = db
                     .create_ap_trackers([ApTracker {
                         id: 0,
                         tracker_id,
+                        upstream_url: upstream_url.to_owned(),
                         updated_at: now,
                         title: "".to_owned(),
                         owner_ct_user_id: None,
@@ -243,6 +281,8 @@ impl<D> AppState<D> {
                 // This drives the stream to completion.
                 .try_for_each(|_| std::future::ready(Ok(())))
                 .await?;
+
+                Ok(tracker_id)
             }
 
             Some(mut tracker) => {
@@ -396,17 +436,20 @@ impl<D> AppState<D> {
                     db.delete_ap_hint_by_id(hint.id).await?;
                 }
 
+                let tracker_id = tracker.tracker_id;
+
                 tracker.updated_at = now;
                 db.update_ap_tracker(tracker, &[ApTrackerIden::UpdatedAt])
                     .await?;
-            }
-        };
 
-        Ok(())
+                Ok(tracker_id)
+            }
+        }
     }
 
-    /// Update the data for the provided upstream tracker ID from the upstream
-    /// tracker.
+    /// Update the data for the provided upstream tracker URL and return the
+    /// local ID of the tracker, creating the tracker if it does not already
+    /// exist.
     ///
     /// If the last update was within the [tracker update
     /// interval](Self::tracker_update_interval) then the update is not
@@ -416,34 +459,53 @@ impl<D> AppState<D> {
     /// tracker, that request will be awaited instead of creating a new request.
     /// This ensures that two simultaneous requests to update the same tracker
     /// will not result in multiple requests to the upstream tracker server.
-    pub async fn update_tracker(&self, tracker_id: &str) -> Result<(), Arc<TrackerUpdateError>>
+    pub async fn upsert_tracker(&self, url: &str) -> Result<Uuid, Arc<TrackerUpdateError>>
     where
         D: DataAccessProvider + Send + Sync + 'static,
     {
+        let url: Url = url
+            .parse()
+            .map_err(|e| Arc::new(TrackerUrlParseError::Url(e).into()))?;
+
+        if !self.tracker_is_permitted(url.clone()) {
+            return Err(Arc::new(TrackerUpdateError::UpstreamNotWhitelisted));
+        }
+
+        // The AP tracker endpoint accepts tracker IDs that have a suffix
+        // consisting of invalid url-safe-base64 characters.  This would allow
+        // creating multiple CT trackers for the same AP tracker
+        // unintentionally, so we validate the ID in the URL to make sure it's
+        // entirely valid.
+        if !url
+            .path_segments()
+            .and_then(|s| s.last())
+            .is_some_and(|id| UrlEncodedTrackerId::from_str(id).is_ok())
+        {
+            return Err(Arc::new(TrackerUrlParseError::TrackerId.into()));
+        }
+
         let fut = async {
             let now = Utc::now();
 
             let mut db = self.data_provider.create_data_access().await?;
             let mut tx = db.begin().await?;
 
-            if tx
-                .get_tracker_by_ap_tracker_id(tracker_id)
+            if let Some(t) = tx
+                .get_tracker_by_upstream_url(url.as_str())
                 .await?
-                .is_some_and(|r| now < r.updated_at + self.tracker_update_interval)
+                .filter(|t| now < t.updated_at + self.tracker_update_interval)
             {
                 // The tracker was updated within the last
                 // tracker_update_interval, so don't update it now.
                 tx.rollback().await?;
-                return Ok(());
+                return Ok(t.tracker_id);
             }
-
-            let url = self.tracker_base_url.join(tracker_id)?;
 
             println!("{} - Requesting AP tracker {url}", Utc::now());
 
             let html = self
                 .reqwest_client
-                .get(url)
+                .get(url.clone())
                 .send()
                 .await?
                 .error_for_status()
@@ -456,15 +518,16 @@ impl<D> AppState<D> {
 
             let (games, hints) = parse_tracker_html(&html)?;
 
-            Self::synchronize_tracker(&mut tx, now, tracker_id.to_owned(), games, hints).await?;
+            let tracker_id =
+                Self::synchronize_tracker(&mut tx, now, url.as_str(), games, hints).await?;
 
             tx.commit().await?;
 
-            Ok(())
+            Ok(tracker_id)
         };
 
         self.inflight_tracker_updates
-            .try_get_with_by_ref(tracker_id, fut)
+            .try_get_with_by_ref(url.as_str(), fut)
             .await
     }
 }
