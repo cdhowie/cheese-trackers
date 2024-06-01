@@ -281,6 +281,8 @@ where
             return Err(StatusCode::FORBIDDEN);
         }
         Err(e) => {
+            println!("Failed to fetch tracker from {}: {e}", body.url);
+
             // We couldn't get/update the tracker but maybe we have data we've
             // fetched before.
             state
