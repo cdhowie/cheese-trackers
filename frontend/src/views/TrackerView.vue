@@ -17,6 +17,9 @@ import DropdownSelector from '@/components/DropdownSelector.vue';
 import LockButton from '@/components/LockButton.vue';
 import Repeat from '@/components/Repeat.vue';
 import HintDisplay from '@/components/HintDisplay.vue';
+import TrackerTable from '@/components/TrackerTable.vue';
+import TrackerTableHeader from '@/components/TrackerTableHeader.vue';
+import TrackerTableSlot from '@/components/TrackerTableSlot.vue';
 
 const props = defineProps(['aptrackerid']);
 
@@ -693,18 +696,18 @@ loadTracker();
             </div>
         </form>
         <button class="btn btn-primary refresh-button" @click="loadTracker()" :disabled="loading">Refresh</button>
-        <table class="table table-sm table-hover text-center tracker-table">
-            <thead style="position: sticky; top: 0; z-index: 100">
-                <tr>
-                    <th @click="setSort(sortByName, false)">
-                        <span class="sorter">
+        <TrackerTable>
+            <template #head>
+                <TrackerTableHeader :show-last-activity="showLastActivity">
+                    <template #name>
+                        <span @click="setSort(sortByName, false)" class="sorter">
                             Name
                             <i v-if="activeSort[0] === sortByName"
                                 :class="{ 'bi-sort-alpha-down': !activeSort[1], 'bi-sort-alpha-up': activeSort[1] }"></i>
                         </span>
-                    </th>
-                    <th>Ping</th>
-                    <th colspan="2">
+                    </template>
+                    <template #ping>Ping</template>
+                    <template #availability>
                         Availability
                         <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown" data-bs-auto-close="outside">
                             <i :class="[availabilityFilter.isActive.value ? 'bi-funnel-fill' : 'bi-funnel']"></i>
@@ -717,8 +720,8 @@ loadTracker();
                                 </button>
                             </li>
                         </ul>
-                    </th>
-                    <th>
+                    </template>
+                    <template #owner>
                         <div class="dropdown">
                             <span @click="setSort(sortByOwner, false)" class="sorter">
                                 Owner (Discord Username)
@@ -768,8 +771,8 @@ loadTracker();
                                 </template>
                             </ul>
                         </div>
-                    </th>
-                    <th>
+                    </template>
+                    <template #game>
                         <div class="dropdown">
                             <span @click="setSort(sortByGame, false)" class="sorter">
                                 Game
@@ -795,8 +798,8 @@ loadTracker();
                                 </li>
                             </ul>
                         </div>
-                    </th>
-                    <th colspan="2">
+                    </template>
+                    <template #status>
                         <div class="dropdown">
                             Status
                             <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown"
@@ -825,8 +828,8 @@ loadTracker();
                                 </li>
                             </ul>
                         </div>
-                    </th>
-                    <th :colspan="showLastActivity ? 3 : 2">
+                    </template>
+                    <template #lastactivity>
                         <div class="dropdown">
                             <span class="sorter" @click="setSort(sortByActivity, true)">
                                 Last Activity (Days)
@@ -847,36 +850,38 @@ loadTracker();
                                 </div>
                             </form>
                         </div>
-                    </th>
-                    <th>Checks</th>
-                    <th>
+                    </template>
+                    <template #checks>Checks</template>
+                    <template #hints>
                         <button class="btn btn-sm btn-outline-light" @click="setAllExpanded(!allExpanded)">Hints <i
                                 :class="{ 'bi-arrows-angle-expand': !allExpanded, 'bi-arrows-angle-contract': allExpanded }"></i></button>
-                    </th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr v-if="sortedAndFilteredGames.length === 0">
-                    <td :colspan="showLastActivity ? 13 : 12" class="text-center text-muted">
-                        No slots match the selected filters.
-                    </td>
-                </tr>
+                    </template>
+                </TrackerTableHeader>
+            </template>
+            <template #body>
+                <TrackerTableSlot v-if="sortedAndFilteredGames.length === 0">
+                    <template #banner>
+                        <span class="text-muted">
+                            No slots match the selected filters.
+                        </span>
+                    </template>
+                </TrackerTableSlot>
                 <template v-for="game in sortedAndFilteredGames">
-                    <tr>
-                        <td>
+                    <TrackerTableSlot>
+                        <template #name>
                             <a
                                 :href="`${trackerData.upstream_url}/0/${game.position}`"
                                 target="_blank"
                                 class="text-reset mw-underline-hover"
                             >{{ game.name }}</a>
-                        </td>
-                        <td>
+                        </template>
+                        <template #ping>
                             <span v-if="game.effective_discord_username && isGameCompleted(game)" class="text-danger">Never</span>
                             <DropdownSelector v-else-if="game.effective_discord_username" :options="pingPreference"
                                 :value="pingPreference.byId[game.discord_ping]" :disabled="loading"
                                 @selected="s => setPing(game, s)"></DropdownSelector>
-                        </td>
-                        <td>
+                        </template>
+                        <template #availability>
                             <DropdownSelector
                                 :options="availabilityStatus"
                                 :value="availabilityStatus.byId[game.availability_status]"
@@ -884,8 +889,8 @@ loadTracker();
                                 :icons="settings.statusIcons"
                                 @selected="s => setGameAvailabilityStatus(game, s)">
                             </DropdownSelector>
-                        </td>
-                        <td>
+                        </template>
+                        <template #claim>
                             <template v-if="currentUser">
                                 <button v-if="!game.effective_discord_username" class="btn btn-sm btn-outline-secondary"
                                     :disabled="loading" @click="claimGame(game)">Claim</button>
@@ -906,14 +911,14 @@ loadTracker();
                                     class="btn btn-sm btn-outline-warning" :disabled="loading"
                                     @click="unclaimGame(game)">Disclaim</button>
                             </template>
-                        </td>
-                        <td>
+                        </template>
+                        <template #owner>
                             <UsernameDisplay :user="getClaimingUser(game)"></UsernameDisplay>
-                        </td>
-                        <td>
+                        </template>
+                        <template #game>
                             <GameDisplay :game="game.game"></GameDisplay>
-                        </td>
-                        <td>
+                        </template>
+                        <template #progression>
                             <DropdownSelector
                                 v-if="!isGameCompleted(game)"
                                 :options="progressionStatus"
@@ -922,8 +927,8 @@ loadTracker();
                                 :icons="settings.statusIcons"
                                 @selected="s => setGameProgressionStatus(game, s)"
                             ></DropdownSelector>
-                        </td>
-                        <td>
+                        </template>
+                        <template #completion>
                             <DropdownSelector
                                 :options="completionStatus"
                                 :value="completionStatus.byId[game.completion_status]"
@@ -931,36 +936,35 @@ loadTracker();
                                 :icons="settings.statusIcons"
                                 @selected="s => setGameCompletionStatus(game, s)">
                             </DropdownSelector>
-                        </td>
-                        <td class="text-end">
+                        </template>
+                        <template #checked>
                             <span :class="[lastCheckedClass(game)]" :title="displayDateTime(getLastCheckedOrLastActivity(game))">{{
                                 displayLastCheckedOrLastActivity(game) }}
                             </span>
-                        </td>
-                        <td v-if="showLastActivity">
+                        </template>
+                        <template #activity v-if="showLastActivity">
                             <span v-if="game.last_activity < game.last_checked" :title="displayDateTime(game.last_activity)">
                                 ({{ displayLastActivity(game) }})
                             </span>
-                        </td>
-                        <td class="text-start p-0">
+                        </template>
+                        <template #stillbk>
                             <button class="btn btn-sm btn-outline-secondary"
                                 :class="{ invisible: !progressionStatus.byId[game.progression_status].isBk || isGameCompleted(game) }"
                                 :disabled="loading"
                                 @click="updateLastChecked(game)">Still BK</button>
-                        </td>
-                        <td>
+                        </template>
+                        <template #checks>
                             <ChecksBar :done="game.checks_done" :total="game.checks_total"></ChecksBar>
-                        </td>
-                        <td>
+                        </template>
+                        <template #hints>
                             <button class="btn btn-sm" :class="[hintsClass(game)]"
                                 @click="gameExpanded[game.id] = !gameExpanded[game.id]">
                                 {{ countUnfoundReceivedHints(game) }}<template v-if="game.notes !== ''">*</template> <i
                                     :class="{ 'bi-arrows-angle-expand': !gameExpanded[game.id], 'bi-arrows-angle-contract': gameExpanded[game.id] }"></i>
                             </button>
-                        </td>
-                    </tr>
-                    <tr v-if="gameExpanded[game.id]">
-                        <td :colspan="showLastActivity ? 13 : 12" class="container-fluid">
+                        </template>
+
+                        <template #hintpane v-if="gameExpanded[game.id]">
                             <div class="row">
                                 <div class="col-12 col-xl-6">
                                     <div>
@@ -1018,11 +1022,11 @@ loadTracker();
                                     </div>
                                 </div>
                             </div>
-                        </td>
-                    </tr>
+                        </template>
+                    </TrackerTableSlot>
                 </template>
-            </tbody>
-        </table>
+            </template>
+        </TrackerTable>
         <div class="container-fluid">
             <div class="row justify-content-center">
                 <div class="col-12 col-lg-8 col-xl-6 col-xxl-5">
@@ -1108,11 +1112,6 @@ loadTracker();
     bottom: 1rem;
     right: 1.5rem;
     z-index: 1;
-}
-
-.tracker-table th,
-.tracker-table td {
-    vertical-align: baseline;
 }
 
 .shrink-column {
