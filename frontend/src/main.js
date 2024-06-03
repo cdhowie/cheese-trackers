@@ -4,6 +4,8 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css';
+
 import { createJsError } from './api';
 import { settings } from './settings';
 

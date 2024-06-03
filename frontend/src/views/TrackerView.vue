@@ -17,9 +17,27 @@ import DropdownSelector from '@/components/DropdownSelector.vue';
 import LockButton from '@/components/LockButton.vue';
 import Repeat from '@/components/Repeat.vue';
 import HintDisplay from '@/components/HintDisplay.vue';
+
 import TrackerTable from '@/components/TrackerTable.vue';
 import TrackerTableHeader from '@/components/TrackerTableHeader.vue';
 import TrackerTableSlot from '@/components/TrackerTableSlot.vue';
+
+import TrackerContainer from '@/components/TrackerContainer.vue';
+import TrackerContainerHeader from '@/components/TrackerContainerHeader.vue';
+import TrackerContainerSlot from '@/components/TrackerContainerSlot.vue';
+
+const layouts = {
+    table: {
+        primary: TrackerTable,
+        header: TrackerTableHeader,
+        slot: TrackerTableSlot,
+    },
+    container: {
+        primary: TrackerContainer,
+        header: TrackerContainerHeader,
+        slot: TrackerContainerSlot,
+    },
+};
 
 const props = defineProps(['aptrackerid']);
 
@@ -30,6 +48,12 @@ const trackerData = ref(undefined);
 const hintsByFinder = ref(undefined);
 const hintsByReceiver = ref(undefined);
 const gameById = ref(undefined);
+
+const layout = computed(() =>
+    trackerData.value?.games?.length >= 1000 ?
+        layouts.container :
+        layouts.table
+);
 
 // Hack that should probably exist as a global service.
 watch(
@@ -696,9 +720,9 @@ loadTracker();
             </div>
         </form>
         <button class="btn btn-primary refresh-button" @click="loadTracker()" :disabled="loading">Refresh</button>
-        <TrackerTable>
+        <component :is="layout.primary" :items="sortedAndFilteredGames">
             <template #head>
-                <TrackerTableHeader :show-last-activity="showLastActivity">
+                <component :is="layout.header" :show-last-activity="showLastActivity">
                     <template #name>
                         <span @click="setSort(sortByName, false)" class="sorter">
                             Name
@@ -856,177 +880,178 @@ loadTracker();
                         <button class="btn btn-sm btn-outline-light" @click="setAllExpanded(!allExpanded)">Hints <i
                                 :class="{ 'bi-arrows-angle-expand': !allExpanded, 'bi-arrows-angle-contract': allExpanded }"></i></button>
                     </template>
-                </TrackerTableHeader>
+                </component>
             </template>
-            <template #body>
-                <TrackerTableSlot v-if="sortedAndFilteredGames.length === 0">
+            <template #empty>
+                <component :is="layout.slot">
                     <template #banner>
                         <span class="text-muted">
                             No slots match the selected filters.
                         </span>
                     </template>
-                </TrackerTableSlot>
-                <template v-for="game in sortedAndFilteredGames">
-                    <TrackerTableSlot>
-                        <template #name>
-                            <a
-                                :href="`${trackerData.upstream_url}/0/${game.position}`"
-                                target="_blank"
-                                class="text-reset mw-underline-hover"
-                            >{{ game.name }}</a>
-                        </template>
-                        <template #ping>
-                            <span v-if="game.effective_discord_username && isGameCompleted(game)" class="text-danger">Never</span>
-                            <DropdownSelector v-else-if="game.effective_discord_username" :options="pingPreference"
-                                :value="pingPreference.byId[game.discord_ping]" :disabled="loading"
-                                @selected="s => setPing(game, s)"></DropdownSelector>
-                        </template>
-                        <template #availability>
-                            <DropdownSelector
-                                :options="availabilityStatus"
-                                :value="availabilityStatus.byId[game.availability_status]"
-                                :disabled="loading"
-                                :icons="settings.statusIcons"
-                                @selected="s => setGameAvailabilityStatus(game, s)">
-                            </DropdownSelector>
-                        </template>
-                        <template #claim>
-                            <template v-if="currentUser">
-                                <button v-if="!game.effective_discord_username" class="btn btn-sm btn-outline-secondary"
-                                    :disabled="loading" @click="claimGame(game)">Claim</button>
+                    <template #activity v-if="showLastActivity"/>
+                </component>
+            </template>
+            <template #game="{ game }">
+                <component :is="layout.slot" :item="game" :index="index" :active="active">
+                    <template #name>
+                        <a
+                            :href="`${trackerData.upstream_url}/0/${game.position}`"
+                            target="_blank"
+                            class="text-reset mw-underline-hover"
+                        >{{ game.name }}</a>
+                    </template>
+                    <template #ping>
+                        <span v-if="game.effective_discord_username && isGameCompleted(game)" class="text-danger">Never</span>
+                        <DropdownSelector v-else-if="game.effective_discord_username" :options="pingPreference"
+                            :value="pingPreference.byId[game.discord_ping]" :disabled="loading"
+                            @selected="s => setPing(game, s)"></DropdownSelector>
+                    </template>
+                    <template #availability>
+                        <DropdownSelector
+                            :options="availabilityStatus"
+                            :value="availabilityStatus.byId[game.availability_status]"
+                            :disabled="loading"
+                            :icons="settings.statusIcons"
+                            @selected="s => setGameAvailabilityStatus(game, s)">
+                        </DropdownSelector>
+                    </template>
+                    <template #claim>
+                        <template v-if="currentUser">
+                            <button v-if="!game.effective_discord_username" class="btn btn-sm btn-outline-secondary"
+                                :disabled="loading" @click="claimGame(game)">Claim</button>
 
-                                <template v-if="game.effective_discord_username && !isEqual(getClaimingUser(game), currentUser)">
-                                    <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
-                                        data-bs-toggle="dropdown">Claim</button>
-                                    <div class="dropdown-menu text-warning p-3">
-                                        <span class="text-warning me-2 d-inline-block align-middle">Another user has claimed
-                                            this
-                                            slot.</span>
-                                        <button class="btn btn-sm btn-warning" @click="claimGame(game)">Claim
-                                            anyway</button>
-                                    </div>
-                                </template>
-
-                                <button v-if="isEqual(getClaimingUser(game), currentUser)"
-                                    class="btn btn-sm btn-outline-warning" :disabled="loading"
-                                    @click="unclaimGame(game)">Disclaim</button>
-                            </template>
-                        </template>
-                        <template #owner>
-                            <UsernameDisplay :user="getClaimingUser(game)"></UsernameDisplay>
-                        </template>
-                        <template #game>
-                            <GameDisplay :game="game.game"></GameDisplay>
-                        </template>
-                        <template #progression>
-                            <DropdownSelector
-                                v-if="!isGameCompleted(game)"
-                                :options="progressionStatus"
-                                :value="progressionStatus.byId[game.progression_status]"
-                                :disabled="loading"
-                                :icons="settings.statusIcons"
-                                @selected="s => setGameProgressionStatus(game, s)"
-                            ></DropdownSelector>
-                        </template>
-                        <template #completion>
-                            <DropdownSelector
-                                :options="completionStatus"
-                                :value="completionStatus.byId[game.completion_status]"
-                                :disabled="loading"
-                                :icons="settings.statusIcons"
-                                @selected="s => setGameCompletionStatus(game, s)">
-                            </DropdownSelector>
-                        </template>
-                        <template #checked>
-                            <span :class="[lastCheckedClass(game)]" :title="displayDateTime(getLastCheckedOrLastActivity(game))">{{
-                                displayLastCheckedOrLastActivity(game) }}
-                            </span>
-                        </template>
-                        <template #activity v-if="showLastActivity">
-                            <span v-if="game.last_activity < game.last_checked" :title="displayDateTime(game.last_activity)">
-                                ({{ displayLastActivity(game) }})
-                            </span>
-                        </template>
-                        <template #stillbk>
-                            <button class="btn btn-sm btn-outline-secondary"
-                                :class="{ invisible: !progressionStatus.byId[game.progression_status].isBk || isGameCompleted(game) }"
-                                :disabled="loading"
-                                @click="updateLastChecked(game)">Still BK</button>
-                        </template>
-                        <template #checks>
-                            <ChecksBar :done="game.checks_done" :total="game.checks_total"></ChecksBar>
-                        </template>
-                        <template #hints>
-                            <button class="btn btn-sm" :class="[hintsClass(game)]"
-                                @click="gameExpanded[game.id] = !gameExpanded[game.id]">
-                                {{ countUnfoundReceivedHints(game) }}<template v-if="game.notes !== ''">*</template> <i
-                                    :class="{ 'bi-arrows-angle-expand': !gameExpanded[game.id], 'bi-arrows-angle-contract': gameExpanded[game.id] }"></i>
-                            </button>
-                        </template>
-
-                        <template #hintpane v-if="gameExpanded[game.id]">
-                            <div class="row">
-                                <div class="col-12 col-xl-6">
-                                    <div>
-                                        <div class="btn-group">
-                                            <button class="btn btn-sm btn-outline-light" :class="{ active: !sentHints }"
-                                                @click="sentHints = false">
-                                                Received hints
-                                            </button>
-                                            <button class="btn btn-sm btn-outline-light" :class="{ active: sentHints }"
-                                                @click="sentHints = true">
-                                                Sent hints
-                                            </button>
-                                        </div>
-                                        <button class="btn btn-sm ms-2 btn-outline-light"
-                                            :class="{ active: showFoundHints }" @click="showFoundHints = !showFoundHints">
-                                            Include found and useless hints
-                                        </button>
-                                        <button class=" btn btn-sm btn-outline-light ms-2"
-                                            :disabled="displayHintsByGame(game.id).length === 0"
-                                            @click="copyHints(displayHintsByGame(game.id))"><i class="bi-copy"></i> Copy
-                                            all</button>
-                                    </div>
-                                    <div v-if="displayHintsByGame(game.id).length === 0" class="text-muted">
-                                        There are no unfound hints right now.
-                                    </div>
-                                    <div v-else class="row justify-content-center">
-                                        <div class="col-auto">
-                                            <table class="table table-responsive table-borderless table-sm hint-table">
-                                                <tbody>
-                                                    <HintDisplay
-                                                        v-for="hint in sortedDisplayHintsByGame(game.id)"
-                                                        :hint="hint"
-                                                        :status="hintStatus(hint)"
-                                                        :show-status="showFoundHints"
-                                                        :direction="sentHints ? 'sent' : 'received'"
-                                                        :receiver-game="gameById[hint.receiver_game_id]"
-                                                        :finder-game="gameById[hint.finder_game_id]"
-                                                        :disabled="loading"
-                                                        @set-classification="s => setHintClassification(hint, s)"
-                                                        @copy="clipboardCopy(hintToString(hint))"
-                                                        @copy-ping="clipboardCopy(hintToStringWithPing(hint))"
-                                                    ></HintDisplay>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
+                            <template v-if="game.effective_discord_username && !isEqual(getClaimingUser(game), currentUser)">
+                                <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
+                                    data-bs-toggle="dropdown">Claim</button>
+                                <div class="dropdown-menu text-warning p-3">
+                                    <span class="text-warning me-2 d-inline-block align-middle">Another user has claimed
+                                        this
+                                        slot.</span>
+                                    <button class="btn btn-sm btn-warning" @click="claimGame(game)">Claim
+                                        anyway</button>
                                 </div>
-                                <div class="col-12 col-xl-6">
-                                    <div class="fw-bold">Notes</div>
-                                    <textarea placeholder="Enter any notes about your game here." class="form-control"
-                                        rows="5" v-model="game.$newnotes" @blur="updateNotes(game)"
-                                        @keyup.esc="game.$newnotes = game.notes"></textarea>
-                                    <div class="text-muted">
-                                        Saves automatically when you click off of the field. Press ESC to cancel any edits.
+                            </template>
+
+                            <button v-if="isEqual(getClaimingUser(game), currentUser)"
+                                class="btn btn-sm btn-outline-warning" :disabled="loading"
+                                @click="unclaimGame(game)">Disclaim</button>
+                        </template>
+                    </template>
+                    <template #owner>
+                        <UsernameDisplay :user="getClaimingUser(game)"></UsernameDisplay>
+                    </template>
+                    <template #game>
+                        <GameDisplay :game="game.game"></GameDisplay>
+                    </template>
+                    <template #progression>
+                        <DropdownSelector
+                            v-if="!isGameCompleted(game)"
+                            :options="progressionStatus"
+                            :value="progressionStatus.byId[game.progression_status]"
+                            :disabled="loading"
+                            :icons="settings.statusIcons"
+                            @selected="s => setGameProgressionStatus(game, s)"
+                        ></DropdownSelector>
+                    </template>
+                    <template #completion>
+                        <DropdownSelector
+                            :options="completionStatus"
+                            :value="completionStatus.byId[game.completion_status]"
+                            :disabled="loading"
+                            :icons="settings.statusIcons"
+                            @selected="s => setGameCompletionStatus(game, s)">
+                        </DropdownSelector>
+                    </template>
+                    <template #checked>
+                        <span :class="[lastCheckedClass(game)]" :title="displayDateTime(getLastCheckedOrLastActivity(game))">{{
+                            displayLastCheckedOrLastActivity(game) }}
+                        </span>
+                    </template>
+                    <template #activity v-if="showLastActivity">
+                        <span v-if="game.last_activity < game.last_checked" :title="displayDateTime(game.last_activity)">
+                            ({{ displayLastActivity(game) }})
+                        </span>
+                    </template>
+                    <template #stillbk>
+                        <button class="btn btn-sm btn-outline-secondary"
+                            :class="{ invisible: !progressionStatus.byId[game.progression_status].isBk || isGameCompleted(game) }"
+                            :disabled="loading"
+                            @click="updateLastChecked(game)">Still BK</button>
+                    </template>
+                    <template #checks>
+                        <ChecksBar :done="game.checks_done" :total="game.checks_total"></ChecksBar>
+                    </template>
+                    <template #hints>
+                        <button class="btn btn-sm" :class="[hintsClass(game)]"
+                            @click="gameExpanded[game.id] = !gameExpanded[game.id]">
+                            {{ countUnfoundReceivedHints(game) }}<template v-if="game.notes !== ''">*</template> <i
+                                :class="{ 'bi-arrows-angle-expand': !gameExpanded[game.id], 'bi-arrows-angle-contract': gameExpanded[game.id] }"></i>
+                        </button>
+                    </template>
+
+                    <template #hintpane v-if="gameExpanded[game.id]">
+                        <div class="row">
+                            <div class="col-12 col-xl-6">
+                                <div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-sm btn-outline-light" :class="{ active: !sentHints }"
+                                            @click="sentHints = false">
+                                            Received hints
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-light" :class="{ active: sentHints }"
+                                            @click="sentHints = true">
+                                            Sent hints
+                                        </button>
+                                    </div>
+                                    <button class="btn btn-sm ms-2 btn-outline-light"
+                                        :class="{ active: showFoundHints }" @click="showFoundHints = !showFoundHints">
+                                        Include found and useless hints
+                                    </button>
+                                    <button class=" btn btn-sm btn-outline-light ms-2"
+                                        :disabled="displayHintsByGame(game.id).length === 0"
+                                        @click="copyHints(displayHintsByGame(game.id))"><i class="bi-copy"></i> Copy
+                                        all</button>
+                                </div>
+                                <div v-if="displayHintsByGame(game.id).length === 0" class="text-muted">
+                                    There are no unfound hints right now.
+                                </div>
+                                <div v-else class="row justify-content-center">
+                                    <div class="col-auto">
+                                        <table class="table table-responsive table-borderless table-sm hint-table">
+                                            <tbody>
+                                                <HintDisplay
+                                                    v-for="hint in sortedDisplayHintsByGame(game.id)"
+                                                    :hint="hint"
+                                                    :status="hintStatus(hint)"
+                                                    :show-status="showFoundHints"
+                                                    :direction="sentHints ? 'sent' : 'received'"
+                                                    :receiver-game="gameById[hint.receiver_game_id]"
+                                                    :finder-game="gameById[hint.finder_game_id]"
+                                                    :disabled="loading"
+                                                    @set-classification="s => setHintClassification(hint, s)"
+                                                    @copy="clipboardCopy(hintToString(hint))"
+                                                    @copy-ping="clipboardCopy(hintToStringWithPing(hint))"
+                                                ></HintDisplay>
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
-                        </template>
-                    </TrackerTableSlot>
-                </template>
+                            <div class="col-12 col-xl-6">
+                                <div class="fw-bold">Notes</div>
+                                <textarea placeholder="Enter any notes about your game here." class="form-control"
+                                    rows="5" v-model="game.$newnotes" @blur="updateNotes(game)"
+                                    @keyup.esc="game.$newnotes = game.notes"></textarea>
+                                <div class="text-muted">
+                                    Saves automatically when you click off of the field. Press ESC to cancel any edits.
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </component>
             </template>
-        </TrackerTable>
+        </component>
         <div class="container-fluid">
             <div class="row justify-content-center">
                 <div class="col-12 col-lg-8 col-xl-6 col-xxl-5">

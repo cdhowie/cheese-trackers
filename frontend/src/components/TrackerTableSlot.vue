@@ -1,14 +1,15 @@
 <script setup>
-import { computed } from 'vue';
-
 const slots = defineSlots();
 
-const columns = computed(() => slots.activity ? 13 : 12);
+// Slots aren't reactive; can't use computed.
+function columns() {
+    return slots.activity ? 13 : 12;
+}
 </script>
 
 <template>
     <tr v-if="$slots.banner">
-        <td :colspan="columns" class="text-center">
+        <td :colspan="columns()" class="text-center">
             <slot name="banner"/>
         </td>
     </tr>
@@ -28,7 +29,7 @@ const columns = computed(() => slots.activity ? 13 : 12);
         <td><slot name="hints"/></td>
     </tr>
     <tr v-if="$slots.hintpane">
-        <td :colspan="columns" class="container-fluid">
+        <td :colspan="columns()" class="container-fluid">
             <slot name="hintpane"/>
         </td>
     </tr>
