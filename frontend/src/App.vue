@@ -51,25 +51,41 @@ function dismissBanner(id) {
 </script>
 
 <template>
-    <nav class="navbar navbar-expand bg-body-tertiary mb-3">
+    <nav class="navbar navbar-expand-lg bg-body-tertiary mb-3">
         <div class="container-fluid">
             <span class="navbar-brand">Cheese Trackers</span>
-            <ul class="navbar-nav me-auto">
-                <li class="nav-item">
-                    <RouterLink class="nav-link" active-class="active" to="/">Dashboard</RouterLink>
-                </li>
-                <li class="nav-item">
-                    <RouterLink class="nav-link" active-class="active" to="/settings">Settings</RouterLink>
-                </li>
-                <li class="nav-item">
-                    <RouterLink class="nav-link" active-class="active" to="/help">Help</RouterLink>
-                </li>
-            </ul>
-            <template v-if="localSettings.auth?.discordUsername">
-                Welcome, {{ localSettings.auth.discordUsername }}!
-                <button class="btn btn-sm btn-secondary ms-2" @click="logout">Log out</button>
-            </template>
-            <button v-else class="btn btn-sm btn-primary" @click="login">Sign in with Discord</button>
+            <button
+                class="navbar-toggler"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#navbar"
+                aria-controls="navbar"
+                aria-expanded="false"
+                aria-label="Toggle navigation"
+            >
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbar">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <RouterLink class="nav-link" active-class="active" to="/">Dashboard</RouterLink>
+                    </li>
+                    <li class="nav-item">
+                        <RouterLink class="nav-link" active-class="active" to="/settings">Settings</RouterLink>
+                    </li>
+                    <li class="nav-item">
+                        <RouterLink class="nav-link" active-class="active" to="/help">Help</RouterLink>
+                    </li>
+                </ul>
+                <hr>
+                <template v-if="localSettings.auth?.discordUsername">
+                    <span class="navbar-text">
+                        Welcome, {{ localSettings.auth.discordUsername }}!
+                    </span>
+                    <button class="btn btn-sm btn-secondary ms-2" @click="logout">Log out</button>
+                </template>
+                <button v-else class="btn btn-sm btn-primary" @click="login">Sign in with Discord</button>
+            </div>
         </div>
     </nav>
 
