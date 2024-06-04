@@ -16,19 +16,22 @@ const props = defineProps(['items']);
                 No slots match the selected filters.
             </div>
         </div>
-        <DynamicScroller :items="props.items" :min-item-size="40" class="scroller">
-            <template #default="{ item, index, active }">
-                <DynamicScrollerItem
-                    :item="item"
-                    :active="active"
-                    :data-index="index"
-                    watch-data
-                >
-                    <slot name="game" :game="item"/>
-                </DynamicScrollerItem>
-            </template>
-        </DynamicScroller>
     </div>
+    
+    <DynamicScroller :items="props.items" :min-item-size="40" class="scroller">
+        <template #default="{ item, index, active }">
+            <DynamicScrollerItem
+                :item="item"
+                :active="active"
+                :data-index="index"
+                watch-data
+            >
+                <div class="container-fluid text-center">
+                    <slot name="game" :game="item"/>
+                </div>
+            </DynamicScrollerItem>
+        </template>
+    </DynamicScroller>
 </template>
 
 <style scoped>

@@ -1,27 +1,31 @@
+<script setup>
+import { breakpoints } from '@/container-breakpoints.js';
+</script>
+
 <template>
     <div class="row p-1" v-if="$slots.banner">
         <div class="col-12 align-self-center"><slot name="banner"/></div>
     </div>
-    <div class="row p-1" v-else>
-        <div class="col-1 align-self-center"><slot name="name"/></div>
-        <div class="col-1 align-self-center"><slot name="ping"/></div>
-        <div class="col-1 align-self-center">
+    <div class="row border-bottom" v-else>
+        <div :class="breakpoints['name']"><slot name="name"/></div>
+        <div :class="breakpoints['ping']"><slot name="ping"/></div>
+        <div :class="breakpoints['availability']">
             <slot name="availability"/>
         </div>
-        <div class="col-2 align-self-center">
+        <div :class="breakpoints['owner']">
             <slot name="claim"/> <slot name="owner"/>
         </div>
-        <div class="col-2 align-self-center"><slot name="game"/></div>
-        <div class="col-2 align-self-center">
+        <div :class="breakpoints['game']"><slot name="game"/></div>
+        <div :class="breakpoints['status']">
             <slot name="progression"/> <slot name="completion"/>
         </div>
-        <div class="col-1 align-self-center">
+        <div :class="breakpoints['lastactivity']">
             <slot name="checked"/> <slot name="activity"/> <slot name="stillbk"/>
         </div>
-        <div class="col-1 align-self-center"><slot name="checks"/></div>
-        <div class="col-1 align-self-center"><slot name="hints"/></div>
+        <div :class="breakpoints['checks']"><slot name="checks"/></div>
+        <div :class="breakpoints['hints']"><slot name="hints"/></div>
     </div>
-    <div class="row p-1" v-if="$slots.hintpane">
+    <div class="row p-1 border-bottom" v-if="$slots.hintpane">
         <div class="container-fluid">
             <slot name="hintpane"/>
         </div>
