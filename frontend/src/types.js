@@ -88,3 +88,8 @@ export function getClaimingUserForGame(game) {
 
     return undefined;
 }
+
+export const sortModes = keyed([
+    { id: 'normal', label: 'Normal' },
+    { id: 'selftop', label: 'Mine first' },
+]);

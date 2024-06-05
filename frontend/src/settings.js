@@ -1,5 +1,8 @@
 import { ref, computed } from "vue";
 import Joi from 'joi';
+import { map } from "lodash-es";
+
+import { sortModes } from "./types";
 
 const SETTINGS_KEY = 'settings';
 
@@ -9,6 +12,8 @@ const SETTINGS_SCHEMA = Joi.object().keys({
 
     statusIcons: Joi.boolean().default(false),
     dismissedBanners: Joi.array().items(Joi.string()).default([]),
+
+    sortMode: Joi.string().valid(...map(sortModes, 'id')).default('normal'),
 
     auth: Joi.object().keys({
         token: Joi.string(),

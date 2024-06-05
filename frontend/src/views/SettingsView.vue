@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import * as settings from '@/settings.js';
-import { pingPreference } from '@/types';
+import { pingPreference, sortModes } from '@/types';
 
 const saved = ref(false);
 
@@ -18,7 +18,13 @@ function saveSettings() {
 <template>
     <form class="container" @submit.prevent="saveSettings">
         <div class="row">
-            <div class="col-12 col-lg-6">
+            <div v-if="!editSettings.auth?.token" class="col-12 col-lg-6">
+                <label for="discordUsernameEntry" class="form-label">Your Discord
+                    username</label>
+                <input id="discordUsernameEntry" class="form-control" type="text" placeholder="Discord username"
+                    v-model="editSettings.unauthenticatedDiscordUsername">
+            </div>
+            <div class="col-12" :class="{ 'col-lg-6': !editSettings.auth?.token }">
                 <label class="form-label">Default ping preference</label>
                 <div class="btn-group form-control border-0 p-0">
                     <template v-for="pref of pingPreference">
@@ -41,11 +47,17 @@ function saveSettings() {
                     </template>
                 </div>
             </div>
-            <div v-if="!editSettings.auth?.token" class="col-12">
-                <label for="discordUsernameEntry" class="form-label">Your Discord
-                    username</label>
-                <input id="discordUsernameEntry" class="form-control" type="text" placeholder="Discord username"
-                    v-model="editSettings.unauthenticatedDiscordUsername">
+            <div class="col-12 col-lg-6">
+                <label class="form-label">Sort mode</label>
+                <div class="btn-group form-control border-0 p-0">
+                    <template v-for="mode in sortModes">
+                        <input type="radio" class="btn-check" name="sortMode" :id="`sort-mode-${mode.id}`"
+                            v-model="editSettings.sortMode" :value="mode.id">
+                        <label class="btn btn-outline-secondary" :for="`sort-mode-${mode.id}`">
+                            {{ mode.label }}
+                        </label>
+                    </template>
+                </div>
             </div>
         </div>
         <div class="row mt-2">

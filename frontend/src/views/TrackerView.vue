@@ -326,8 +326,23 @@ function setSort(sorter, defOrder) {
     }
 }
 
+const SORT_MODES = {
+    normal: () => 0,
+    selftop: (g) => isEqual(getClaimingUser(g), currentUser.value) ? 0 : 1,
+};
+
 const sortedAndFilteredGames = computed(() =>
-    orderBy(filteredGames.value, activeSort.value[0], activeSort.value[1] ? 'desc' : 'asc')
+    orderBy(
+        filteredGames.value,
+        [
+            SORT_MODES[settings.value.sortMode],
+            activeSort.value[0],
+        ],
+        [
+            'asc',
+            activeSort.value[1] ? 'desc' : 'asc',
+        ]
+    )
 );
 
 const gameExpanded = ref({});
