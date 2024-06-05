@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import Joi from 'joi';
 
 const SETTINGS_KEY = 'settings';
@@ -22,6 +22,15 @@ const SETTINGS_SCHEMA = Joi.object().keys({
 }).prefs({ stripUnknown: true });
 
 export const settings = ref(load());
+
+export const currentUser = computed(() =>
+    settings.value.auth?.token ? {
+        id: settings.value.auth.userId,
+        discordUsername: settings.value.auth.discordUsername,
+    } : settings.value.unauthenticatedDiscordUsername ? {
+        discordUsername: settings.value.unauthenticatedDiscordUsername,
+    } : undefined
+);
 
 function fallback() {
     return SETTINGS_SCHEMA.validate({}).value;

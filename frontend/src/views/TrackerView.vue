@@ -4,7 +4,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue';
 import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, isEqual, fromPairs, every, omit, findIndex } from 'lodash-es';
 import moment from 'moment';
-import { settings } from '@/settings';
+import { settings, currentUser } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker, updateHint as apiUpdateHint } from '@/api';
 import { progressionStatus, completionStatus, availabilityStatus, pingPreference, hintClassification, unifiedGameStatus, getClaimingUserForGame as getClaimingUser } from '@/types';
@@ -70,15 +70,6 @@ watch(
 onUnmounted(() => {
     document.title = 'Cheese Trackers';
 });
-
-const currentUser = computed(() =>
-    settings.value.auth?.token ? {
-        id: settings.value.auth.userId,
-        discordUsername: settings.value.auth.discordUsername,
-    } : settings.value.unauthenticatedDiscordUsername ? {
-        discordUsername: settings.value.unauthenticatedDiscordUsername,
-    } : undefined
-);
 
 const trackerOwner = computed(() =>
     trackerData.value.owner_ct_user_id && {
