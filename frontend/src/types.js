@@ -1,4 +1,4 @@
-import { findIndex, keyBy, map } from "lodash-es";
+import { keyBy, map } from "lodash-es";
 
 function keyed(v) {
     v.byId = keyBy(v, 'id');
@@ -51,20 +51,15 @@ export const pingPreference = keyed([
 // reiterated in every component that needs it.
 
 // We use this instead of deriving from isBk to control the order.
-const INCOMPLETE_PROGRESSION_OVERRIDES = ['soft_bk', 'bk'];
+const INCOMPLETE_PROGRESSION_OVERRIDES = ['bk', 'soft_bk'];
 
-export const unifiedGameStatus = keyed((() => {
-    const statuses = [...completionStatus];
-    statuses.splice(
-        findIndex(completionStatus, i => i.id === 'incomplete') + 1,
-        0,
-        ...map(
-            INCOMPLETE_PROGRESSION_OVERRIDES,
-            k => progressionStatus.byId[k]
-        )
-    );
-    return statuses;
-})());
+export const unifiedGameStatus = keyed((() => [
+    ...map(
+        INCOMPLETE_PROGRESSION_OVERRIDES,
+        k => progressionStatus.byId[k]
+    ),
+    ...completionStatus,
+])());
 
 unifiedGameStatus.forGame = (game) =>
     (

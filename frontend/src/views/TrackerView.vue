@@ -245,6 +245,22 @@ const statGamesByProgressionStatus = computed(() =>
     groupBy(statGames.value, 'progression_status')
 );
 
+const SUMMARY_PROGRESSION_STATUS = map(
+    ['unknown', 'bk', 'soft_bk', 'unblocked', 'go'],
+    (k) => {
+        const s = progressionStatus.byId[k];
+        if (k === 'go') {
+            return { ...s, color: 'light' };
+        }
+        return s;
+    }
+);
+
+const SUMMARY_UNIFIED_STATUS = map(
+    ['bk', 'soft_bk', 'incomplete', 'all_checks', 'goal', 'done'],
+    (k) => unifiedGameStatus.byId[k]
+);
+
 function statChecksByStatusProgression(status) {
     return sumBy(statGamesByProgressionStatus.value[status], g => g.checks_total - g.checks_done);
 }
@@ -1091,7 +1107,7 @@ loadTracker();
                                 <th class="text-end shrink-column">Progression</th>
                                 <td class="align-middle">
                                     <div class="progress">
-                                        <div v-for="status in progressionStatus" class="progress-bar"
+                                        <div v-for="status in SUMMARY_PROGRESSION_STATUS" class="progress-bar"
                                             :class="[`bg-${status.color}`]"
                                             :style="{ width: `${percent(statChecksByStatusProgression(status.id), statTotalChecks)}%` }">
                                         </div>
@@ -1105,7 +1121,7 @@ loadTracker();
                                 <th class="text-end shrink-column">Completion</th>
                                 <td class="align-middle">
                                     <div class="progress">
-                                        <div v-for="status in unifiedGameStatus" class="progress-bar"
+                                        <div v-for="status in SUMMARY_UNIFIED_STATUS" class="progress-bar"
                                             :class="[`bg-${status.color}`]"
                                             :style="{ width: `${percent(statGamesByUnifiedStatus[status.id]?.length || 0, statGames.length)}%` }">
                                         </div>
