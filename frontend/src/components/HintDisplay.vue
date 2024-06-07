@@ -51,6 +51,10 @@ const CAN_PING_BY_PREFERENCE = {
 const canPing = computed(() => {
     const otherSlot = props.direction === 'sent' ? props.finderGame : props.receiverGame;
 
+    if (!otherSlot) {
+        return;
+    }
+
     const otherSlotCompletion = completionStatus.byId[otherSlot.completion_status];
 
     if (otherSlotCompletion?.complete || !otherSlot.effective_discord_username) {
@@ -94,6 +98,7 @@ const canPing = computed(() => {
                 :class="HINT_STATUS_UI[props.status].iconclasses"
                 :title="HINT_STATUS_UI[props.status].icontooltip"></i
             > <HintPingIcon
+                v-if="canPing !== undefined"
                 :ping="canPing"
                 @copy="$emit('copyPing')"></HintPingIcon
             > <a
