@@ -315,22 +315,55 @@ const filteredGames = computed(() =>
     })
 );
 
-function sortByName(g) {
-    return g.name.toLowerCase();
+function chainCompare(...fns) {
+    return (a, b) => {
+        for (const fn of fns) {
+            const r = fn(a, b);
+
+            if (!isNaN(r) && r !== 0) {
+                return r;
+            }
+        }
+
+        return 0;
+    };
 }
 
-function sortByGame(g) {
-    return g.game.toLowerCase();
+function compareByIteratee(f) {
+    return (a, b) => {
+        const x = f(a);
+        const y = f(b);
+
+        if (x < y) {
+            return -1;
+        }
+
+        if (x > y) {
+            return 1;
+        }
+
+        return 0;
+    };
 }
 
-function sortByActivity(g) {
+function reverseCompare(f) {
+    return (a, b) => -f(a, b);
+}
+
+const sortByName = (() => {
+    const collator = new Intl.Collator(undefined, { numeric: true });
+
+    return (a, b) => collator.compare(a.name, b.name);
+})();
+
+const sortByGame = compareByIteratee(g => g.game.toLowerCase());
+
+const sortByActivity = compareByIteratee(g => {
     const days = gameDaysSinceLastCheckedOrLastActivity(g);
     return days === undefined ? Number.POSITIVE_INFINITY : days;
-}
+});
 
-function sortByOwner(g) {
-    return (g.effective_discord_username || '').toLowerCase();
-}
+const sortByOwner = compareByIteratee(g => (g.effective_discord_username || '').toLowerCase());
 
 const activeSort = ref([sortByName, false]);
 
@@ -348,16 +381,13 @@ const SORT_MODES = {
 };
 
 const sortedAndFilteredGames = computed(() =>
-    orderBy(
-        filteredGames.value,
-        [
-            SORT_MODES[settings.value.sortMode],
-            activeSort.value[0],
-        ],
-        [
-            'asc',
-            activeSort.value[1] ? 'desc' : 'asc',
-        ]
+    [...filteredGames.value].sort(
+        chainCompare(
+            compareByIteratee(SORT_MODES[settings.value.sortMode]),
+            activeSort.value[1] ?
+                reverseCompare(activeSort.value[0]) :
+                activeSort.value[0]
+        )
     )
 );
 
