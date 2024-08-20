@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/app/target \
     cp target/release/cheese-trackers-server .
 
 
-FROM docker.io/node:20-bullseye AS frontendbuilder
+FROM docker.io/node:20-bookworm AS frontendbuilder
 
 WORKDIR /app
 COPY frontend/ /app
