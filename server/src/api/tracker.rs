@@ -529,7 +529,13 @@ where
             .claimed_by_ct_user_id
             .is_some_and(|id| user.as_ref().map_or(true, |u| u.0.id != id))
     {
-        return Err(StatusCode::FORBIDDEN);
+        return Err(match user {
+            // A user is trying to claim on behalf of another user.
+            Some(_) => StatusCode::FORBIDDEN,
+            // A user is trying to claim while unauthenticated; their token
+            // probably expired.
+            None => StatusCode::UNAUTHORIZED,
+        });
     }
 
     // Update the username.
