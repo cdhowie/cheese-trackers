@@ -316,30 +316,6 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         pg_select_one(self.0.as_mut(), Expr::col(ApHintIden::Id).eq(hint_id)).boxed()
     }
 
-    fn delete_ap_hints_by_tracker_id(
-        &mut self,
-        tracker_id: i32,
-    ) -> BoxFuture<'_, sqlx::Result<()>> {
-        async move {
-            let (sql, values) = Query::delete()
-                .from_table(ApHintIden::Table)
-                .and_where(Expr::col(ApHintIden::FinderGameId).in_subquery(
-                    Query::select().build_with(|q| {
-                        q.column(ApGameIden::Id)
-                            .from(ApGameIden::Table)
-                            .and_where(Expr::col(ApGameIden::TrackerId).eq(tracker_id));
-                    }),
-                ))
-                .build_sqlx(PostgresQueryBuilder);
-
-            sqlx::query_with(&sql, values)
-                .execute(self.0.as_mut())
-                .await
-                .map(|_| ())
-        }
-        .boxed()
-    }
-
     fn create_ap_games<'s, 'v, 'f>(
         &'s mut self,
         games: impl IntoIterator<Item = ApGame> + Send + 'v,

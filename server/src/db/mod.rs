@@ -120,10 +120,6 @@ pub trait DataAccess {
     /// Gets an [`ApHint`] by its database ID.
     fn get_ap_hint(&mut self, hint_id: i32) -> BoxFuture<'_, sqlx::Result<Option<ApHint>>>;
 
-    /// Deletes all of the [`ApHint`]s for a tracker by the tracker's ID.
-    fn delete_ap_hints_by_tracker_id(&mut self, tracker_id: i32)
-        -> BoxFuture<'_, sqlx::Result<()>>;
-
     /// Creates one or more new [`ApGame`]s in the database.
     ///
     /// The `id` field of the values is ignored.  It will be populated with the
