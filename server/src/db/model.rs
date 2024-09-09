@@ -1,13 +1,9 @@
 //! Database model types.
 
-// Not all generated *Iden variants are used.
-#![allow(unused)]
-
 use std::{fmt::Debug, hash::Hash};
 
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::{DateTime, Utc};
-use sea_query::{Alias, Iden, SimpleExpr};
+use sea_query::{Iden, Value};
 use sqlx::{FromRow, Row};
 use uuid::Uuid;
 
@@ -38,7 +34,7 @@ pub trait Model {
     /// The values produced by this function must exactly match the order that
     /// identifiers are produced by [`columns()`](Self::columns), which implies
     /// the two functions must produce the same number of items.
-    fn into_values(self) -> impl Iterator<Item = SimpleExpr>;
+    fn into_values(self) -> impl Iterator<Item = Value>;
 }
 
 // This is a hack that should be replaced with a proper proc macro.  For
@@ -86,7 +82,7 @@ macro_rules! db_struct {
                     [< $n Iden >]::Id
                 }
 
-                fn into_values(self) -> impl Iterator<Item = SimpleExpr> {
+                fn into_values(self) -> impl Iterator<Item = Value> {
                     [
                         $( self.$f.into() ),*
                     ]
@@ -131,15 +127,12 @@ macro_rules! db_enum {
                 ),*
             }
 
-            impl From<$n> for SimpleExpr {
+            impl From<$n> for Value {
                 fn from(value: $n) -> Self {
-                    SimpleExpr::Value(
-                        match value {
-                            $( $n::$variant => stringify!([< $variant:snake >]) ),*
-                        }
-                        .into(),
-                    )
-                    .cast_as(Alias::new(stringify!([< $n:snake >])))
+                    match value {
+                        $( $n::$variant => stringify!([< $variant:snake >]) ),*
+                    }
+                    .into()
                 }
             }
         }

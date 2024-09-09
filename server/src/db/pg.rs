@@ -92,7 +92,7 @@ where
                 value
                     .into_values()
                     .enumerate()
-                    .filter_map(|(pos, v)| (pos != id_pos).then_some(v)),
+                    .filter_map(|(pos, v)| (pos != id_pos).then_some(v.into())),
             );
         }
 
@@ -216,7 +216,8 @@ where
                 values
                     .remove(&col)
                     .ok_or_else(|| format!("column {col:?} appears twice"))
-                    .unwrap(),
+                    .unwrap()
+                    .into(),
             ))
         }))
         .and_where(Expr::col(T::primary_key()).eq(pkey))

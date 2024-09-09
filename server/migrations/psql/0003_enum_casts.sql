@@ -1,0 +1,7 @@
+CREATE CAST (text AS availability_status) WITH INOUT AS ASSIGNMENT;
+CREATE CAST (text AS completion_status) WITH INOUT AS ASSIGNMENT;
+CREATE CAST (text AS game_status) WITH INOUT AS ASSIGNMENT;
+CREATE CAST (text AS hint_classification) WITH INOUT AS ASSIGNMENT;
+CREATE CAST (text AS ping_preference) WITH INOUT AS ASSIGNMENT;
+CREATE CAST (text AS progression_status) WITH INOUT AS ASSIGNMENT;
+CREATE CAST (text AS tracker_game_status) WITH INOUT AS ASSIGNMENT;
