@@ -790,8 +790,8 @@ loadTracker();
                                 class="btn"
                                 :disabled="loading || (!currentUserIsTrackerOwner && trackerOwner)"
                                 :class="{
-                                    [`btn-outline-${pref.color}`]: true,
-                                    active: trackerData.global_ping_policy === pref.id
+                                    [`btn-outline-${pref.color}`]: trackerData.global_ping_policy !== pref.id,
+                                    [`btn-${pref.color}`]: trackerData.global_ping_policy === pref.id,
                                 }"
                                 @click.prevent="updateTracker({ global_ping_policy: pref.id })"
                             >{{ pref.label }}</button>
