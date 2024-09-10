@@ -6,14 +6,15 @@ import GameDisplay from './GameDisplay.vue';
 import EnumDisplay from './EnumDisplay.vue';
 import UsernameDisplay from './UsernameDisplay.vue';
 
-const props = defineProps(['game']);
+const props = defineProps(['game', 'globalPingPolicy']);
 
 const completion = computed(() => completionStatus.byId[props.game.completion_status]);
 
 const ping = computed(() =>
-    pingPreference.byId[
-        completion.value?.complete ? 'never' : props.game.discord_ping
-    ]
+    completion.value?.complete ? pingPreference.byId.never : (
+        props.globalPingPolicy ||
+        pingPreference.byId[props.game.discord_ping]
+    )
 );
 
 const progression = computed(() => progressionStatus.byId[props.game.progression_status]);

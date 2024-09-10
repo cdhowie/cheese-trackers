@@ -20,6 +20,7 @@ const props = defineProps([
     'disabled',
     'status',
     'showStatus',
+    'globalPingPolicy',
 ]);
 
 const HINT_STATUS_UI = {
@@ -61,7 +62,7 @@ const canPing = computed(() => {
         return 'no';
     }
 
-    return CAN_PING_BY_PREFERENCE[otherSlot.discord_ping];
+    return CAN_PING_BY_PREFERENCE[props.globalPingPolicy?.id || otherSlot.discord_ping];
 });
 </script>
 
@@ -70,7 +71,7 @@ const canPing = computed(() => {
         <td class="bg-transparent text-end pe-0">
             <template v-if="props.direction === 'received'">
                 <span v-if="props.receiverGame" class="text-info">
-                    <SlotDisplay :game="props.receiverGame"/>
+                    <SlotDisplay :game="props.receiverGame" :global-ping-policy="props.globalPingPolicy"/>
                 </span>
                 <span v-else class="text-primary">(Item link)</span>'s
             </template>
@@ -89,7 +90,7 @@ const canPing = computed(() => {
         <td class="bg-transparent text-start ps-0">
             <template v-if="props.direction === 'sent'" class="text-info">
                 <span class="text-info">
-                    <SlotDisplay :game="props.finderGame"/>
+                    <SlotDisplay :game="props.finderGame" :global-ping-policy="props.globalPingPolicy"/>
                 </span>'s
             </template>
             <span class="text-info">{{ props.hint.location }}</span>

@@ -7,7 +7,7 @@ import moment from 'moment';
 import { settings, currentUser } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker, updateHint as apiUpdateHint } from '@/api';
-import { progressionStatus, completionStatus, availabilityStatus, pingPreference, hintClassification, unifiedGameStatus, getClaimingUserForGame as getClaimingUser } from '@/types';
+import { progressionStatus, completionStatus, availabilityStatus, pingPreference, pingPolicy, hintClassification, unifiedGameStatus, getClaimingUserForGame as getClaimingUser } from '@/types';
 import { percent, synchronize } from '@/util';
 import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
@@ -189,6 +189,18 @@ function dateToDays(d) {
 
 function isGameCompleted(game) {
     return completionStatus.byId[game.completion_status]?.complete;
+}
+
+function effectivePingPreference(game) {
+    if (isGameCompleted(game)) {
+        return pingPreference.byId.never;
+    }
+
+    if (trackerData.value.global_ping_policy) {
+        return pingPolicy.byId[trackerData.value.global_ping_policy];
+    }
+
+    return { ...pingPreference.byId[game.discord_ping], editable: true };
 }
 
 function lastCheckedClass(game) {
@@ -769,6 +781,23 @@ loadTracker();
                             :value="trackerOwner?.discordUsername">
                     </div>
                 </div>
+                <div class="col-12 col-lg-6">
+                    <label class="form-label">Ping policy</label>
+                    <div class="btn-group form-control border-0 p-0">
+                        <template v-for="pref of pingPolicy">
+                            <button
+                                type="radio"
+                                class="btn"
+                                :disabled="loading || (!currentUserIsTrackerOwner && trackerOwner)"
+                                :class="{
+                                    [`btn-outline-${pref.color}`]: true,
+                                    active: trackerData.global_ping_policy === pref.id
+                                }"
+                                @click.prevent="updateTracker({ global_ping_policy: pref.id })"
+                            >{{ pref.label }}</button>
+                        </template>
+                    </div>
+                </div>
             </div>
         </form>
         <button class="btn btn-primary refresh-button" @click="loadTracker()" :disabled="loading">Refresh</button>
@@ -953,9 +982,12 @@ loadTracker();
                             class="text-reset mw-underline-hover"
                         >{{ game.name }}</a>
                     </template>
-                    <template #ping>
-                        <span v-if="game.effective_discord_username && isGameCompleted(game)" class="text-danger">Never</span>
-                        <DropdownSelector v-else-if="game.effective_discord_username" :options="pingPreference"
+                    <template #ping v-if="game.effective_discord_username">
+                        <span
+                            v-if="!effectivePingPreference(game).editable"
+                            :class="`text-${effectivePingPreference(game).color}`"
+                        >{{ effectivePingPreference(game).label }}</span>
+                        <DropdownSelector v-else :options="pingPreference"
                             :value="pingPreference.byId[game.discord_ping]" :disabled="loading"
                             @selected="s => setPing(game, s)"></DropdownSelector>
                     </template>
@@ -1080,6 +1112,7 @@ loadTracker();
                                                     :direction="sentHints ? 'sent' : 'received'"
                                                     :receiver-game="gameById[hint.receiver_game_id]"
                                                     :finder-game="gameById[hint.finder_game_id]"
+                                                    :global-ping-policy="trackerData.global_ping_policy && pingPolicy.byId[trackerData.global_ping_policy]"
                                                     :disabled="loading"
                                                     @set-classification="s => setHintClassification(hint, s)"
                                                     @copy="clipboardCopy(hintToString(hint))"

@@ -3,7 +3,7 @@
 use std::{fmt::Debug, hash::Hash};
 
 use chrono::{DateTime, Utc};
-use sea_query::{Iden, Value};
+use sea_query::{Iden, Nullable, Value};
 use sqlx::{FromRow, Row};
 use uuid::Uuid;
 
@@ -135,6 +135,12 @@ macro_rules! db_enum {
                     .into()
                 }
             }
+
+            impl Nullable for $n {
+                fn null() -> Value {
+                    Value::String(None)
+                }
+            }
         }
     };
 }
@@ -247,6 +253,8 @@ db_struct! {
         pub owner_ct_user_id: Option<i32>,
         pub lock_title: bool,
         pub upstream_url: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub global_ping_policy: Option<PingPreference>,
     }
 }
 

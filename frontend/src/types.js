@@ -43,6 +43,15 @@ export const pingPreference = keyed([
     { id: 'never', label: 'Never', color: 'danger', pingWhen: 'never' },
 ]);
 
+export const pingPolicy = keyed([
+    { id: undefined, label: 'None', color: 'secondary' },
+    { id: 'liberally', label: 'Liberally', color: 'success', pingWhen: 'liberally' },
+    { id: 'sparingly', label: 'Sparingly', color: 'warning', pingWhen: 'sparingly' },
+    { id: 'hints', label: 'Hints', color: 'warning', pingWhen: 'for hints' },
+    { id: 'see_notes', label: 'Custom', color: 'info', pingWhen: "after checking the async's ping policy" },
+    { id: 'never', label: 'Never', color: 'danger', pingWhen: 'never' },
+]);
+
 // A few views show a unified game status which is a combination of the
 // completion status and progression status.  If the completion status is
 // incomplete, then we use the progression status only if it's a BK type.

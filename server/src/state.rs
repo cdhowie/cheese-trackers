@@ -205,6 +205,7 @@ impl<D> AppState<D> {
                         title: "".to_owned(),
                         owner_ct_user_id: None,
                         lock_title: false,
+                        global_ping_policy: None,
                     }])
                     .try_next()
                     .await?

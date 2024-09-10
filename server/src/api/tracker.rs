@@ -150,6 +150,8 @@ where
         pub owner_ct_user_id: Option<i32>,
         pub lock_title: bool,
         pub upstream_url: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub global_ping_policy: Option<PingPreference>,
     }
 
     impl From<ApTracker> for Tracker {
@@ -162,6 +164,7 @@ where
                 owner_ct_user_id: value.owner_ct_user_id,
                 lock_title: value.lock_title,
                 upstream_url: value.upstream_url,
+                global_ping_policy: value.global_ping_policy,
             }
         }
     }
@@ -327,6 +330,7 @@ pub struct UpdateTrackerRequest {
     pub title: String,
     pub owner_ct_user_id: Option<i32>,
     pub lock_title: bool,
+    pub global_ping_policy: Option<PingPreference>,
 }
 
 /// `PUT /tracker/:tracker_id`: Update tracker.
@@ -373,6 +377,7 @@ where
         // updating all settings.
         (None, _) => {
             tracker.title = tracker_update.title;
+            tracker.global_ping_policy = tracker_update.global_ping_policy;
 
             if tracker_update.lock_title {
                 return Err(StatusCode::FORBIDDEN);
@@ -384,6 +389,7 @@ where
         (Some(uid), Some(u)) if uid == u.0.id => {
             tracker.title = tracker_update.title;
             tracker.lock_title = tracker_update.lock_title;
+            tracker.global_ping_policy = tracker_update.global_ping_policy;
         }
 
         // The current user is not the owner.  They can only change unlocked
@@ -398,6 +404,10 @@ where
             } else if tracker.title != tracker_update.title {
                 return Err(StatusCode::FORBIDDEN);
             }
+
+            if tracker.global_ping_policy != tracker_update.global_ping_policy {
+                return Err(StatusCode::FORBIDDEN);
+            }
         }
     };
 
@@ -407,6 +417,7 @@ where
             ApTrackerIden::Title,
             ApTrackerIden::OwnerCtUserId,
             ApTrackerIden::LockTitle,
+            ApTrackerIden::GlobalPingPolicy,
         ],
     )
     .await

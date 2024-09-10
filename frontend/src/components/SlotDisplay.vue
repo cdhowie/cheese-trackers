@@ -4,7 +4,7 @@ import { useFloating, flip, autoUpdate, shift, offset } from '@floating-ui/vue';
 
 import SlotSummary from './SlotSummary.vue';
 
-const props = defineProps(['game']);
+const props = defineProps(['game', 'globalPingPolicy']);
 
 const show = ref(false);
 
@@ -30,7 +30,7 @@ const { floatingStyles } = useFloating(reference, floating, {
     >{{ props.game.name }}</span>
     <Teleport to="body">
         <div ref="floating" class="popup" :style="floatingStyles" v-if="show">
-            <SlotSummary :game="props.game"/>
+            <SlotSummary :game="props.game" :global-ping-policy="props.globalPingPolicy"/>
         </div>
     </Teleport>
 </template>
