@@ -652,7 +652,8 @@ async function updateObject(data, updater, mutator, patcher) {
             ({ status, data }) => status >= 200 && status < 300 ? data : undefined,
             e => {
                 console.error(`Failed to update: ${e}`);
-                return undefined;
+                loading.value = false;
+                throw e;
             }
         )
         .then(saved => {
