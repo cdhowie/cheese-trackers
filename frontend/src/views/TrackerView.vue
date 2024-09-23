@@ -819,7 +819,7 @@ loadTracker();
                             <div class="btn-group form-control border-0 p-0">
                                 <template v-for="pref of pingPolicy">
                                     <button
-                                        type="radio"
+                                        type="button"
                                         class="btn"
                                         :disabled="loading || !canEditTrackerSettings"
                                         :class="{
