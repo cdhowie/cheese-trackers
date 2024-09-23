@@ -29,15 +29,39 @@ import YesNo from '@/components/ShouldPing.vue';
             an unauthenticated icon (<i title="Unauthenticated" class="bg-transparent text-warning bi-unlock-fill"></i>) to
             help distinguish authenticated vs unauthenticated claims.
         </p>
-        <h2>Tracker Title</h2>
+        <h2>Tracker Settings</h2>
         <p>
-            Every tracker has a title at the top. By default, this will say
-            <span class="text-muted fst-italic">untitled tracker</span>. You can
-            click this text to create a title, which will be displayed at the
-            top of the sheet as well as in the browser tab and/or title bar.
-            This can help players who are in a large number of multiworlds
-            better manage their tracker tabs.
+            Clicking the gear button by the tracker title will open up a
+            settings pane.  These settings apply to the whole tracker.
         </p>
+        <ul>
+            <li>
+                <b>Organizer</b>: The organizer of this async.  If the tracker
+                is unclaimed, clicking the "claim" button will make yourself the
+                organizer.  If you are the organizer, you can click "disclaim"
+                to disclaim it.  If someone else is the organizer, you cannot
+                claim it.
+            </li>
+            <li>
+                <b>Lock settings</b>: If toggled on, only the organizer can
+                change the tracker settings.  This setting can only be toggled
+                by the organizer.
+            </li>
+            <li>
+                <b>Title</b>: The title displayed at the top of the tracker and
+                in the browser tab and/or title bar.
+            </li>
+            <li>
+                <b>Ping policy</b>: Sets the ping policy for the tracker.  If
+                set to "none" then participants can set their own ping
+                preference per slot.  Otherwise, the effective ping preference
+                for each slot is forced to be the same as the tracker's ping
+                policy.  See the <a href="#pinging">pinging</a> section for a
+                description of each policy.  "Custom" specifies that the async
+                has some other ping policy, which should be described in the
+                tracker description (once that field is added).
+            </li>
+        </ul>
         <h2>Tracker Columns</h2>
         <p>
             When you open a tracker, you will be presented with a large table.
@@ -405,7 +429,7 @@ import YesNo from '@/components/ShouldPing.vue';
             mistake, you can press the escape (ESC) key on your keyboard to
             revert any changes.
         </p>
-        <h2>Pinging</h2>
+        <h2><a name="pinging"/>Pinging</h2>
         <p>
             There are mulitple scenarios where the owner of a slot may want to
             be notified on Discord with a ping. The table below describes these
