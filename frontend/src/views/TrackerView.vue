@@ -826,7 +826,7 @@ loadTracker();
                 </div>
                 <div class="col-12 mb-3" v-if="trackerOwner">
                     <CancelableEdit
-                        v-if="canEditTrackerSettings"
+                        v-if="currentUserIsTrackerOwner"
                         :modelValue="trackerData?.description || ''"
                         @update:modelValue="(d) => updateTracker({ description: d})"
                         v-slot="props"
@@ -834,7 +834,7 @@ loadTracker();
                         <label class="form-label" for="trackerDescriptionEdit">Description</label>
                         <textarea
                             id="trackerDescriptionEdit"
-                            :disabled="loading || !canEditTrackerSettings"
+                            :disabled="loading"
                             class="form-control mb-2"
                             rows="10"
                             :value="props.value"
@@ -861,11 +861,11 @@ loadTracker();
                             :source="props.value"
                         />
                     </CancelableEdit>
-                    <template v-else>
+                    <template v-else-if="(trackerData?.description || '').length">
                         <label class="form-label">Description</label>
                         <TrackerDescription
                             class="form-control pt-3 pb-3"
-                            :source="trackerData?.description || ''"
+                            :source="trackerData.description"
                         />
                     </template>
                 </div>
