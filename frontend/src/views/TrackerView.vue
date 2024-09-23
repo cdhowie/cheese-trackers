@@ -738,7 +738,7 @@ loadTracker();
             You will be unable to claim slots until you either sign in with Discord or set your Discord username in the
             <router-link to="/settings">settings</router-link>.
         </div>
-        <h2 class="text-center mb-4">
+        <h2 class="text-center" :class="showTools ? 'mb-3' : 'mb-4'">
             <span :class="{ 'text-muted': !trackerData.title, 'fst-italic': !trackerData.title }">{{
                 trackerData.title.length ?
                 trackerData.title : 'Untitled tracker' }}
@@ -749,7 +749,7 @@ loadTracker();
                 <i :class="showTools ? 'bi-gear-fill' : 'bi-gear'"></i>
             </button>
         </h2>
-        <form class="container bg-dark-subtle pt-3 mb-3 rounded" v-if="showTools">
+        <form class="container bg-dark-subtle pt-3 mb-4 rounded" v-if="showTools">
             <div class="row">
                 <div class="col-12 col-xxl-6 mb-3">
                     <div class="row">
