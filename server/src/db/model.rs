@@ -249,6 +249,7 @@ db_struct! {
         pub tracker_id: Uuid,
         pub updated_at: DateTime<Utc>,
         pub title: String,
+        pub description: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub owner_ct_user_id: Option<i32>,
         pub lock_settings: bool,

@@ -59,7 +59,34 @@ import YesNo from '@/components/ShouldPing.vue';
                 policy.  See the <a href="#pinging">pinging</a> section for a
                 description of each policy.  "Custom" specifies that the async
                 has some other ping policy, which should be described in the
-                tracker description (once that field is added).
+                tracker description.
+            </li>
+            <li>
+                <p>
+                    <b>Description</b>: Sets a description for the tracker, using
+                    <a href="https://spec.commonmark.org/0.31.2/"
+                    target="_blank">CommonMark</a> syntax.  This description will be
+                    displayed at the top of the tracker.
+                </p>
+                <p class="text-warning">
+                    The description can be viewed by anyone who has a link to
+                    the tracker, even if the link is a read-only link. <b>Do not
+                    include information in the description if it is only
+                    intended for participants and not observers.</b> For
+                    example, putting the room link in the description would
+                    allow someone who has a read-only tracker link to connect to
+                    the multiworld server, and even obtain a read-write tracker
+                    link via the multiworld tracker link available on the room
+                    page.
+                </p>
+                <p>
+                    For security reasons, only the organizer can edit this
+                    setting, regardless of whether the settings lock is enabled,
+                    and the description will only be visible if the tracker has
+                    an organizer.  The organizer of the async assumes
+                    responsibility for the contents of the description, links in
+                    particular.
+                </p>
             </li>
         </ul>
         <h2>Tracker Columns</h2>

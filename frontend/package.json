@@ -13,8 +13,10 @@
     "axios": "^1.6.7",
     "joi": "^17.12.1",
     "lodash-es": "^4.17.21",
+    "markdown-it-link-attributes": "^4.0.1",
     "moment": "^2.30.1",
     "vue": "^3.4.15",
+    "vue-markdown-render": "^2.2.1",
     "vue-router": "^4.2.5",
     "vue-virtual-scroller": "^2.0.0-beta.8"
   },

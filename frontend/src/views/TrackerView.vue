@@ -9,6 +9,7 @@ import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker, updateHint as apiUpdateHint } from '@/api';
 import { progressionStatus, completionStatus, availabilityStatus, pingPreference, pingPolicy, hintClassification, unifiedGameStatus, getClaimingUserForGame as getClaimingUser } from '@/types';
 import { percent, synchronize } from '@/util';
+
 import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
 import UsernameDisplay from '@/components/UsernameDisplay.vue';
@@ -16,6 +17,8 @@ import GameDisplay from '@/components/GameDisplay.vue';
 import DropdownSelector from '@/components/DropdownSelector.vue';
 import Repeat from '@/components/Repeat.vue';
 import HintDisplay from '@/components/HintDisplay.vue';
+import CancelableEdit from '@/components/CancelableEdit.vue';
+import TrackerDescription from '@/components/TrackerDescription.vue';
 
 import TrackerTable from '@/components/TrackerTable.vue';
 import TrackerTableHeader from '@/components/TrackerTableHeader.vue';
@@ -615,31 +618,6 @@ function hintToStringWithPing(hint) {
     return `${hintToString(hint)} @${otherSlot.effective_discord_username} `;
 }
 
-const editedTitle = ref('');
-const editingTitle = ref(false);
-
-watch(
-    () => trackerData.value?.title,
-    () => {
-        if (!editingTitle.value) {
-            editedTitle.value = trackerData.value?.title || '';
-        }
-    }
-);
-
-function saveTitle() {
-    editingTitle.value = false;
-
-    if ((trackerData.value.title || '') !== editedTitle.value) {
-        updateTracker({ title: editedTitle.value });
-    }
-}
-
-function cancelEditTitle() {
-    editedTitle.value = trackerData.value?.title || '';
-    editingTitle.value = false;
-}
-
 async function updateObject(data, updater, mutator, patcher) {
     if (loading.value) {
         return;
@@ -738,7 +716,7 @@ loadTracker();
             You will be unable to claim slots until you either sign in with Discord or set your Discord username in the
             <router-link to="/settings">settings</router-link>.
         </div>
-        <h2 class="text-center" :class="showTools ? 'mb-3' : 'mb-4'">
+        <h2 class="text-center" :class="(showTools || (trackerData?.description || '').length) ? 'mb-3' : 'mb-4'">
             <span :class="{ 'text-muted': !trackerData.title, 'fst-italic': !trackerData.title }">{{
                 trackerData.title.length ?
                 trackerData.title : 'Untitled tracker' }}
@@ -749,6 +727,11 @@ loadTracker();
                 <i :class="showTools ? 'bi-gear-fill' : 'bi-gear'"></i>
             </button>
         </h2>
+        <TrackerDescription
+            v-if="!showTools && (trackerData?.description || '').length && trackerOwner"
+            class="container bg-dark-subtle pt-3 pb-3 mb-4 rounded"
+            :source="trackerData.description"
+        />
         <form class="container bg-dark-subtle pt-3 mb-4 rounded" v-if="showTools">
             <div class="row">
                 <div class="col-12 col-xxl-6 mb-3">
@@ -800,15 +783,23 @@ loadTracker();
                     <div class="row">
                         <label class="col-form-label col-3" for="trackerTitleEdit">Title</label>
                         <div class="col-9">
-                            <input type="text"
-                                id="trackerTitleEdit"
-                                :disabled="loading || !canEditTrackerSettings"
-                                class="form-control" v-model="editedTitle"
-                                placeholder="Title"
-                                @blur="saveTitle"
-                                @keyup.enter.prevent="saveTitle"
-                                @keyup.esc="cancelEditTitle"
+                            <CancelableEdit
+                                :modelValue="trackerData?.title || ''"
+                                @update:modelValue="(title) => updateTracker({ title })"
+                                v-slot="props"
                             >
+                                <input type="text"
+                                    id="trackerTitleEdit"
+                                    :disabled="loading || !canEditTrackerSettings"
+                                    class="form-control"
+                                    :value="props.value"
+                                    @input="e => props.edited(e.target.value)"
+                                    placeholder="Title"
+                                    @blur="props.save()"
+                                    @keyup.enter.prevent="props.save()"
+                                    @keyup.esc="props.cancel()"
+                                >
+                            </CancelableEdit>
                         </div>
                     </div>
                 </div>
@@ -832,6 +823,51 @@ loadTracker();
                             </div>
                         </div>
                     </div>
+                </div>
+                <div class="col-12 mb-3" v-if="trackerOwner">
+                    <CancelableEdit
+                        v-if="canEditTrackerSettings"
+                        :modelValue="trackerData?.description || ''"
+                        @update:modelValue="(d) => updateTracker({ description: d})"
+                        v-slot="props"
+                    >
+                        <label class="form-label" for="trackerDescriptionEdit">Description</label>
+                        <textarea
+                            id="trackerDescriptionEdit"
+                            :disabled="loading || !canEditTrackerSettings"
+                            class="form-control mb-2"
+                            rows="10"
+                            :value="props.value"
+                            @input="e => props.edited(e.target.value)"
+                            placeholder="Description"
+                            @blur="props.save()"
+                            @keyup.esc="props.cancel()"
+                        />
+                        <div class="alert alert-warning">
+                            The description can be viewed by anyone who has a
+                            link to the tracker, even if the link is a read-only
+                            link. <b>Do not include information in the
+                            description if it is only intended for participants
+                            and not observers.</b> For example, putting the room
+                            link in the description would allow someone who has
+                            a read-only tracker link to connect to the
+                            multiworld server, and even obtain a read-write
+                            tracker link via the multiworld tracker link
+                            available on the room page.
+                        </div>
+                        <label class="form-label">Preview</label>
+                        <TrackerDescription
+                            class="form-control pt-3 pb-3"
+                            :source="props.value"
+                        />
+                    </CancelableEdit>
+                    <template v-else>
+                        <label class="form-label">Description</label>
+                        <TrackerDescription
+                            class="form-control pt-3 pb-3"
+                            :source="trackerData?.description || ''"
+                        />
+                    </template>
                 </div>
             </div>
         </form>

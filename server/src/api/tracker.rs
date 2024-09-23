@@ -146,6 +146,7 @@ where
         pub tracker_id: UrlEncodedTrackerId,
         pub updated_at: DateTime<Utc>,
         pub title: String,
+        pub description: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub owner_ct_user_id: Option<i32>,
         pub lock_settings: bool,
@@ -161,6 +162,7 @@ where
                 tracker_id: value.tracker_id.into(),
                 updated_at: value.updated_at,
                 title: value.title,
+                description: value.description,
                 owner_ct_user_id: value.owner_ct_user_id,
                 lock_settings: value.lock_settings,
                 upstream_url: value.upstream_url,
@@ -328,6 +330,8 @@ where
 #[derive(Debug, serde::Deserialize)]
 pub struct UpdateTrackerRequest {
     pub title: String,
+    #[serde(default)] // Backwards-compatibility
+    pub description: String,
     pub owner_ct_user_id: Option<i32>,
     #[serde(alias = "lock_title")] // Backwards-compatibility
     pub lock_settings: bool,
@@ -358,6 +362,19 @@ where
         .unexpected()?
         .ok_or(StatusCode::NOT_FOUND)?;
 
+    // Update settings.  Some settings are handled specially:
+    //
+    // * owner_ct_user_id can only be updated if it's not set and the current
+    //   user is setting it to their own user ID (claiming) or if it's set to
+    //   the current user's ID and the current user is unsetting it
+    //   (disclaiming).  In all other cases, the update request is rejected.
+    // * lock_settings can only be changed by the organizer, and if there is no
+    //   organizer then there is no point in setting it because anyone could
+    //   unset it.
+    // * description allows adding arbitrary text and links.  This could allow
+    //   CT to become an unwitting accomplice in e.g. phishing schemes.
+    //   Therefore, this field can only be edited by the organizer.
+
     if tracker_update.owner_ct_user_id != tracker.owner_ct_user_id {
         // A change in ownership requires authentication.
         let user = user.as_ref().ok_or(StatusCode::UNAUTHORIZED)?;
@@ -374,46 +391,38 @@ where
     }
 
     match (tracker.owner_ct_user_id, user, tracker.lock_settings) {
-        // There is no current owner.
-        (None, _, _) => {
-            if tracker_update.lock_settings {
-                // Locking settings makes no sense without an owner, since
-                // anyone could unlock them.
-                return Err(StatusCode::FORBIDDEN);
-            }
-            tracker.lock_settings = false;
-
-            tracker.title = tracker_update.title;
-            tracker.global_ping_policy = tracker_update.global_ping_policy;
-        }
-
         // The current user is the owner.  They can change all settings.
         (Some(uid), Some(u), _) if uid == u.0.id => {
-            tracker.title = tracker_update.title;
             tracker.lock_settings = tracker_update.lock_settings;
-            tracker.global_ping_policy = tracker_update.global_ping_policy;
-        }
-
-        // The current user is not the owner but settings are unlocked.  They
-        // can change anything except whether settings are locked.
-        (_, _, false) => {
-            if tracker_update.lock_settings {
-                return Err(StatusCode::FORBIDDEN);
-            }
-
-            tracker.title = tracker_update.title;
-            tracker.global_ping_policy = tracker_update.global_ping_policy;
+            tracker.description = tracker_update.description;
         }
 
         // The current user is not the owner and settings are locked.  They
         // cannot change anything.
-        (_, _, true) => return Err(StatusCode::FORBIDDEN),
+        (Some(_), _, true) => return Err(StatusCode::FORBIDDEN),
+
+        // There is no current owner or the current user is not the owner but
+        // settings are unlocked.  In both cases, they can change anything
+        // except the description, and whether settings are locked.
+        (None, _, _) | (_, _, false) => {
+            if tracker_update.lock_settings || tracker_update.description != tracker.description {
+                // Locking settings makes no sense without an owner, since
+                // anyone could unlock them.
+                return Err(StatusCode::FORBIDDEN);
+            }
+
+            tracker.lock_settings = false;
+        }
     };
+
+    tracker.title = tracker_update.title;
+    tracker.global_ping_policy = tracker_update.global_ping_policy;
 
     tx.update_ap_tracker(
         tracker,
         &[
             ApTrackerIden::Title,
+            ApTrackerIden::Description,
             ApTrackerIden::OwnerCtUserId,
             ApTrackerIden::LockSettings,
             ApTrackerIden::GlobalPingPolicy,

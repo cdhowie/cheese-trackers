@@ -203,6 +203,7 @@ impl<D> AppState<D> {
                         upstream_url: upstream_url.to_owned(),
                         updated_at: now,
                         title: "".to_owned(),
+                        description: "".to_owned(),
                         owner_ct_user_id: None,
                         lock_settings: false,
                         global_ping_policy: None,
