@@ -148,7 +148,7 @@ where
         pub title: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub owner_ct_user_id: Option<i32>,
-        pub lock_title: bool,
+        pub lock_settings: bool,
         pub upstream_url: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub global_ping_policy: Option<PingPreference>,
@@ -162,7 +162,7 @@ where
                 updated_at: value.updated_at,
                 title: value.title,
                 owner_ct_user_id: value.owner_ct_user_id,
-                lock_title: value.lock_title,
+                lock_settings: value.lock_settings,
                 upstream_url: value.upstream_url,
                 global_ping_policy: value.global_ping_policy,
             }
@@ -329,7 +329,8 @@ where
 pub struct UpdateTrackerRequest {
     pub title: String,
     pub owner_ct_user_id: Option<i32>,
-    pub lock_title: bool,
+    #[serde(alias = "lock_title")] // Backwards-compatibility
+    pub lock_settings: bool,
     pub global_ping_policy: Option<PingPreference>,
 }
 
@@ -372,43 +373,41 @@ where
         };
     }
 
-    match (tracker.owner_ct_user_id, user) {
-        // There is no current owner.  Force everything unlocked, and allow
-        // updating all settings.
-        (None, _) => {
-            tracker.title = tracker_update.title;
-            tracker.global_ping_policy = tracker_update.global_ping_policy;
-
-            if tracker_update.lock_title {
+    match (tracker.owner_ct_user_id, user, tracker.lock_settings) {
+        // There is no current owner.
+        (None, _, _) => {
+            if tracker_update.lock_settings {
+                // Locking settings makes no sense without an owner, since
+                // anyone could unlock them.
                 return Err(StatusCode::FORBIDDEN);
             }
-            tracker.lock_title = false;
+            tracker.lock_settings = false;
+
+            tracker.title = tracker_update.title;
+            tracker.global_ping_policy = tracker_update.global_ping_policy;
         }
 
         // The current user is the owner.  They can change all settings.
-        (Some(uid), Some(u)) if uid == u.0.id => {
+        (Some(uid), Some(u), _) if uid == u.0.id => {
             tracker.title = tracker_update.title;
-            tracker.lock_title = tracker_update.lock_title;
+            tracker.lock_settings = tracker_update.lock_settings;
             tracker.global_ping_policy = tracker_update.global_ping_policy;
         }
 
-        // The current user is not the owner.  They can only change unlocked
-        // settings, and cannot configure any locks.
-        _ => {
-            if !tracker.lock_title {
-                if tracker_update.lock_title {
-                    return Err(StatusCode::FORBIDDEN);
-                }
-
-                tracker.title = tracker_update.title;
-            } else if tracker.title != tracker_update.title {
+        // The current user is not the owner but settings are unlocked.  They
+        // can change anything except whether settings are locked.
+        (_, _, false) => {
+            if tracker_update.lock_settings {
                 return Err(StatusCode::FORBIDDEN);
             }
 
-            if tracker.global_ping_policy != tracker_update.global_ping_policy {
-                return Err(StatusCode::FORBIDDEN);
-            }
+            tracker.title = tracker_update.title;
+            tracker.global_ping_policy = tracker_update.global_ping_policy;
         }
+
+        // The current user is not the owner and settings are locked.  They
+        // cannot change anything.
+        (_, _, true) => return Err(StatusCode::FORBIDDEN),
     };
 
     tx.update_ap_tracker(
@@ -416,7 +415,7 @@ where
         &[
             ApTrackerIden::Title,
             ApTrackerIden::OwnerCtUserId,
-            ApTrackerIden::LockTitle,
+            ApTrackerIden::LockSettings,
             ApTrackerIden::GlobalPingPolicy,
         ],
     )

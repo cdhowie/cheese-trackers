@@ -14,7 +14,6 @@ import ChecksBar from '@/components/ChecksBar.vue';
 import UsernameDisplay from '@/components/UsernameDisplay.vue';
 import GameDisplay from '@/components/GameDisplay.vue';
 import DropdownSelector from '@/components/DropdownSelector.vue';
-import LockButton from '@/components/LockButton.vue';
 import Repeat from '@/components/Repeat.vue';
 import HintDisplay from '@/components/HintDisplay.vue';
 
@@ -84,12 +83,18 @@ const currentUserIsTrackerOwner = computed(() => {
     return uid !== undefined && uid === trackerOwner.value?.id;
 });
 
+const canEditTrackerSettings = computed(() =>
+    currentUserIsTrackerOwner.value || !trackerData.value.lock_settings
+);
+
 function claimTracker() {
     updateTracker({
         owner_ct_user_id: currentUser.value.id,
         // This will be ignored by the server, but is used to update our local
         // state after the request.
         owner_discord_username: currentUser.value.discordUsername,
+        // Default settings to locked.
+        lock_settings: true,
     });
 }
 
@@ -97,7 +102,7 @@ function disclaimTracker() {
     updateTracker({
         owner_ct_user_id: undefined,
         owner_discord_username: undefined,
-        lock_title: false,
+        lock_settings: false,
     });
 }
 
@@ -744,59 +749,88 @@ loadTracker();
                 <i :class="showTools ? 'bi-gear-fill' : 'bi-gear'"></i>
             </button>
         </h2>
-        <form class="container mb-4" v-if="showTools">
+        <form class="container" v-if="showTools">
             <div class="row">
-                <div class="col-12 col-lg-6">
-                    <label class="form-label">Title</label>
-                    <div class="input-group">
-                        <input type="text"
-                            :disabled="loading || (!currentUserIsTrackerOwner && trackerData.lock_title)"
-                            class="form-control" v-model="editedTitle"
-                            placeholder="Title"
-                            @blur="saveTitle"
-                            @keyup.enter.prevent="saveTitle"
-                            @keyup.esc="cancelEditTitle">
-                        <LockButton
-                            :loading="loading"
-                            :is-owner="currentUserIsTrackerOwner"
-                            :locked="trackerData.lock_title"
-                            @click="updateTracker({ lock_title: !trackerData.lock_title })"></LockButton>
+                <div class="col-12 col-xxl-6 mb-3">
+                    <div class="row">
+                        <label class="col-form-label col-3">Organizer</label>
+                        <div class="col-9">
+                            <div class="input-group">
+                                <button v-if="currentUser?.id !== undefined && !trackerOwner"
+                                    type="button"
+                                    class="btn btn-outline-secondary"
+                                    :disabled="loading"
+                                    @click="claimTracker">Claim</button>
+                                <button v-if="currentUserIsTrackerOwner"
+                                    type="button"
+                                    class="btn btn-outline-warning"
+                                    :disabled="loading"
+                                    @click="disclaimTracker">Disclaim</button>
+                                <input type="text" disabled="disabled"
+                                    class="form-control"
+                                    placeholder="(Unclaimed)"
+                                    :value="trackerOwner?.discordUsername">
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-12 col-lg-6">
-                    <label class="form-label">Organizer</label>
-                    <div class="input-group">
-                        <button v-if="currentUser?.id !== undefined && !trackerOwner"
-                            type="button"
-                            class="btn btn-outline-secondary"
-                            :disabled="loading"
-                            @click="claimTracker">Claim</button>
-                        <button v-if="currentUserIsTrackerOwner"
-                            type="button"
-                            class="btn btn-outline-warning"
-                            :disabled="loading"
-                            @click="disclaimTracker">Disclaim</button>
-                        <input type="text" disabled="disabled"
-                            class="form-control"
-                            placeholder="(Unclaimed)"
-                            :value="trackerOwner?.discordUsername">
+                <div class="col-12 col-xxl-6 mb-3">
+                    <div class="row">
+                        <label class="col-form-label col-3" for="trackerLockSettingsCheck">Lock settings</label>
+                        <div class="col-9">
+                            <div class="form-control-plaintext form-check form-switch">
+                                <input
+                                    :disabled="loading || !currentUserIsTrackerOwner"
+                                    class="form-check-input"
+                                    type="checkbox"
+                                    role="switch"
+                                    id="trackerLockSettingsCheck"
+                                    :checked="trackerData.lock_settings"
+                                    @change="
+                                        updateTracker({ lock_settings: !trackerData.lock_settings }).catch(() => {
+                                            $event.target.checked = trackerData.lock_settings;
+                                        });
+                                    "
+                                >
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="col-12 col-lg-6">
-                    <label class="form-label">Ping policy</label>
-                    <div class="btn-group form-control border-0 p-0">
-                        <template v-for="pref of pingPolicy">
-                            <button
-                                type="radio"
-                                class="btn"
-                                :disabled="loading || (!currentUserIsTrackerOwner && trackerOwner)"
-                                :class="{
-                                    [`btn-outline-${pref.color}`]: trackerData.global_ping_policy !== pref.id,
-                                    [`btn-${pref.color}`]: trackerData.global_ping_policy === pref.id,
-                                }"
-                                @click.prevent="updateTracker({ global_ping_policy: pref.id })"
-                            >{{ pref.label }}</button>
-                        </template>
+                <div class="col-12 col-xxl-6 mb-3">
+                    <div class="row">
+                        <label class="col-form-label col-3" for="trackerTitleEdit">Title</label>
+                        <div class="col-9">
+                            <input type="text"
+                                id="trackerTitleEdit"
+                                :disabled="loading || !canEditTrackerSettings"
+                                class="form-control" v-model="editedTitle"
+                                placeholder="Title"
+                                @blur="saveTitle"
+                                @keyup.enter.prevent="saveTitle"
+                                @keyup.esc="cancelEditTitle"
+                            >
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-xxl-6 mb-3">
+                    <div class="row">
+                        <label class="col-form-label col-3">Ping policy</label>
+                        <div class="col-9">
+                            <div class="btn-group form-control border-0 p-0">
+                                <template v-for="pref of pingPolicy">
+                                    <button
+                                        type="radio"
+                                        class="btn"
+                                        :disabled="loading || !canEditTrackerSettings"
+                                        :class="{
+                                            [`btn-outline-${pref.color}`]: trackerData.global_ping_policy !== pref.id,
+                                            [`btn-${pref.color}`]: trackerData.global_ping_policy === pref.id,
+                                        }"
+                                        @click.prevent="updateTracker({ global_ping_policy: pref.id })"
+                                    >{{ pref.label }}</button>
+                                </template>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

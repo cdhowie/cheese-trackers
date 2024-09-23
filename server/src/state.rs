@@ -204,7 +204,7 @@ impl<D> AppState<D> {
                         updated_at: now,
                         title: "".to_owned(),
                         owner_ct_user_id: None,
-                        lock_title: false,
+                        lock_settings: false,
                         global_ping_policy: None,
                     }])
                     .try_next()

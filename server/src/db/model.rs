@@ -251,7 +251,7 @@ db_struct! {
         pub title: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub owner_ct_user_id: Option<i32>,
-        pub lock_title: bool,
+        pub lock_settings: bool,
         pub upstream_url: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub global_ping_policy: Option<PingPreference>,
