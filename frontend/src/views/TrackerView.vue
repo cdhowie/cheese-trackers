@@ -749,7 +749,7 @@ loadTracker();
                 <i :class="showTools ? 'bi-gear-fill' : 'bi-gear'"></i>
             </button>
         </h2>
-        <form class="container" v-if="showTools">
+        <form class="container bg-dark-subtle pt-3 mb-3 rounded" v-if="showTools">
             <div class="row">
                 <div class="col-12 col-xxl-6 mb-3">
                     <div class="row">
