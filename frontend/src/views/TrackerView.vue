@@ -62,6 +62,12 @@ const roomHost = computed(() => {
     }
 });
 
+const roomHostAndPort = computed(() => {
+    if (roomHost.value && trackerData.value?.last_port) {
+        return `${roomHost.value}:${trackerData.value.last_port}`;
+    }
+});
+
 const layout = computed(() =>
     trackerData.value?.games?.length >= 1000 ?
         layouts.container :
@@ -764,15 +770,17 @@ loadTracker();
                     class="badge text-bg-info"
                 >
                     <i class="bi-door-open-fill"></i>
-                </a> <span
-                    v-if="trackerData?.last_port"
-                    class="badge text-bg-info"
+                </a> <button
+                    type="button"
+                    v-if="roomHostAndPort"
+                    class="badge text-bg-info border border-0"
+                    @click="clipboardCopy(roomHostAndPort)"
                 >
                     <i class="bi-ethernet"></i> <span class="font-monospace"
                     >
-                        {{ roomHost }}:{{ trackerData.last_port }}
+                        {{ roomHostAndPort }}
                     </span>
-                </span>
+                </button>
             </div>
         </div>
         <TrackerDescription
