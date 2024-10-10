@@ -16,6 +16,7 @@ use tower_http::{
 };
 use tower_layer::Layer;
 
+mod ap_api;
 mod api;
 mod auth;
 mod conf;

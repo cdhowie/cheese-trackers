@@ -9,7 +9,7 @@ use axum::{
     Json,
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -24,7 +24,7 @@ use crate::{
         DataAccess, DataAccessProvider, Transactable, Transaction,
     },
     logging::UnexpectedResultExt,
-    state::{AppState, TrackerUpdateError},
+    state::{AppState, GetRoomLinkError, TrackerUpdateError},
 };
 
 const URLSAFE_BASE64_UUID_LEN: usize = 22;
@@ -153,6 +153,9 @@ where
         pub upstream_url: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub global_ping_policy: Option<PingPreference>,
+        pub room_link: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub last_port: Option<i32>,
     }
 
     impl From<ApTracker> for Tracker {
@@ -167,6 +170,8 @@ where
                 lock_settings: value.lock_settings,
                 upstream_url: value.upstream_url,
                 global_ping_policy: value.global_ping_policy,
+                room_link: value.room_link,
+                last_port: value.last_port,
             }
         }
     }
@@ -336,6 +341,7 @@ pub struct UpdateTrackerRequest {
     #[serde(alias = "lock_title")] // Backwards-compatibility
     pub lock_settings: bool,
     pub global_ping_policy: Option<PingPreference>,
+    pub room_link: String,
 }
 
 /// `PUT /tracker/:tracker_id`: Update tracker.
@@ -418,6 +424,35 @@ where
     tracker.title = tracker_update.title;
     tracker.global_ping_policy = tracker_update.global_ping_policy;
 
+    if tracker.room_link != tracker_update.room_link {
+        tracker.room_link = tracker_update.room_link;
+
+        (tracker.last_port, tracker.next_port_check_at) = match tracker.room_link.is_empty() {
+            true => (None, None),
+            false => {
+                match state
+                    .get_last_port(&tracker.room_link, &tracker.upstream_url)
+                    .await
+                {
+                    Ok((port, check)) => (Some(port.into()), Some(check)),
+
+                    Err(GetRoomLinkError::UrlParse(_) | GetRoomLinkError::InvalidRoomLink) => {
+                        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+                    }
+
+                    Err(e) => {
+                        eprintln!(
+                            "During tracker update request, failed to fetch room info for {:?} for tracker {:?}: {e}",
+                            tracker.room_link, tracker.upstream_url
+                        );
+
+                        (None, Utc::now().checked_add_signed(TimeDelta::minutes(5)))
+                    }
+                }
+            }
+        };
+    }
+
     tx.update_ap_tracker(
         tracker,
         &[
@@ -426,6 +461,9 @@ where
             ApTrackerIden::OwnerCtUserId,
             ApTrackerIden::LockSettings,
             ApTrackerIden::GlobalPingPolicy,
+            ApTrackerIden::RoomLink,
+            ApTrackerIden::LastPort,
+            ApTrackerIden::NextPortCheckAt,
         ],
     )
     .await
@@ -433,7 +471,7 @@ where
 
     tx.commit().await.unexpected()?;
 
-    Ok(StatusCode::NO_CONTENT)
+    get_tracker(State(state), Path(tracker_id)).await
 }
 
 /// Request body for [`update_hint`].

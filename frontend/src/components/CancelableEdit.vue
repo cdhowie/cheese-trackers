@@ -1,16 +1,17 @@
 <script setup>
 import { ref, watch } from 'vue';
 
-const model = defineModel();
+const props = defineProps(['modelValue', 'reset']);
+const emit = defineEmits(['update:modelValue']);
 
-const editedValue = ref(model.value);
+const editedValue = ref(props.modelValue);
 const editingValue = ref(false);
 
 watch(
-    () => model.value,
+    () => [props.modelValue, props.reset],
     () => {
         if (!editingValue.value) {
-            editedValue.value = model.value;
+            editedValue.value = props.modelValue;
         }
     }
 );
@@ -18,12 +19,12 @@ watch(
 function save() {
     if (editingValue.value) {
         editingValue.value = false;
-        model.value = editedValue.value;
+        emit('update:modelValue', editedValue.value);
     }
 }
 
 function cancel() {
-    editedValue.value = model.value;
+    editedValue.value = props.modelValue;
     editingValue.value = false;
 }
 

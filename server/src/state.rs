@@ -8,7 +8,7 @@ use std::{
 
 use arrayvec::ArrayVec;
 use axum::http::HeaderValue;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use futures::TryStreamExt;
 use jsonwebtoken::Header;
 use url::Url;
@@ -207,6 +207,9 @@ impl<D> AppState<D> {
                         owner_ct_user_id: None,
                         lock_settings: false,
                         global_ping_policy: None,
+                        room_link: "".to_owned(),
+                        last_port: None,
+                        next_port_check_at: None,
                     }])
                     .try_next()
                     .await?
@@ -492,36 +495,87 @@ impl<D> AppState<D> {
             let mut db = self.data_provider.create_data_access().await?;
             let mut tx = db.begin().await?;
 
-            if let Some(t) = tx
-                .get_tracker_by_upstream_url(url.as_str())
-                .await?
-                .filter(|t| now < t.updated_at + self.tracker_update_interval)
-            {
-                // The tracker was updated within the last
-                // tracker_update_interval, so don't update it now.
-                tx.rollback().await?;
-                return Ok(t.tracker_id);
-            }
+            let tracker = tx.get_tracker_by_upstream_url(url.as_str()).await?;
+
+            match tracker {
+                Some(t) if now < t.updated_at + self.tracker_update_interval => {
+                    // The tracker was updated within the last
+                    // tracker_update_interval, so don't update it now.
+                    tx.rollback().await?;
+                    return Ok(t.tracker_id);
+                }
+                _ => {}
+            };
 
             println!("{} - Requesting AP tracker {url}", Utc::now());
 
-            let html = self
-                .reqwest_client
-                .get(url.clone())
-                .send()
-                .await?
-                .error_for_status()
-                .map_err(|e| match e.status() {
-                    Some(reqwest::StatusCode::NOT_FOUND) => TrackerUpdateError::TrackerNotFound,
-                    _ => TrackerUpdateError::Http(e),
-                })?
-                .text()
-                .await?;
+            let sync_tracker_fut = async {
+                let html = self
+                    .reqwest_client
+                    .get(url.clone())
+                    .send()
+                    .await?
+                    .error_for_status()
+                    .map_err(|e| match e.status() {
+                        Some(reqwest::StatusCode::NOT_FOUND) => TrackerUpdateError::TrackerNotFound,
+                        _ => TrackerUpdateError::Http(e),
+                    })?
+                    .text()
+                    .await?;
 
-            let (games, hints) = parse_tracker_html(&html)?;
+                let (games, hints) = parse_tracker_html(&html)?;
 
-            let tracker_id =
-                Self::synchronize_tracker(&mut tx, now, url.as_str(), games, hints).await?;
+                Self::synchronize_tracker(&mut tx, now, url.as_str(), games, hints).await
+            };
+
+            let last_port_fut = async {
+                let tracker = match tracker {
+                    None => return Ok(None),
+                    Some(t) if t.room_link.is_empty() => return Ok(None),
+                    Some(t) => t,
+                };
+
+                if tracker.next_port_check_at.is_some_and(|d| d > Utc::now()) {
+                    return Ok(None);
+                }
+
+                self.get_last_port(&tracker.room_link, &tracker.upstream_url)
+                    .await
+                    .map(|r| Some((r, tracker)))
+            };
+
+            // If the last port check fails we can still accept the results of
+            // the data sync.  However, if the data sync fails then we cannot
+            // trust the state of the transaction and must roll it back.
+            //
+            // Therefore, we use try_join to bail early if the tracker sync
+            // fails, but this means we need to wrap errors fetching the room
+            // port number in success so that a failure there doesn't abort the
+            // tracker sync, which may yet succeed.
+            let last_port_fut = async { Ok::<_, TrackerUpdateError>(last_port_fut.await) };
+
+            let (tracker_id, last_port) = tokio::try_join!(sync_tracker_fut, last_port_fut)?;
+
+            match last_port {
+                // No update at this time.  No room link, not due for update,
+                // etc.
+                Ok(None) => {}
+
+                Err(e) => {
+                    eprintln!("During tracker refresh request, failed to fetch room info for tracker {url:?}: {e}");
+                }
+
+                Ok(Some(((port, next_check), mut tracker))) => {
+                    tracker.last_port = Some(port.into());
+                    tracker.next_port_check_at = Some(next_check);
+
+                    tx.update_ap_tracker(
+                        tracker,
+                        &[ApTrackerIden::LastPort, ApTrackerIden::NextPortCheckAt],
+                    )
+                    .await?;
+                }
+            };
 
             tx.commit().await?;
 
@@ -532,4 +586,92 @@ impl<D> AppState<D> {
             .try_get_with_by_ref(url.as_str(), fut)
             .await
     }
+
+    /// Gets the last port the room had (which may be its current port).
+    pub async fn get_last_port(
+        &self,
+        room_link: &str,
+        tracker_link: &str,
+    ) -> Result<(u16, DateTime<Utc>), GetRoomLinkError> {
+        let room_url: Url = room_link.parse()?;
+        let mut tracker_url: Url = tracker_link.parse()?;
+
+        let room_id = extract_room_id_from_room_link(&room_url, &tracker_url)
+            .ok_or(GetRoomLinkError::InvalidRoomLink)?;
+
+        println!(
+            "{} - Requesting port from room {room_url} for tracker {tracker_url}",
+            Utc::now()
+        );
+
+        // Set the tracker URL's path to the API base and clear out other stuff
+        // we don't want.  It doesn't matter whether we use the tracker or the
+        // room URL at this point (we verified they have the same protocol,
+        // host, and port) -- however, we are borrowing room_id from the room
+        // URL, so we can't mutate that.
+        tracker_url.set_path("/api/");
+        tracker_url.set_query(None);
+        tracker_url.set_fragment(None);
+
+        let client =
+            crate::ap_api::Client::new_with_client(tracker_url, self.reqwest_client.clone());
+
+        let r = client.get_room_status(room_id).await?;
+
+        // Set the next time to check either when the room times out, or 5
+        // minutes from now, whichever is later.
+        let next_check = r
+            .last_activity
+            .checked_add_signed(TimeDelta::seconds(r.timeout_sec.into()))
+            .ok_or(GetRoomLinkError::DateTimeOutOfRange)?
+            .max(
+                Utc::now()
+                    .checked_add_signed(TimeDelta::minutes(5))
+                    .ok_or(GetRoomLinkError::DateTimeOutOfRange)?,
+            );
+
+        Ok((r.last_port, next_check))
+    }
+}
+
+/// Extracts the room ID from a room link.
+///
+/// This function also verifies that the room link is valid and belongs to the
+/// same domain as the tracker link.
+fn extract_room_id_from_room_link<'a>(room_link: &'a Url, tracker_link: &Url) -> Option<&'a str> {
+    // Make sure the room URL has the same host as the tracker URL.
+    if room_link.cannot_be_a_base()
+        || tracker_link.cannot_be_a_base()
+        || room_link.scheme() != tracker_link.scheme()
+        || room_link.host_str() != tracker_link.host_str()
+        || room_link.port_or_known_default() != tracker_link.port_or_known_default()
+    {
+        return None;
+    }
+
+    // Get the room ID and verify that it's a single path component.
+    room_link
+        .path()
+        .strip_prefix("/room/")
+        .filter(|id| !id.contains('/'))
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum GetRoomLinkError {
+    #[error("unable to parse URL: {0}")]
+    UrlParse(
+        #[from]
+        #[source]
+        url::ParseError,
+    ),
+    #[error("the room link is invalid")]
+    InvalidRoomLink,
+    #[error("failed to fetch room information: {0}")]
+    ApiRequest(
+        #[from]
+        #[source]
+        reqwest::Error,
+    ),
+    #[error("a DateTime was out of range")]
+    DateTimeOutOfRange,
 }

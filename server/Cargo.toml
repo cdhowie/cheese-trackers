@@ -28,7 +28,7 @@ jsonwebtoken = "9.2.0"
 moka = { version = "0.12.5", features = ["future"] }
 oauth2 = "4.4.2"
 paste = "1.0.14"
-reqwest = "0.11.24"
+reqwest = { version = "0.11.24", features = ["json"] }
 scraper = "0.18.1"
 sea-query = { version = "0.30.7", default-features = false, features = [
     "derive",

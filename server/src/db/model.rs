@@ -256,6 +256,11 @@ db_struct! {
         pub upstream_url: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub global_ping_policy: Option<PingPreference>,
+        pub room_link: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub last_port: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub next_port_check_at: Option<DateTime<Utc>>,
     }
 }
 

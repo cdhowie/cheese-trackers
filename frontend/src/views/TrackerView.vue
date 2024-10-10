@@ -51,6 +51,17 @@ const hintsByFinder = ref(undefined);
 const hintsByReceiver = ref(undefined);
 const gameById = ref(undefined);
 
+const updateTrackerErrorCount = ref(0);
+
+const roomHost = computed(() => {
+    if (trackerData.value?.room_link?.length) {
+        try {
+            const url = new URL(trackerData.value.room_link);
+            return url.hostname;
+        } catch (e) {}
+    }
+});
+
 const layout = computed(() =>
     trackerData.value?.games?.length >= 1000 ?
         layouts.container :
@@ -498,17 +509,21 @@ async function loadTracker() {
 
     try {
         const { data } = await apiGetTracker(props.aptrackerid);
-        data.games.forEach(patchGame);
-        trackerData.value = data;
-
-        hintsByFinder.value = groupBy(trackerData.value.hints, 'finder_game_id');
-        hintsByReceiver.value = groupBy(filter(trackerData.value.hints, h => h.receiver_game_id !== undefined), 'receiver_game_id');
-        gameById.value = keyBy(trackerData.value.games, 'id');
+        handleTrackerResponse(data);
     } catch (e) {
         error.value = e;
     } finally {
         loading.value = false;
     }
+}
+
+function handleTrackerResponse(data) {
+    data.games.forEach(patchGame);
+    trackerData.value = data;
+
+    hintsByFinder.value = groupBy(trackerData.value.hints, 'finder_game_id');
+    hintsByReceiver.value = groupBy(filter(trackerData.value.hints, h => h.receiver_game_id !== undefined), 'receiver_game_id');
+    gameById.value = keyBy(trackerData.value.games, 'id');
 }
 
 function claimGame(game) {
@@ -647,19 +662,25 @@ async function updateObject(data, updater, mutator, patcher) {
             if (patcher) {
                 patcher(data);
             }
+            return saved;
         });
 }
 
 async function updateTracker(data) {
-    return updateObject(
-        Object.assign(
-            omit(trackerData.value, 'games', 'hints'),
-            data
-        ),
-        apiUpdateTracker,
-        undefined,
-        () => { Object.assign(trackerData.value, data); }
-    );
+    try {
+        const r = await updateObject(
+            Object.assign(
+                omit(trackerData.value, 'games', 'hints'),
+                data
+            ),
+            apiUpdateTracker
+        );
+
+        handleTrackerResponse(r);
+    } catch (e) {
+        updateTrackerErrorCount.value += 1;
+        console.log(e);
+    }
 }
 
 async function updateGame(game, mutator) {
@@ -716,17 +737,44 @@ loadTracker();
             You will be unable to claim slots until you either sign in with Discord or set your Discord username in the
             <router-link to="/settings">settings</router-link>.
         </div>
-        <h2 class="text-center" :class="(showTools || (trackerData?.description || '').length) ? 'mb-3' : 'mb-4'">
-            <span :class="{ 'text-muted': !trackerData.title, 'fst-italic': !trackerData.title }">{{
-                trackerData.title.length ?
-                trackerData.title : 'Untitled tracker' }}
-            </span>
-            <template v-if="trackerOwner">
-                by <UsernameDisplay :user="trackerOwner"></UsernameDisplay>
-            </template> <button class="btn btn-sm btn-outline-light" :class="{ active: showTools }" @click="showTools = !showTools">
-                <i :class="showTools ? 'bi-gear-fill' : 'bi-gear'"></i>
-            </button>
-        </h2>
+        <div  :class="(showTools || (trackerData?.description || '').length) ? 'mb-3' : 'mb-4'">
+            <h2 class="text-center">
+                <span :class="{ 'text-muted': !trackerData.title, 'fst-italic': !trackerData.title }">{{
+                    trackerData.title.length ?
+                    trackerData.title : 'Untitled tracker' }}
+                </span>
+                <template v-if="trackerOwner">
+                    by <UsernameDisplay :user="trackerOwner"></UsernameDisplay>
+                </template> <button
+                    class="btn btn-sm btn-outline-light"
+                    :class="{ active: showTools }"
+                    @click="showTools = !showTools"
+                >
+                    <i :class="showTools ? 'bi-gear-fill' : 'bi-gear'"></i>
+                </button>
+            </h2>
+            <div
+                v-if="trackerData?.room_link?.length"
+                class="text-center"
+            >
+                <a
+                    :href="trackerData.room_link"
+                    target="_blank"
+                    alt="Room"
+                    class="badge text-bg-info"
+                >
+                    <i class="bi-door-open-fill"></i>
+                </a> <span
+                    v-if="trackerData?.last_port"
+                    class="badge text-bg-info"
+                >
+                    <i class="bi-ethernet"></i> <span class="font-monospace"
+                    >
+                        {{ roomHost }}:{{ trackerData.last_port }}
+                    </span>
+                </span>
+            </div>
+        </div>
         <TrackerDescription
             v-if="!showTools && (trackerData?.description || '').length && trackerOwner"
             class="container bg-dark-subtle pt-3 pb-3 mb-4 rounded"
@@ -785,16 +833,44 @@ loadTracker();
                         <div class="col-9">
                             <CancelableEdit
                                 :modelValue="trackerData?.title || ''"
+                                :reset="updateTrackerErrorCount"
                                 @update:modelValue="(title) => updateTracker({ title })"
                                 v-slot="props"
                             >
-                                <input type="text"
+                                <input
+                                    type="text"
                                     id="trackerTitleEdit"
                                     :disabled="loading || !canEditTrackerSettings"
                                     class="form-control"
                                     :value="props.value"
-                                    @input="e => props.edited(e.target.value)"
+                                    @input="(e) => props.edited(e.target.value)"
                                     placeholder="Title"
+                                    @blur="props.save()"
+                                    @keyup.enter.prevent="props.save()"
+                                    @keyup.esc="props.cancel()"
+                                >
+                            </CancelableEdit>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-xxl-6 mb-3">
+                    <div class="row">
+                        <label class="col-form-label col-3" for="trackerRoomLinkEdit">Room link</label>
+                        <div class="col-9">
+                            <CancelableEdit
+                                :modelValue="trackerData?.room_link"
+                                :reset="updateTrackerErrorCount"
+                                @update:modelValue="(room_link) => updateTracker({ room_link })"
+                                v-slot="props"
+                            >
+                                <input
+                                    type="text"
+                                    id="trackerRoomLinkEdit"
+                                    :disabled="loading || !canEditTrackerSettings"
+                                    class="form-control"
+                                    :value="props.value"
+                                    @input="(e) => props.edited(e.target.value)"
+                                    placeholder="Room link"
                                     @blur="props.save()"
                                     @keyup.enter.prevent="props.save()"
                                     @keyup.esc="props.cancel()"
@@ -827,6 +903,7 @@ loadTracker();
                 <div class="col-12 mb-3" v-if="currentUserIsTrackerOwner">
                     <CancelableEdit
                         :modelValue="trackerData?.description || ''"
+                        :reset="updateTrackerErrorCount"
                         @update:modelValue="(d) => updateTracker({ description: d})"
                         v-slot="props"
                     >
