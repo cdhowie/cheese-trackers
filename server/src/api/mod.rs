@@ -15,6 +15,7 @@ use crate::{
     conf::Banner,
     db::{model::JsError, DataAccess, DataAccessProvider},
     logging::UnexpectedResultExt,
+    send_hack::send_stream,
     state::AppState,
 };
 
@@ -130,11 +131,11 @@ where
             .await
             .unexpected()?;
 
-        db.create_js_errors([JsError {
+        send_stream(db.create_js_errors([JsError {
             id: 0,
             ct_user_id: request.ct_user_id,
             error: request.error,
-        }])
+        }]))
         .try_for_each(|_| std::future::ready(Ok(())))
         .await
         .unexpected()

@@ -4,7 +4,9 @@
 //! This mechanism allows switching the underlying data type without any code
 //! changes, while also permitting per-backend optimizations.
 
-use futures::{future::BoxFuture, stream::BoxStream};
+use std::future::Future;
+
+use futures::Stream;
 use sqlx::migrate::MigrateError;
 
 use uuid::Uuid;
@@ -27,11 +29,13 @@ pub trait DataAccessProvider {
     type DataAccess: DataAccess + Transactable + Send;
 
     /// Apply migrations to the database.
-    fn migrate(&self) -> BoxFuture<'_, Result<(), MigrateError>>;
+    fn migrate(&self) -> impl Future<Output = Result<(), MigrateError>> + Send;
 
     /// Creates a new data access value, such as by acquiring a connection from
     /// a pool.
-    fn create_data_access(&self) -> BoxFuture<'_, Result<Self::DataAccess, sqlx::Error>>;
+    fn create_data_access(
+        &self,
+    ) -> impl Future<Output = Result<Self::DataAccess, sqlx::Error>> + Send;
 }
 
 /// Transaction creation.
@@ -41,16 +45,16 @@ pub trait Transactable {
         Self: 'a;
 
     /// Creates a new transaction.
-    fn begin(&mut self) -> BoxFuture<'_, Result<Self::Transaction<'_>, sqlx::Error>>;
+    fn begin(&mut self) -> impl Future<Output = Result<Self::Transaction<'_>, sqlx::Error>> + Send;
 }
 
 /// Database transaction.
 pub trait Transaction<'a> {
     /// Commits the transaction.
-    fn commit(self) -> BoxFuture<'a, Result<(), sqlx::Error>>;
+    fn commit(self) -> impl Future<Output = Result<(), sqlx::Error>> + Send + 'a;
 
     /// Rolls back the transaction.
-    fn rollback(self) -> BoxFuture<'a, Result<(), sqlx::Error>>;
+    fn rollback(self) -> impl Future<Output = Result<(), sqlx::Error>> + Send + 'a;
 }
 
 /// Database-agnostic data access.
@@ -59,16 +63,13 @@ pub trait DataAccess {
     fn get_tracker_by_tracker_id(
         &mut self,
         tracker_id: Uuid,
-    ) -> BoxFuture<'_, sqlx::Result<Option<ApTracker>>>;
+    ) -> impl Future<Output = sqlx::Result<Option<ApTracker>>> + Send;
 
     /// Gets an [`ApTracker`] by its upstream URL.
-    fn get_tracker_by_upstream_url<'s, 'r, 'f>(
-        &'s mut self,
-        upstream_url: &'r str,
-    ) -> BoxFuture<'f, sqlx::Result<Option<ApTracker>>>
-    where
-        's: 'f,
-        'r: 'f;
+    fn get_tracker_by_upstream_url(
+        &mut self,
+        upstream_url: &str,
+    ) -> impl Future<Output = sqlx::Result<Option<ApTracker>>> + Send;
 
     /// Creates one or more new [`ApTracker`]s in the database.
     ///
@@ -77,10 +78,10 @@ pub trait DataAccess {
     fn create_ap_trackers<'s, 'v, 'f>(
         &'s mut self,
         trackers: impl IntoIterator<Item = ApTracker> + Send + 'v,
-    ) -> BoxStream<'f, sqlx::Result<ApTracker>>
+    ) -> impl Stream<Item = sqlx::Result<ApTracker>> + Send + 'f
     where
         's: 'f,
-        'v: 's;
+        'v: 'f;
 
     /// Updates an existing [`ApTracker`].
     ///
@@ -96,29 +97,29 @@ pub trait DataAccess {
     /// contains the primary key for the table.  (Implementations may also
     /// ignore the presence of duplicates and/or the primary key, but this is
     /// not guaranteed.)
-    fn update_ap_tracker<'f, 's, 'c>(
-        &'s mut self,
+    fn update_ap_tracker(
+        &mut self,
         tracker: ApTracker,
-        columns: &'c [ApTrackerIden],
-    ) -> BoxFuture<'f, sqlx::Result<Option<ApTracker>>>
-    where
-        's: 'f,
-        'c: 'f;
+        columns: &[ApTrackerIden],
+    ) -> impl Future<Output = sqlx::Result<Option<ApTracker>>> + Send;
 
     /// Gets all of the [`ApGame`]s for a tracker by the tracker's ID.
     fn get_ap_games_by_tracker_id(
         &mut self,
         tracker_id: i32,
-    ) -> BoxStream<'_, sqlx::Result<ApGame>>;
+    ) -> impl Stream<Item = sqlx::Result<ApGame>> + Send;
 
     /// Gets all of the [`ApHint`]s for a tracker by the tracker's ID.
     fn get_ap_hints_by_tracker_id(
         &mut self,
         tracker_id: i32,
-    ) -> BoxStream<'_, sqlx::Result<ApHint>>;
+    ) -> impl Stream<Item = sqlx::Result<ApHint>> + Send;
 
     /// Gets an [`ApHint`] by its database ID.
-    fn get_ap_hint(&mut self, hint_id: i32) -> BoxFuture<'_, sqlx::Result<Option<ApHint>>>;
+    fn get_ap_hint(
+        &mut self,
+        hint_id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<ApHint>>> + Send;
 
     /// Creates one or more new [`ApGame`]s in the database.
     ///
@@ -127,13 +128,16 @@ pub trait DataAccess {
     fn create_ap_games<'s, 'v, 'f>(
         &'s mut self,
         games: impl IntoIterator<Item = ApGame> + Send + 'v,
-    ) -> BoxStream<'f, sqlx::Result<ApGame>>
+    ) -> impl Stream<Item = sqlx::Result<ApGame>> + Send + 'f
     where
         's: 'f,
         'v: 'f;
 
     /// Gets an [`ApGame`] by its database ID.
-    fn get_ap_game(&mut self, game_id: i32) -> BoxFuture<'_, sqlx::Result<Option<ApGame>>>;
+    fn get_ap_game(
+        &mut self,
+        game_id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<ApGame>>> + Send;
 
     /// Updates an existing [`ApGame`].
     ///
@@ -149,14 +153,11 @@ pub trait DataAccess {
     /// contains the primary key for the table.  (Implementations may also
     /// ignore the presence of duplicates and/or the primary key, but this is
     /// not guaranteed.)
-    fn update_ap_game<'f, 's, 'c>(
-        &'s mut self,
+    fn update_ap_game(
+        &mut self,
         game: ApGame,
-        columns: &'c [ApGameIden],
-    ) -> BoxFuture<'f, sqlx::Result<Option<ApGame>>>
-    where
-        's: 'f,
-        'c: 'f;
+        columns: &[ApGameIden],
+    ) -> impl Future<Output = sqlx::Result<Option<ApGame>>> + Send;
 
     /// Creates one or more new [`ApHint`]s in the database.
     ///
@@ -165,7 +166,7 @@ pub trait DataAccess {
     fn create_ap_hints<'s, 'v, 'f>(
         &'s mut self,
         hints: impl IntoIterator<Item = ApHint> + Send + 'v,
-    ) -> BoxStream<'f, sqlx::Result<ApHint>>
+    ) -> impl Stream<Item = sqlx::Result<ApHint>> + Send + 'f
     where
         's: 'f,
         'v: 'f;
@@ -184,28 +185,31 @@ pub trait DataAccess {
     /// contains the primary key for the table.  (Implementations may also
     /// ignore the presence of duplicates and/or the primary key, but this is
     /// not guaranteed.)
-    fn update_ap_hint<'f, 's, 'c>(
-        &'s mut self,
+    fn update_ap_hint(
+        &mut self,
         hint: ApHint,
-        columns: &'c [ApHintIden],
-    ) -> BoxFuture<'f, sqlx::Result<Option<ApHint>>>
-    where
-        's: 'f,
-        'c: 'f;
+        columns: &[ApHintIden],
+    ) -> impl Future<Output = sqlx::Result<Option<ApHint>>> + Send;
 
     /// Deletes an existing [`ApHint`] by its ID.
     ///
     /// If a hint was deleted, it is returned.
-    fn delete_ap_hint_by_id(&mut self, id: i32) -> BoxFuture<'_, sqlx::Result<Option<ApHint>>>;
+    fn delete_ap_hint_by_id(
+        &mut self,
+        id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<ApHint>>> + Send;
 
     /// Gets a [`CtUser`] by its id.
-    fn get_ct_user_by_id(&mut self, id: i32) -> BoxFuture<'_, sqlx::Result<Option<CtUser>>>;
+    fn get_ct_user_by_id(
+        &mut self,
+        id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<CtUser>>> + Send;
 
     /// Gets a [`CtUser`] by its `discord_user_id` field.
     fn get_ct_user_by_discord_user_id(
         &mut self,
         discord_user_id: i64,
-    ) -> BoxFuture<'_, sqlx::Result<Option<CtUser>>>;
+    ) -> impl Future<Output = sqlx::Result<Option<CtUser>>> + Send;
 
     /// Creates one or more new [`CtUser`]s in the database.
     ///
@@ -214,7 +218,7 @@ pub trait DataAccess {
     fn create_ct_users<'s, 'v, 'f>(
         &'s mut self,
         users: impl IntoIterator<Item = CtUser> + Send + 'v,
-    ) -> BoxStream<'f, sqlx::Result<CtUser>>
+    ) -> impl Stream<Item = sqlx::Result<CtUser>> + Send + 'f
     where
         's: 'f,
         'v: 'f;
@@ -233,14 +237,11 @@ pub trait DataAccess {
     /// contains the primary key for the table.  (Implementations may also
     /// ignore the presence of duplicates and/or the primary key, but this is
     /// not guaranteed.)
-    fn update_ct_user<'f, 's, 'c>(
-        &'s mut self,
+    fn update_ct_user(
+        &mut self,
         user: CtUser,
-        columns: &'c [CtUserIden],
-    ) -> BoxFuture<'f, sqlx::Result<Option<CtUser>>>
-    where
-        's: 'f,
-        'c: 'f;
+        columns: &[CtUserIden],
+    ) -> impl Future<Output = sqlx::Result<Option<CtUser>>> + Send;
 
     /// Creates one or more new [`JsError`]s in the database.
     ///
@@ -249,7 +250,7 @@ pub trait DataAccess {
     fn create_js_errors<'s, 'v, 'f>(
         &'s mut self,
         errors: impl IntoIterator<Item = JsError> + Send + 'v,
-    ) -> BoxStream<'f, sqlx::Result<JsError>>
+    ) -> impl Stream<Item = sqlx::Result<JsError>> + Send + 'f
     where
         's: 'f,
         'v: 'f;
@@ -258,7 +259,7 @@ pub trait DataAccess {
     fn get_dashboard_trackers(
         &mut self,
         user_id: i32,
-    ) -> BoxStream<'_, sqlx::Result<ApTrackerDashboard>>;
+    ) -> impl Stream<Item = sqlx::Result<ApTrackerDashboard>> + Send;
 }
 
 /// Build values using a closure.

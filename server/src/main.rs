@@ -22,6 +22,7 @@ mod auth;
 mod conf;
 mod db;
 mod logging;
+mod send_hack;
 mod signal;
 mod state;
 mod stream;

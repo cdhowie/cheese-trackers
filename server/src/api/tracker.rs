@@ -24,6 +24,7 @@ use crate::{
         DataAccess, DataAccessProvider, Transactable, Transaction,
     },
     logging::UnexpectedResultExt,
+    send_hack::send_future,
     state::{AppState, GetRoomLinkError, TrackerUpdateError},
 };
 
@@ -256,7 +257,7 @@ where
         .await
         .unexpected()?;
 
-    tx.rollback().await.unexpected()?;
+    send_future(tx.rollback()).await.unexpected()?;
     drop(db);
 
     Ok(Json(GetTrackerResponse {
@@ -469,7 +470,7 @@ where
     .await
     .unexpected()?;
 
-    tx.commit().await.unexpected()?;
+    send_future(tx.commit()).await.unexpected()?;
 
     get_tracker(State(state), Path(tracker_id)).await
 }
@@ -527,7 +528,7 @@ where
         .unexpected()?
         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    tx.commit().await.unexpected()?;
+    send_future(tx.commit()).await.unexpected()?;
 
     Ok(Json(hint))
 }
@@ -636,7 +637,7 @@ where
         .ok_or_else(|| format!("ApGame {game_id} did not exist on update"))
         .unexpected()?;
 
-    tx.commit().await.unexpected()?;
+    send_future(tx.commit()).await.unexpected()?;
 
     Ok(Json(game))
 }

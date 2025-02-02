@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, future::Future};
 
 use async_stream::stream;
-use futures::{future::BoxFuture, stream::BoxStream, FutureExt, Stream, StreamExt};
+use futures::Stream;
 use sea_query::{Alias, Asterisk, Expr, Func, PostgresQueryBuilder, Query, SimpleExpr};
 use sea_query_binder::SqlxBinder;
 use sqlx::{
@@ -14,22 +14,19 @@ use super::{model::*, BuildWith, DataAccess, DataAccessProvider, Transactable, T
 impl DataAccessProvider for PgPool {
     type DataAccess = PgDataAccess<PoolConnection<Postgres>>;
 
-    fn migrate(&self) -> BoxFuture<'_, Result<(), MigrateError>> {
-        async move {
-            // To avoid options in the migration scripts from interfering with
-            // subsequent usage, we acquire a connection and detach it from the
-            // pool.  This way, when we drop it, the connection is discarded
-            // instead of being returned to the pool.
-            let mut conn = self.acquire().await?.detach();
-            sqlx::migrate!("migrations/psql")
-                .run_direct(&mut conn)
-                .await
-        }
-        .boxed()
+    async fn migrate(&self) -> Result<(), MigrateError> {
+        // To avoid options in the migration scripts from interfering with
+        // subsequent usage, we acquire a connection and detach it from the
+        // pool.  This way, when we drop it, the connection is discarded instead
+        // of being returned to the pool.
+        let mut conn = self.acquire().await?.detach();
+        sqlx::migrate!("migrations/psql")
+            .run_direct(&mut conn)
+            .await
     }
 
-    fn create_data_access(&self) -> BoxFuture<'_, Result<Self::DataAccess, sqlx::Error>> {
-        Box::pin(async { self.acquire().await.map(PgDataAccess) })
+    async fn create_data_access(&self) -> Result<Self::DataAccess, sqlx::Error> {
+        self.acquire().await.map(PgDataAccess)
     }
 }
 
@@ -233,67 +230,56 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
     fn get_tracker_by_tracker_id(
         &mut self,
         tracker_id: uuid::Uuid,
-    ) -> BoxFuture<'_, sqlx::Result<Option<ApTracker>>> {
+    ) -> impl Future<Output = sqlx::Result<Option<ApTracker>>> + Send {
         pg_select_one(
             self.0.as_mut(),
             Expr::col(ApTrackerIden::TrackerId).eq(tracker_id),
         )
-        .boxed()
     }
 
-    fn get_tracker_by_upstream_url<'s, 'r, 'f>(
-        &'s mut self,
-        upstream_url: &'r str,
-    ) -> BoxFuture<'f, sqlx::Result<Option<ApTracker>>>
-    where
-        's: 'f,
-        'r: 'f,
-    {
+    fn get_tracker_by_upstream_url(
+        &mut self,
+        upstream_url: &str,
+    ) -> impl Future<Output = sqlx::Result<Option<ApTracker>>> + Send {
         pg_select_one(
             self.0.as_mut(),
             Expr::col(ApTrackerIden::UpstreamUrl).eq(upstream_url),
         )
-        .boxed()
     }
 
     fn create_ap_trackers<'s, 'v, 'f>(
         &'s mut self,
         trackers: impl IntoIterator<Item = ApTracker> + Send + 'v,
-    ) -> BoxStream<'f, sqlx::Result<ApTracker>>
+    ) -> impl Stream<Item = sqlx::Result<ApTracker>> + Send + 'f
     where
         's: 'f,
-        'v: 's,
+        'v: 'f,
     {
-        pg_insert(self.0.as_mut(), trackers).boxed()
+        pg_insert(self.0.as_mut(), trackers)
     }
 
-    fn update_ap_tracker<'f, 's, 'c>(
-        &'s mut self,
+    fn update_ap_tracker(
+        &mut self,
         tracker: ApTracker,
-        columns: &'c [ApTrackerIden],
-    ) -> BoxFuture<'f, sqlx::Result<Option<ApTracker>>>
-    where
-        's: 'f,
-        'c: 'f,
-    {
-        pg_update(self.0.as_mut(), tracker, columns).boxed()
+        columns: &[ApTrackerIden],
+    ) -> impl Future<Output = sqlx::Result<Option<ApTracker>>> + Send {
+        pg_update(self.0.as_mut(), tracker, columns)
     }
 
     fn get_ap_games_by_tracker_id(
         &mut self,
         tracker_id: i32,
-    ) -> BoxStream<'_, sqlx::Result<ApGame>> {
+    ) -> impl Stream<Item = sqlx::Result<ApGame>> + Send {
         pg_select_many(
             self.0.as_mut(),
             Expr::col(ApGameIden::TrackerId).eq(tracker_id),
         )
-        .boxed()
     }
 
     fn get_ap_hints_by_tracker_id(
         &mut self,
         tracker_id: i32,
-    ) -> BoxStream<'_, sqlx::Result<ApHint>> {
+    ) -> impl Stream<Item = sqlx::Result<ApHint>> + Send {
         let (sql, values) = Query::select()
             .column((ApHintIden::Table, Asterisk))
             .from(ApHintIden::Table)
@@ -310,120 +296,118 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
                 yield row;
             }
         }
-        .boxed()
     }
 
-    fn get_ap_hint(&mut self, hint_id: i32) -> BoxFuture<'_, sqlx::Result<Option<ApHint>>> {
-        pg_select_one(self.0.as_mut(), Expr::col(ApHintIden::Id).eq(hint_id)).boxed()
+    fn get_ap_hint(
+        &mut self,
+        hint_id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<ApHint>>> + Send {
+        pg_select_one(self.0.as_mut(), Expr::col(ApHintIden::Id).eq(hint_id))
     }
 
     fn create_ap_games<'s, 'v, 'f>(
         &'s mut self,
         games: impl IntoIterator<Item = ApGame> + Send + 'v,
-    ) -> BoxStream<'f, sqlx::Result<ApGame>>
+    ) -> impl Stream<Item = sqlx::Result<ApGame>> + Send + 'f
     where
         's: 'f,
         'v: 'f,
     {
-        pg_insert(self.0.as_mut(), games).boxed()
+        pg_insert(self.0.as_mut(), games)
     }
 
-    fn get_ap_game(&mut self, game_id: i32) -> BoxFuture<'_, sqlx::Result<Option<ApGame>>> {
-        pg_select_one(self.0.as_mut(), Expr::col(ApGameIden::Id).eq(game_id)).boxed()
+    fn get_ap_game(
+        &mut self,
+        game_id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<ApGame>>> + Send {
+        pg_select_one(self.0.as_mut(), Expr::col(ApGameIden::Id).eq(game_id))
     }
 
-    fn update_ap_game<'f, 's, 'c>(
-        &'s mut self,
+    fn update_ap_game(
+        &mut self,
         game: ApGame,
-        columns: &'c [ApGameIden],
-    ) -> BoxFuture<'f, sqlx::Result<Option<ApGame>>>
-    where
-        's: 'f,
-        'c: 'f,
-    {
-        pg_update(self.0.as_mut(), game, columns).boxed()
+        columns: &[ApGameIden],
+    ) -> impl Future<Output = sqlx::Result<Option<ApGame>>> + Send {
+        pg_update(self.0.as_mut(), game, columns)
     }
 
     fn create_ap_hints<'s, 'v, 'f>(
         &'s mut self,
         hints: impl IntoIterator<Item = ApHint> + Send + 'v,
-    ) -> BoxStream<'f, sqlx::Result<ApHint>>
+    ) -> impl Stream<Item = sqlx::Result<ApHint>> + Send + 'f
     where
         's: 'f,
         'v: 'f,
     {
-        pg_insert(self.0.as_mut(), hints).boxed()
+        pg_insert(self.0.as_mut(), hints)
     }
 
-    fn update_ap_hint<'f, 's, 'c>(
-        &'s mut self,
+    fn update_ap_hint(
+        &mut self,
         hint: ApHint,
-        columns: &'c [ApHintIden],
-    ) -> BoxFuture<'f, sqlx::Result<Option<ApHint>>>
-    where
-        's: 'f,
-        'c: 'f,
-    {
-        pg_update(self.0.as_mut(), hint, columns).boxed()
+        columns: &[ApHintIden],
+    ) -> impl Future<Output = sqlx::Result<Option<ApHint>>> + Send {
+        pg_update(self.0.as_mut(), hint, columns)
     }
 
-    fn delete_ap_hint_by_id(&mut self, id: i32) -> BoxFuture<'_, sqlx::Result<Option<ApHint>>> {
-        pg_delete(self.0.as_mut(), id).boxed()
+    fn delete_ap_hint_by_id(
+        &mut self,
+        id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<ApHint>>> + Send {
+        pg_delete(self.0.as_mut(), id)
     }
 
-    fn get_ct_user_by_id(&mut self, id: i32) -> BoxFuture<'_, sqlx::Result<Option<CtUser>>> {
-        pg_select_one(self.0.as_mut(), Expr::col(CtUserIden::Id).eq(id)).boxed()
+    fn get_ct_user_by_id(
+        &mut self,
+        id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<CtUser>>> + Send {
+        pg_select_one(self.0.as_mut(), Expr::col(CtUserIden::Id).eq(id))
     }
 
     fn get_ct_user_by_discord_user_id(
         &mut self,
         discord_user_id: i64,
-    ) -> BoxFuture<'_, sqlx::Result<Option<CtUser>>> {
+    ) -> impl Future<Output = sqlx::Result<Option<CtUser>>> + Send {
         pg_select_one(
             self.0.as_mut(),
             Expr::col(CtUserIden::DiscordUserId).eq(discord_user_id),
         )
-        .boxed()
     }
 
     fn create_ct_users<'s, 'v, 'f>(
         &'s mut self,
         users: impl IntoIterator<Item = CtUser> + Send + 'v,
-    ) -> BoxStream<'f, sqlx::Result<CtUser>>
+    ) -> impl Stream<Item = sqlx::Result<CtUser>> + Send + 'f
     where
         's: 'f,
         'v: 'f,
     {
-        pg_insert(self.0.as_mut(), users).boxed()
+        pg_insert(self.0.as_mut(), users)
     }
 
-    fn update_ct_user<'f, 's, 'c>(
-        &'s mut self,
+    fn update_ct_user(
+        &mut self,
         user: CtUser,
-        columns: &'c [CtUserIden],
-    ) -> BoxFuture<'f, sqlx::Result<Option<CtUser>>>
-    where
-        's: 'f,
-        'c: 'f,
-    {
-        pg_update(self.0.as_mut(), user, columns).boxed()
+        columns: &[CtUserIden],
+    ) -> impl Future<Output = sqlx::Result<Option<CtUser>>> + Send {
+        pg_update(self.0.as_mut(), user, columns)
     }
 
     fn create_js_errors<'s, 'v, 'f>(
         &'s mut self,
         errors: impl IntoIterator<Item = JsError> + Send + 'v,
-    ) -> BoxStream<'f, sqlx::Result<JsError>>
+    ) -> impl Stream<Item = sqlx::Result<JsError>> + Send + 'f
     where
         's: 'f,
         'v: 'f,
     {
-        pg_insert(self.0.as_mut(), errors).boxed()
+        pg_insert(self.0.as_mut(), errors)
     }
 
     fn get_dashboard_trackers(
         &mut self,
         user_id: i32,
-    ) -> BoxStream<'_, sqlx::Result<ApTrackerDashboard>> {
+    ) -> impl Stream<Item = sqlx::Result<ApTrackerDashboard>> + Send {
         let (sql, values) = Query::select()
             .column(Asterisk)
             .from_function(
@@ -437,17 +421,16 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
                 yield r;
             }
         }
-        .boxed()
     }
 }
 
 impl<'a> Transaction<'a> for PgDataAccess<sqlx::Transaction<'a, Postgres>> {
-    fn commit(self) -> BoxFuture<'a, Result<(), sqlx::Error>> {
-        self.0.commit().boxed()
+    fn commit(self) -> impl Future<Output = Result<(), sqlx::Error>> + Send + 'a {
+        self.0.commit()
     }
 
-    fn rollback(self) -> BoxFuture<'a, Result<(), sqlx::Error>> {
-        self.0.rollback().boxed()
+    fn rollback(self) -> impl Future<Output = Result<(), sqlx::Error>> + Send + 'a {
+        self.0.rollback()
     }
 }
 
@@ -456,12 +439,9 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send + 'static> Transa
 {
     type Transaction<'a> = PgDataAccess<sqlx::Transaction<'a, Postgres>>;
 
-    fn begin(&mut self) -> BoxFuture<'_, Result<Self::Transaction<'_>, sqlx::Error>> {
-        async move {
-            sqlx::Connection::begin(self.0.as_mut())
-                .await
-                .map(PgDataAccess)
-        }
-        .boxed()
+    async fn begin(&mut self) -> Result<Self::Transaction<'_>, sqlx::Error> {
+        sqlx::Connection::begin(self.0.as_mut())
+            .await
+            .map(PgDataAccess)
     }
 }

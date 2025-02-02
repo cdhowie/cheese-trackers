@@ -13,6 +13,7 @@ use crate::{
         DataAccess, DataAccessProvider, Transactable, Transaction,
     },
     logging::UnexpectedResultExt,
+    send_hack::{send_future, send_stream},
     state::AppState,
 };
 
@@ -90,22 +91,27 @@ where
 
     // Try to insert the user.  If the user already exists, we'll fetch it
     // below.
-    let r = tx
-        .create_ct_users([CtUser {
-            id: 0,
-            discord_access_token: token.access_token().secret().to_owned(),
-            discord_access_token_expires_at: expires_at,
-            discord_refresh_token: token
-                .refresh_token()
-                .ok_or(MissingRefreshTokenError)
-                .unexpected()?
-                .secret()
-                .to_owned(),
-            discord_user_id,
-            discord_username: user_info.name.clone(),
-        }])
-        .try_next()
-        .await;
+    let r = {
+        let users = send_stream(
+            tx.create_ct_users([CtUser {
+                id: 0,
+                discord_access_token: token.access_token().secret().to_owned(),
+                discord_access_token_expires_at: expires_at,
+                discord_refresh_token: token
+                    .refresh_token()
+                    .ok_or(MissingRefreshTokenError)
+                    .unexpected()?
+                    .secret()
+                    .to_owned(),
+                discord_user_id,
+                discord_username: user_info.name.clone(),
+            }]),
+        );
+
+        tokio::pin!(users);
+
+        users.try_next().await
+    };
 
     let ct_user = match r {
         Err(e)
@@ -113,7 +119,7 @@ where
                 .is_some_and(|dbe| dbe.is_unique_violation()) =>
         {
             // Restart failed transaction.
-            tx.rollback().await.unexpected()?;
+            send_future(tx.rollback()).await.unexpected()?;
             tx = db.begin().await.unexpected()?;
 
             Ok(None)
@@ -159,7 +165,7 @@ where
         }
     };
 
-    tx.commit().await.unexpected()?;
+    send_future(tx.commit()).await.unexpected()?;
 
     Ok(Json(Response {
         token: state.token_processor.encode(ct_user.id).unexpected()?,

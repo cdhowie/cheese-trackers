@@ -25,6 +25,7 @@ use crate::{
         },
         DataAccess, DataAccessProvider, Transactable, Transaction,
     },
+    send_hack::{send_future, send_stream},
     stream::try_into_grouping_map_by,
     tracker::{parse_tracker_html, Checks, Game, Hint, ParseTrackerError},
 };
@@ -196,8 +197,8 @@ impl<D> AppState<D> {
             None => {
                 let tracker_id = Uuid::new_v4();
 
-                let tracker = db
-                    .create_ap_trackers([ApTracker {
+                let tracker = {
+                    let trackers = send_stream(db.create_ap_trackers([ApTracker {
                         id: 0,
                         tracker_id,
                         upstream_url: upstream_url.to_owned(),
@@ -210,10 +211,15 @@ impl<D> AppState<D> {
                         room_link: "".to_owned(),
                         last_port: None,
                         next_port_check_at: None,
-                    }])
-                    .try_next()
-                    .await?
-                    .ok_or(TrackerUpdateError::Database(sqlx::Error::RowNotFound))?;
+                    }]));
+
+                    tokio::pin!(trackers);
+
+                    trackers
+                        .try_next()
+                        .await?
+                        .ok_or(TrackerUpdateError::Database(sqlx::Error::RowNotFound))?
+                };
 
                 // Hints only contain the game's name so we need a way to map
                 // those to the database IDs.
@@ -251,37 +257,44 @@ impl<D> AppState<D> {
 
                     game.update_completion_status();
 
-                    let game = db
-                        .create_ap_games([game])
-                        .try_next()
-                        .await?
-                        .ok_or(TrackerUpdateError::Database(sqlx::Error::RowNotFound))?;
+                    let game = {
+                        let games = send_stream(db.create_ap_games([game]));
+
+                        tokio::pin!(games);
+
+                        games
+                            .try_next()
+                            .await?
+                            .ok_or(TrackerUpdateError::Database(sqlx::Error::RowNotFound))?
+                    };
 
                     name_to_id.insert(game.name, game.id);
                 }
 
-                db.create_ap_hints(
-                    hints
-                        .into_iter()
-                        .map(|hint| {
-                            Ok::<_, TrackerUpdateError>(ApHint {
-                                id: 0,
-                                finder_game_id: *name_to_id.get(&hint.finder).ok_or_else(|| {
-                                    TrackerUpdateError::HintGameMissing(hint.finder)
-                                })?,
-                                // If the receiving game can't be found, it's most
-                                // likely an item link check, which means the receiver
-                                // would be multiple games.  We record this as null in
-                                // the database.
-                                receiver_game_id: name_to_id.get(&hint.receiver).copied(),
-                                item: hint.item,
-                                location: hint.location,
-                                entrance: hint.entrance,
-                                found: hint.found,
-                                classification: HintClassification::Unknown,
+                send_stream(
+                    db.create_ap_hints(
+                        hints
+                            .into_iter()
+                            .map(|hint| {
+                                Ok::<_, TrackerUpdateError>(ApHint {
+                                    id: 0,
+                                    finder_game_id: *name_to_id.get(&hint.finder).ok_or_else(
+                                        || TrackerUpdateError::HintGameMissing(hint.finder),
+                                    )?,
+                                    // If the receiving game can't be found, it's most
+                                    // likely an item link check, which means the receiver
+                                    // would be multiple games.  We record this as null in
+                                    // the database.
+                                    receiver_game_id: name_to_id.get(&hint.receiver).copied(),
+                                    item: hint.item,
+                                    location: hint.location,
+                                    entrance: hint.entrance,
+                                    found: hint.found,
+                                    classification: HintClassification::Unknown,
+                                })
                             })
-                        })
-                        .collect::<Result<Vec<_>, _>>()?,
+                            .collect::<Result<Vec<_>, _>>()?,
+                    ),
                 )
                 // This drives the stream to completion.
                 .try_for_each(|_| std::future::ready(Ok(())))
@@ -430,7 +443,7 @@ impl<D> AppState<D> {
                 }
 
                 if !new_hints.is_empty() {
-                    db.create_ap_hints(new_hints)
+                    send_stream(db.create_ap_hints(new_hints))
                         .try_for_each(|_| std::future::ready(Ok(())))
                         .await?;
                 }
@@ -501,7 +514,7 @@ impl<D> AppState<D> {
                 Some(t) if now < t.updated_at + self.tracker_update_interval => {
                     // The tracker was updated within the last
                     // tracker_update_interval, so don't update it now.
-                    tx.rollback().await?;
+                    send_future(tx.rollback()).await?;
                     return Ok(t.tracker_id);
                 }
                 _ => {}
@@ -577,7 +590,7 @@ impl<D> AppState<D> {
                 }
             };
 
-            tx.commit().await?;
+            send_future(tx.commit()).await?;
 
             Ok(tracker_id)
         };
