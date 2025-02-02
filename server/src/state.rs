@@ -481,10 +481,10 @@ impl<D> AppState<D> {
         // creating multiple CT trackers for the same AP tracker
         // unintentionally, so we validate the ID in the URL to make sure it's
         // entirely valid.
-        if !url
+        if url
             .path_segments()
             .and_then(|s| s.last())
-            .is_some_and(|id| UrlEncodedTrackerId::from_str(id).is_ok())
+            .is_none_or(|id| UrlEncodedTrackerId::from_str(id).is_err())
         {
             return Err(Arc::new(TrackerUrlParseError::TrackerId.into()));
         }

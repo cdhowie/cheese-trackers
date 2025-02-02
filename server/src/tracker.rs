@@ -316,7 +316,7 @@ impl<'a> TableDeserializer<'a> {
     }
 }
 
-impl<'de, 'a> Deserializer<'de> for TableDeserializer<'a> {
+impl<'de> Deserializer<'de> for TableDeserializer<'_> {
     type Error = DeError;
 
     fn deserialize_any<V>(mut self, visitor: V) -> Result<V::Value, Self::Error>
@@ -334,7 +334,7 @@ impl<'de, 'a> Deserializer<'de> for TableDeserializer<'a> {
     }
 }
 
-impl<'a, 'de> SeqAccess<'de> for TableDeserializer<'a> {
+impl<'de> SeqAccess<'de> for TableDeserializer<'_> {
     type Error = DeError;
 
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>

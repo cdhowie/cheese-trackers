@@ -52,7 +52,7 @@ async fn set_asset_cache_headers(
     let cacheable = response
         .headers()
         .get(header::CONTENT_TYPE)
-        .map_or(false, |v| v == "application/javascript" || v == "text/css");
+        .is_some_and(|v| v == "application/javascript" || v == "text/css");
 
     response.headers_mut().insert(
         header::CACHE_CONTROL,
