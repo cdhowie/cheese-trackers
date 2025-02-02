@@ -1,12 +1,11 @@
 //! Authentication tokens.
 
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, convert::Infallible, sync::Arc};
 
 use axum::{
-    extract::FromRequestParts,
+    extract::{FromRequestParts, OptionalFromRequestParts},
     http::{header::AUTHORIZATION, StatusCode},
 };
-use futures::{future::BoxFuture, FutureExt};
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
@@ -106,36 +105,45 @@ where
 {
     type Rejection = StatusCode;
 
-    fn from_request_parts<'p, 's, 'f>(
-        parts: &'p mut axum::http::request::Parts,
-        state: &'s Arc<AppState<D>>,
-    ) -> BoxFuture<'f, Result<Self, Self::Rejection>>
-    where
-        'p: 'f,
-        's: 'f,
-        Self: 'f,
-    {
-        async move {
-            let token = parts
-                .headers
-                .get(AUTHORIZATION)
-                .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.strip_prefix("Bearer "))
-                .and_then(|v| state.token_processor.decode(v).ok())
-                .ok_or(StatusCode::UNAUTHORIZED)?;
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &Arc<AppState<D>>,
+    ) -> Result<Self, Self::Rejection> {
+        let token = parts
+            .headers
+            .get(AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Bearer "))
+            .and_then(|v| state.token_processor.decode(v).ok())
+            .ok_or(StatusCode::UNAUTHORIZED)?;
 
-            let user = state
-                .data_provider
-                .create_data_access()
-                .await
-                .unexpected()?
-                .get_ct_user_by_id(token.sub)
-                .await
-                .unexpected()?
-                .ok_or(StatusCode::UNAUTHORIZED)?;
+        let user = state
+            .data_provider
+            .create_data_access()
+            .await
+            .unexpected()?
+            .get_ct_user_by_id(token.sub)
+            .await
+            .unexpected()?
+            .ok_or(StatusCode::UNAUTHORIZED)?;
 
-            Ok(Self(user))
+        Ok(Self(user))
+    }
+}
+
+impl<D> OptionalFromRequestParts<Arc<AppState<D>>> for AuthenticatedUser
+where
+    D: DataAccessProvider + Send + Sync,
+{
+    type Rejection = Infallible;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &Arc<AppState<D>>,
+    ) -> Result<Option<Self>, Self::Rejection> {
+        match <Self as FromRequestParts<_>>::from_request_parts(parts, state).await {
+            Ok(v) => Ok(Some(v)),
+            Err(_) => Ok(None),
         }
-        .boxed()
     }
 }

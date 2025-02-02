@@ -131,7 +131,7 @@ impl Serialize for UrlEncodedTrackerId {
     }
 }
 
-/// `GET /tracker/:tracker_id`: Get tracker.
+/// `GET /tracker/{tracker_id}`: Get tracker.
 pub async fn get_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
     Path(tracker_id): Path<UrlEncodedTrackerId>,
@@ -344,7 +344,7 @@ pub struct UpdateTrackerRequest {
     pub room_link: String,
 }
 
-/// `PUT /tracker/:tracker_id`: Update tracker.
+/// `PUT /tracker/{tracker_id}`: Update tracker.
 pub async fn update_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
     Path(tracker_id): Path<UrlEncodedTrackerId>,
@@ -480,7 +480,7 @@ pub struct UpdateHintRequest {
     pub classification: HintClassification,
 }
 
-/// `PUT /tracker/:tracker_id/hint/:hint_id`: Update hint.
+/// `PUT /tracker/{tracker_id}/hint/{hint_id}`: Update hint.
 pub async fn update_hint<D>(
     State(state): State<Arc<AppState<D>>>,
     Path((tracker_id, hint_id)): Path<(UrlEncodedTrackerId, i32)>,
@@ -545,7 +545,7 @@ pub struct UpdateGameRequest {
     pub notes: String,
 }
 
-/// `PUT /tracker/:tracker_id/game/:game_id`: Update game.
+/// `PUT /tracker/{tracker_id}/game/{game_id}`: Update game.
 pub async fn update_game<D>(
     State(state): State<Arc<AppState<D>>>,
     user: Option<AuthenticatedUser>,

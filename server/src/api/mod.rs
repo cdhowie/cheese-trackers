@@ -34,14 +34,14 @@ where
         .route("/auth/complete", post(auth::complete_discord_auth))
         .route("/dashboard/tracker", get(dashboard::get_dashboard_trackers))
         .route("/tracker", post(tracker::create_tracker))
-        .route("/tracker/:tracker_id", get(tracker::get_tracker))
-        .route("/tracker/:tracker_id", put(tracker::update_tracker))
+        .route("/tracker/{tracker_id}", get(tracker::get_tracker))
+        .route("/tracker/{tracker_id}", put(tracker::update_tracker))
         .route(
-            "/tracker/:tracker_id/game/:game_id",
+            "/tracker/{tracker_id}/game/{game_id}",
             put(tracker::update_game),
         )
         .route(
-            "/tracker/:tracker_id/hint/:hint_id",
+            "/tracker/{tracker_id}/hint/{hint_id}",
             put(tracker::update_hint),
         )
         .route("/settings", get(get_settings))
