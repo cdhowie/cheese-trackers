@@ -181,12 +181,18 @@ const gameFilter = ref(undefined);
 
 const showLastActivity = ref(false);
 
-// TODO: Make these configurable by the room owner.
-const lastCheckedThresholds = [
-    { days: 2, color: 'danger' },
-    { days: 1, color: 'warning' },
-    { color: 'success' }
-];
+const lastCheckedThresholds = computed(() => {
+    const td = trackerData.value;
+    if (!td) {
+        return [];
+    }
+
+    return [
+        { days: td.inactivity_threshold_red_hours / 24, color: 'danger' },
+        { days: td.inactivity_threshold_yellow_hours / 24, color: 'warning' },
+        { color: 'success' },
+    ];
+});
 
 function getLastCheckedOrLastActivity(game) {
     return reduce(
@@ -239,7 +245,7 @@ function lastCheckedClass(game) {
         return 'text-danger';
     }
 
-    for (const t of lastCheckedThresholds) {
+    for (const t of lastCheckedThresholds.value) {
         if (t.days === undefined || sinceDays >= t.days) {
             return `text-${t.color}`;
         }
@@ -884,6 +890,63 @@ loadTracker();
                                     @keyup.esc="props.cancel()"
                                 >
                             </CancelableEdit>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-xxl-6 mb-3">
+                    <div class="row">
+                        <label class="col-form-label col-3">Inactivity thresholds</label>
+                        <div class="col-9">
+                            <div class="row">
+                                <div class="col-6">
+                                    <CancelableEdit
+                                        :modelValue="trackerData?.inactivity_threshold_yellow_hours"
+                                        :reset="updateTrackerErrorCount"
+                                        @update:modelValue="(h) => updateTracker({ inactivity_threshold_yellow_hours: +h })"
+                                        v-slot="props"
+                                    >
+                                        <div class="input-group">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                :disabled="loading || !canEditTrackerSettings"
+                                                class="form-control"
+                                                :value="props.value"
+                                                @input="(e) => props.edited(e.target.value)"
+                                                @change="(e) => { props.edited(e.target.value); e.target.focus(); }"
+                                                @blur="props.save()"
+                                                @keyup.enter.prevent="props.save()"
+                                                @keyup.esc="props.cancel()"
+                                            >
+                                            <span class="input-group-text text-warning">hours</span>
+                                        </div>
+                                    </CancelableEdit>
+                                </div>
+                                <div class="col-6">
+                                    <CancelableEdit
+                                        :modelValue="trackerData?.inactivity_threshold_red_hours"
+                                        :reset="updateTrackerErrorCount"
+                                        @update:modelValue="(h) => updateTracker({ inactivity_threshold_red_hours: +h })"
+                                        v-slot="props"
+                                    >
+                                        <div class="input-group">
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                :disabled="loading || !canEditTrackerSettings"
+                                                class="form-control"
+                                                :value="props.value"
+                                                @input="(e) => props.edited(e.target.value)"
+                                                @change="(e) => { props.edited(e.target.value); e.target.focus(); }"
+                                                @blur="props.save()"
+                                                @keyup.enter.prevent="props.save()"
+                                                @keyup.esc="props.cancel()"
+                                            >
+                                            <span class="input-group-text text-danger">hours</span>
+                                        </div>
+                                    </CancelableEdit>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

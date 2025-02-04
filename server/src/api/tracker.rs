@@ -157,6 +157,8 @@ where
         pub room_link: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub last_port: Option<i32>,
+        pub inactivity_threshold_yellow_hours: i32,
+        pub inactivity_threshold_red_hours: i32,
     }
 
     impl From<ApTracker> for Tracker {
@@ -173,6 +175,8 @@ where
                 global_ping_policy: value.global_ping_policy,
                 room_link: value.room_link,
                 last_port: value.last_port,
+                inactivity_threshold_yellow_hours: value.inactivity_threshold_yellow_hours,
+                inactivity_threshold_red_hours: value.inactivity_threshold_red_hours,
             }
         }
     }
@@ -343,6 +347,8 @@ pub struct UpdateTrackerRequest {
     pub lock_settings: bool,
     pub global_ping_policy: Option<PingPreference>,
     pub room_link: String,
+    pub inactivity_threshold_yellow_hours: i32,
+    pub inactivity_threshold_red_hours: i32,
 }
 
 /// `PUT /tracker/{tracker_id}`: Update tracker.
@@ -355,6 +361,14 @@ pub async fn update_tracker<D>(
 where
     D: DataAccessProvider + Send + Sync + 'static,
 {
+    if tracker_update.inactivity_threshold_yellow_hours < 0
+        || tracker_update.inactivity_threshold_red_hours < 0
+        || tracker_update.inactivity_threshold_yellow_hours
+            > tracker_update.inactivity_threshold_red_hours
+    {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
     let mut db = state
         .data_provider
         .create_data_access()
@@ -424,6 +438,8 @@ where
 
     tracker.title = tracker_update.title;
     tracker.global_ping_policy = tracker_update.global_ping_policy;
+    tracker.inactivity_threshold_yellow_hours = tracker_update.inactivity_threshold_yellow_hours;
+    tracker.inactivity_threshold_red_hours = tracker_update.inactivity_threshold_red_hours;
 
     if tracker.room_link != tracker_update.room_link {
         tracker.room_link = tracker_update.room_link;
@@ -465,6 +481,8 @@ where
             ApTrackerIden::RoomLink,
             ApTrackerIden::LastPort,
             ApTrackerIden::NextPortCheckAt,
+            ApTrackerIden::InactivityThresholdYellowHours,
+            ApTrackerIden::InactivityThresholdRedHours,
         ],
     )
     .await

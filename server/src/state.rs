@@ -211,6 +211,8 @@ impl<D> AppState<D> {
                         room_link: "".to_owned(),
                         last_port: None,
                         next_port_check_at: None,
+                        inactivity_threshold_yellow_hours: 24,
+                        inactivity_threshold_red_hours: 48,
                     }]));
 
                     tokio::pin!(trackers);

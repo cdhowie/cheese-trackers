@@ -261,6 +261,8 @@ db_struct! {
         pub last_port: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub next_port_check_at: Option<DateTime<Utc>>,
+        pub inactivity_threshold_yellow_hours: i32,
+        pub inactivity_threshold_red_hours: i32,
     }
 }
 
