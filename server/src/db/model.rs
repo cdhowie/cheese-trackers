@@ -263,6 +263,7 @@ db_struct! {
         pub next_port_check_at: Option<DateTime<Utc>>,
         pub inactivity_threshold_yellow_hours: i32,
         pub inactivity_threshold_red_hours: i32,
+        pub require_authentication_to_claim: bool,
     }
 }
 

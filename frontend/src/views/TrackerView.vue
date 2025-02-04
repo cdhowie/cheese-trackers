@@ -107,6 +107,13 @@ const canEditTrackerSettings = computed(() =>
     currentUserIsTrackerOwner.value || !trackerData.value.lock_settings
 );
 
+const canClaimGames = computed(() =>
+    currentUser.value && (
+        !trackerData.value?.require_authentication_to_claim ||
+        currentUser.value.id !== undefined
+    )
+);
+
 function claimTracker() {
     updateTracker({
         owner_ct_user_id: currentUser.value.id,
@@ -123,6 +130,7 @@ function disclaimTracker() {
         owner_ct_user_id: undefined,
         owner_discord_username: undefined,
         lock_settings: false,
+        require_authentication_to_claim: false,
     });
 }
 
@@ -692,6 +700,7 @@ async function updateTracker(data) {
     } catch (e) {
         updateTrackerErrorCount.value += 1;
         console.log(e);
+        throw e;
     }
 }
 
@@ -971,6 +980,28 @@ loadTracker();
                         </div>
                     </div>
                 </div>
+                <div class="col-12 col-xxl-6 mb-3" v-if="trackerData.lock_settings">
+                    <div class="row">
+                        <label class="col-form-label col-6" for="trackerRequireAuthCheck">Require authentication to claim</label>
+                        <div class="col-6">
+                            <div class="form-control-plaintext form-check form-switch">
+                                <input
+                                    :disabled="loading || !currentUserIsTrackerOwner"
+                                    class="form-check-input"
+                                    type="checkbox"
+                                    role="switch"
+                                    id="trackerRequireAuthCheck"
+                                    :checked="trackerData.require_authentication_to_claim"
+                                    @change="
+                                        updateTracker({ require_authentication_to_claim: !trackerData.require_authentication_to_claim }).catch(() => {
+                                            $event.target.checked = trackerData.require_authentication_to_claim;
+                                        });
+                                    "
+                                >
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="col-12 mb-3" v-if="currentUserIsTrackerOwner">
                     <CancelableEdit
                         :modelValue="trackerData?.description || ''"
@@ -1220,10 +1251,10 @@ loadTracker();
                     </template>
                     <template #claim>
                         <template v-if="currentUser">
-                            <button v-if="!game.effective_discord_username" class="btn btn-sm btn-outline-secondary"
+                            <button v-if="canClaimGames && !game.effective_discord_username" class="btn btn-sm btn-outline-secondary"
                                 :disabled="loading" @click="claimGame(game)">Claim</button>
 
-                            <template v-if="game.effective_discord_username && !isEqual(getClaimingUser(game), currentUser)">
+                            <template v-else-if="canClaimGames && game.effective_discord_username && !isEqual(getClaimingUser(game), currentUser)">
                                 <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
                                     data-bs-toggle="dropdown">Claim</button>
                                 <div class="dropdown-menu text-warning p-3">
@@ -1235,7 +1266,7 @@ loadTracker();
                                 </div>
                             </template>
 
-                            <button v-if="isEqual(getClaimingUser(game), currentUser)"
+                            <button v-else-if="isEqual(getClaimingUser(game), currentUser)"
                                 class="btn btn-sm btn-outline-warning" :disabled="loading"
                                 @click="unclaimGame(game)">Disclaim</button>
                         </template>

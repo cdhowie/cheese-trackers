@@ -213,6 +213,7 @@ impl<D> AppState<D> {
                         next_port_check_at: None,
                         inactivity_threshold_yellow_hours: 24,
                         inactivity_threshold_red_hours: 48,
+                        require_authentication_to_claim: false,
                     }]));
 
                     tokio::pin!(trackers);

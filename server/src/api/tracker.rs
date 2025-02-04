@@ -159,6 +159,7 @@ where
         pub last_port: Option<i32>,
         pub inactivity_threshold_yellow_hours: i32,
         pub inactivity_threshold_red_hours: i32,
+        pub require_authentication_to_claim: bool,
     }
 
     impl From<ApTracker> for Tracker {
@@ -177,6 +178,7 @@ where
                 last_port: value.last_port,
                 inactivity_threshold_yellow_hours: value.inactivity_threshold_yellow_hours,
                 inactivity_threshold_red_hours: value.inactivity_threshold_red_hours,
+                require_authentication_to_claim: value.require_authentication_to_claim,
             }
         }
     }
@@ -349,6 +351,7 @@ pub struct UpdateTrackerRequest {
     pub room_link: String,
     pub inactivity_threshold_yellow_hours: i32,
     pub inactivity_threshold_red_hours: i32,
+    pub require_authentication_to_claim: bool,
 }
 
 /// `PUT /tracker/{tracker_id}`: Update tracker.
@@ -416,6 +419,17 @@ where
         (Some(uid), Some(u), _) if uid == u.0.id => {
             tracker.lock_settings = tracker_update.lock_settings;
             tracker.description = tracker_update.description;
+
+            // Some settings are not useful if settings aren't locked.
+            if !tracker_update.lock_settings
+                && (!tracker.require_authentication_to_claim
+                    && tracker_update.require_authentication_to_claim)
+            {
+                return Err(StatusCode::FORBIDDEN);
+            }
+
+            tracker.require_authentication_to_claim =
+                tracker_update.lock_settings && tracker_update.require_authentication_to_claim;
         }
 
         // The current user is not the owner and settings are locked.  They
@@ -423,16 +437,19 @@ where
         (Some(_), _, true) => return Err(StatusCode::FORBIDDEN),
 
         // There is no current owner or the current user is not the owner but
-        // settings are unlocked.  In both cases, they can change anything
-        // except the description, and whether settings are locked.
+        // settings are unlocked.  In both cases, they can change almost
+        // anything.  Some settings do not make sense to change when settings
+        // aren't locked.
         (None, _, _) | (_, _, false) => {
-            if tracker_update.lock_settings || tracker_update.description != tracker.description {
-                // Locking settings makes no sense without an owner, since
-                // anyone could unlock them.
+            if tracker_update.lock_settings
+                || tracker_update.description != tracker.description
+                || tracker_update.require_authentication_to_claim
+            {
                 return Err(StatusCode::FORBIDDEN);
             }
 
             tracker.lock_settings = false;
+            tracker.require_authentication_to_claim = false;
         }
     };
 
@@ -483,6 +500,7 @@ where
             ApTrackerIden::NextPortCheckAt,
             ApTrackerIden::InactivityThresholdYellowHours,
             ApTrackerIden::InactivityThresholdRedHours,
+            ApTrackerIden::RequireAuthenticationToClaim,
         ],
     )
     .await
@@ -620,7 +638,18 @@ where
         // can be set to NULL.
         Some(_) => None,
         // Otherwise, take the unauthenticated username from the update.
-        None => game_update.discord_username,
+        None => {
+            // But don't allow a new unauthenticated claim if the tracker
+            // disallows it.
+            if game_update.discord_username != game.discord_username
+                && tracker.require_authentication_to_claim
+                && game_update.discord_username.is_some()
+            {
+                return Err(StatusCode::FORBIDDEN);
+            }
+
+            game_update.discord_username
+        }
     };
 
     game.claimed_by_ct_user_id = game_update.claimed_by_ct_user_id;
