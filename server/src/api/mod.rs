@@ -22,6 +22,7 @@ use crate::{
 pub mod auth;
 pub mod dashboard;
 pub mod tracker;
+pub mod user;
 
 /// Creates a new API router with the provided state.
 pub fn create_router<D>(state: Arc<AppState<D>>) -> axum::Router<()>
@@ -45,6 +46,9 @@ where
             "/tracker/{tracker_id}/hint/{hint_id}",
             put(tracker::update_hint),
         )
+        .route("/user/self/api_key", get(user::get_api_key))
+        .route("/user/self/api_key", post(user::reset_api_key))
+        .route("/user/self/api_key", delete(user::clear_api_key))
         .route("/settings", get(get_settings))
         .route("/jserror", post(create_js_error))
         // Since UI settings are in a header added by middleware, this no-op

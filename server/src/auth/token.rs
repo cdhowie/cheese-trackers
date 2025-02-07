@@ -91,13 +91,24 @@ pub struct TokenPayload<'a> {
     pub iss: Cow<'a, str>,
 }
 
-/// Extracts a [`CtUser`] from a request, authenticated by a bearer token.
+/// Extracts a [`CtUser`] from a request, authenticated by a session token or an
+/// API key.
 ///
-/// Extraction will fail if a token was not provided, the token is invalid, the
-/// user ID encoded in the token is not present in the database, or a database
-/// error occurs.
+/// Extraction will fail if a token or key was not provided, the token or key is
+/// invalid, the user ID encoded in the token is not present in the database, or
+/// a database error occurs.
 #[derive(Debug, Clone)]
-pub struct AuthenticatedUser(pub CtUser);
+pub struct AuthenticatedUser {
+    pub user: CtUser,
+    pub source: AuthenticationSource,
+}
+
+/// Identifies the source of a user's authentication.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthenticationSource {
+    SessionToken,
+    ApiKey,
+}
 
 impl<D> FromRequestParts<Arc<AppState<D>>> for AuthenticatedUser
 where
@@ -109,25 +120,54 @@ where
         parts: &mut axum::http::request::Parts,
         state: &Arc<AppState<D>>,
     ) -> Result<Self, Self::Rejection> {
-        let token = parts
+        let bearer_token = parts
             .headers
             .get(AUTHORIZATION)
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.strip_prefix("Bearer "))
-            .and_then(|v| state.token_processor.decode(v).ok())
             .ok_or(StatusCode::UNAUTHORIZED)?;
 
-        let user = state
-            .data_provider
-            .create_data_access()
-            .await
-            .unexpected()?
-            .get_ct_user_by_id(token.sub)
-            .await
-            .unexpected()?
-            .ok_or(StatusCode::UNAUTHORIZED)?;
+        match bearer_token.parse() {
+            Ok(key) => {
+                let user = state
+                    .data_provider
+                    .create_data_access()
+                    .await
+                    .unexpected()?
+                    .get_ct_user_by_api_key(key)
+                    .await
+                    .ok()
+                    .flatten()
+                    .ok_or(StatusCode::UNAUTHORIZED)?;
 
-        Ok(Self(user))
+                Ok(Self {
+                    user,
+                    source: AuthenticationSource::ApiKey,
+                })
+            }
+
+            Err(_) => {
+                let token = state
+                    .token_processor
+                    .decode(bearer_token)
+                    .map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+                let user = state
+                    .data_provider
+                    .create_data_access()
+                    .await
+                    .unexpected()?
+                    .get_ct_user_by_id(token.sub)
+                    .await
+                    .unexpected()?
+                    .ok_or(StatusCode::UNAUTHORIZED)?;
+
+                Ok(Self {
+                    user,
+                    source: AuthenticationSource::SessionToken,
+                })
+            }
+        }
     }
 }
 
@@ -144,6 +184,37 @@ where
         match <Self as FromRequestParts<_>>::from_request_parts(parts, state).await {
             Ok(v) => Ok(Some(v)),
             Err(_) => Ok(None),
+        }
+    }
+}
+
+/// Extracts a [`CtUser`] from a request, authenticated by a session token.
+///
+/// Extraction will fail if a token was not provided, the token is invalid, the
+/// user ID encoded in the token is not present in the database, or a database
+/// error occurs.
+///
+/// Note this extractor specifically excludes API keys.
+#[derive(Debug, Clone)]
+pub struct TokenAuthenticatedUser(pub CtUser);
+
+impl<S> FromRequestParts<S> for TokenAuthenticatedUser
+where
+    AuthenticatedUser: FromRequestParts<S, Rejection = StatusCode>,
+    S: Sync,
+{
+    type Rejection = StatusCode;
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let user =
+            <AuthenticatedUser as FromRequestParts<S>>::from_request_parts(parts, state).await?;
+
+        match user.source {
+            AuthenticationSource::SessionToken => Ok(Self(user.user)),
+            AuthenticationSource::ApiKey => Err(StatusCode::FORBIDDEN),
         }
     }
 }

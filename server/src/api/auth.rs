@@ -105,6 +105,7 @@ where
                     .to_owned(),
                 discord_user_id,
                 discord_username: user_info.name.clone(),
+                api_key: None,
             }]),
         );
 

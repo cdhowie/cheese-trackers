@@ -374,6 +374,13 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         )
     }
 
+    fn get_ct_user_by_api_key(
+        &mut self,
+        api_key: uuid::Uuid,
+    ) -> impl Future<Output = sqlx::Result<Option<CtUser>>> + Send {
+        pg_select_one(self.0.as_mut(), Expr::col(CtUserIden::ApiKey).eq(api_key))
+    }
+
     fn create_ct_users<'s, 'v, 'f>(
         &'s mut self,
         users: impl IntoIterator<Item = CtUser> + Send + 'v,

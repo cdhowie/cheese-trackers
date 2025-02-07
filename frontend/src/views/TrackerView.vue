@@ -9,6 +9,7 @@ import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker, updateHint as apiUpdateHint } from '@/api';
 import { progressionStatus, completionStatus, availabilityStatus, pingPreference, pingPolicy, hintClassification, unifiedGameStatus, getClaimingUserForGame as getClaimingUser } from '@/types';
 import { percent, synchronize } from '@/util';
+import { copy as clipboardCopy } from '@/clipboard';
 
 import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
@@ -627,8 +628,6 @@ function updateNotes(game) {
     }
 }
 
-const showCopiedToast = ref(false);
-
 function hintToString(hint) {
     const receiver = gameById.value[hint.receiver_game_id]?.name || '(Item link)';
     const finder = gameById.value[hint.finder_game_id].name;
@@ -638,13 +637,6 @@ function hintToString(hint) {
 
 function copyHints(hints) {
     clipboardCopy(join(map(hints, hintToString), '\n'))
-}
-
-function clipboardCopy(text) {
-    navigator.clipboard.writeText(text);
-
-    showCopiedToast.value = true;
-    setTimeout(() => { showCopiedToast.value = false; }, 3000);
 }
 
 function hintToStringWithPing(hint) {
@@ -1456,13 +1448,6 @@ loadTracker();
         <div class="text-center">Last updated from Archipelago at {{ displayDateTime(trackerData.updated_at) }}
         </div>
     </template>
-    <div class="toast-container position-fixed bottom-0 end-0 p-3">
-        <div class="toast text-bg-success" :class="{ show: showCopiedToast }">
-            <div class="toast-body">
-                Copied to the clipboard.
-            </div>
-        </div>
-    </div>
 </template>
 
 <style scoped>

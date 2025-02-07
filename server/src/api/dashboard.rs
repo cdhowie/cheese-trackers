@@ -57,7 +57,7 @@ where
         .unexpected()?;
 
     Ok(Json(
-        db.get_dashboard_trackers(user.0.id)
+        db.get_dashboard_trackers(user.user.id)
             .map_ok(Into::into)
             .try_collect::<Vec<DashboardTracker>>()
             .await

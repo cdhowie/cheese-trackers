@@ -108,3 +108,15 @@ export async function createJsError(data) {
         data,
     });
 }
+
+export async function getApiKey() {
+    return api_http.get('user/self/api_key');
+}
+
+export async function newApiKey() {
+    return api_http.post('user/self/api_key');
+}
+
+export async function deleteApiKey() {
+    return api_http.delete('user/self/api_key');
+}

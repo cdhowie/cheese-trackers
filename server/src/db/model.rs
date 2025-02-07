@@ -363,6 +363,7 @@ db_struct! {
         pub discord_refresh_token: String,
         pub discord_username: String,
         pub discord_user_id: i64,
+        pub api_key: Option<Uuid>,
     }
 }
 

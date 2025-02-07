@@ -4,6 +4,7 @@ import { RouterLink, RouterView, useRoute } from 'vue-router';
 import { authBegin, ping, uiSettings as serverSettings } from '@/api.js';
 import { BUILD_VERSION } from './build';
 import * as settings from '@/settings';
+import { showCopiedToast } from './clipboard';
 import { filter, includes } from 'lodash-es';
 
 const route = useRoute();
@@ -112,6 +113,14 @@ function dismissBanner(id) {
         <div class="toast text-bg-info" :class="{ show: newVersionAvailable }">
             <div class="toast-body">
                 A new build is available. Please refresh the page to load the new version.
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container position-fixed bottom-0 end-0 p-3">
+        <div class="toast text-bg-success" :class="{ show: showCopiedToast }">
+            <div class="toast-body">
+                Copied to the clipboard.
             </div>
         </div>
     </div>

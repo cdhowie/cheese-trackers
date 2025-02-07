@@ -211,6 +211,12 @@ pub trait DataAccess {
         discord_user_id: i64,
     ) -> impl Future<Output = sqlx::Result<Option<CtUser>>> + Send;
 
+    /// Gets a [`CtUser`] by its `api_key` field.
+    fn get_ct_user_by_api_key(
+        &mut self,
+        api_key: Uuid,
+    ) -> impl Future<Output = sqlx::Result<Option<CtUser>>> + Send;
+
     /// Creates one or more new [`CtUser`]s in the database.
     ///
     /// The `id` field of the value is ignored.  It will be populated with the

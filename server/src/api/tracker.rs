@@ -407,7 +407,7 @@ where
         // user ID must match the authenticated user.
         tracker.owner_ct_user_id = match (tracker.owner_ct_user_id, tracker_update.owner_ct_user_id)
         {
-            (None, Some(uid)) | (Some(uid), None) if uid == user.0.id => {
+            (None, Some(uid)) | (Some(uid), None) if uid == user.user.id => {
                 tracker_update.owner_ct_user_id
             }
             _ => return Err(StatusCode::FORBIDDEN),
@@ -416,7 +416,7 @@ where
 
     match (tracker.owner_ct_user_id, user, tracker.lock_settings) {
         // The current user is the owner.  They can change all settings.
-        (Some(uid), Some(u), _) if uid == u.0.id => {
+        (Some(uid), Some(u), _) if uid == u.user.id => {
             tracker.lock_settings = tracker_update.lock_settings;
             tracker.description = tracker_update.description;
 
@@ -621,7 +621,7 @@ where
     if game_update.claimed_by_ct_user_id != game.claimed_by_ct_user_id
         && game_update
             .claimed_by_ct_user_id
-            .is_some_and(|id| user.as_ref().map_or(true, |u| u.0.id != id))
+            .is_some_and(|id| user.as_ref().map_or(true, |u| u.user.id != id))
     {
         return Err(match user {
             // A user is trying to claim on behalf of another user.
