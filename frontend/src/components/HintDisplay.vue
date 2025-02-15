@@ -16,6 +16,7 @@ const props = defineProps([
     'hint',
     'direction',
     'receiverGame',
+    'itemLinkName',
     'finderGame',
     'disabled',
     'status',
@@ -73,7 +74,9 @@ const canPing = computed(() => {
                 <span v-if="props.receiverGame" class="text-info">
                     <SlotDisplay :game="props.receiverGame" :global-ping-policy="props.globalPingPolicy"/>
                 </span>
-                <span v-else class="text-primary">(Item link)</span>'s
+                <span v-else class="text-primary" title="Item link">
+                    <i class="bi-link-45deg"/> {{ props.itemLinkName !== '' ? props.itemLinkName : '(Item link)' }}
+                </span>'s
             </template>
             <span class="text-info p-0">{{ props.hint.item }}</span>
             <span class="ps-1">

@@ -279,6 +279,13 @@ impl<D> AppState<D> {
                         hints
                             .into_iter()
                             .map(|hint| {
+                                let receiver_game_id = name_to_id.get(&hint.receiver).copied();
+
+                                let item_link_name = match receiver_game_id {
+                                    Some(_) => String::new(),
+                                    None => hint.receiver,
+                                };
+
                                 Ok::<_, TrackerUpdateError>(ApHint {
                                     id: 0,
                                     finder_game_id: *name_to_id.get(&hint.finder).ok_or_else(
@@ -288,7 +295,8 @@ impl<D> AppState<D> {
                                     // likely an item link check, which means the receiver
                                     // would be multiple games.  We record this as null in
                                     // the database.
-                                    receiver_game_id: name_to_id.get(&hint.receiver).copied(),
+                                    receiver_game_id,
+                                    item_link_name,
                                     item: hint.item,
                                     location: hint.location,
                                     entrance: hint.entrance,
@@ -390,6 +398,7 @@ impl<D> AppState<D> {
                         (
                             hint.finder_game_id,
                             hint.receiver_game_id,
+                            hint.item_link_name.clone(),
                             hint.item.clone(),
                             hint.location.clone(),
                             hint.entrance.clone(),
@@ -412,10 +421,16 @@ impl<D> AppState<D> {
 
                     let receiver = name_to_id.get(&tracker_hint.receiver).copied();
 
+                    let item_link_name = match receiver {
+                        Some(_) => String::new(),
+                        None => tracker_hint.receiver,
+                    };
+
                     match existing_hints
                         .get_mut(&(
                             finder,
                             receiver,
+                            item_link_name.clone(),
                             tracker_hint.item.clone(),
                             tracker_hint.location.clone(),
                             tracker_hint.entrance.clone(),
@@ -435,6 +450,7 @@ impl<D> AppState<D> {
                                 id: 0,
                                 finder_game_id: finder,
                                 receiver_game_id: receiver,
+                                item_link_name,
                                 item: tracker_hint.item,
                                 location: tracker_hint.location,
                                 entrance: tracker_hint.entrance,

@@ -351,6 +351,7 @@ db_struct! {
         pub entrance: String,
         pub found: bool,
         pub classification: HintClassification,
+        pub item_link_name: String,
     }
 }
 

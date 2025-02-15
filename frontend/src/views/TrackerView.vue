@@ -629,7 +629,9 @@ function updateNotes(game) {
 }
 
 function hintToString(hint) {
-    const receiver = gameById.value[hint.receiver_game_id]?.name || '(Item link)';
+    const receiver = gameById.value[hint.receiver_game_id]?.name || (
+        hint.item_link_name !== '' ? `[LINK] ${hint.item_link_name}` : '(Item link)'
+    );
     const finder = gameById.value[hint.finder_game_id].name;
     const entrance = hint.entrance === 'Vanilla' ? '' : ` (${hint.entrance})`;
     return `${receiver}'s ${hint.item} is at ${finder}'s ${hint.location}${entrance}`;
@@ -1353,6 +1355,7 @@ loadTracker();
                                                     :direction="sentHints ? 'sent' : 'received'"
                                                     :receiver-game="gameById[hint.receiver_game_id]"
                                                     :finder-game="gameById[hint.finder_game_id]"
+                                                    :item-link-name="hint.item_link_name"
                                                     :global-ping-policy="trackerData.global_ping_policy && pingPolicy.byId[trackerData.global_ping_policy]"
                                                     :disabled="loading"
                                                     @set-classification="s => setHintClassification(hint, s)"
