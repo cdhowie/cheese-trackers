@@ -266,6 +266,26 @@ pub trait DataAccess {
         &mut self,
         user_id: i32,
     ) -> impl Stream<Item = sqlx::Result<ApTrackerDashboard>> + Send;
+
+    /// Get a dashboard override.
+    fn get_ap_tracker_dashboard_override(
+        &mut self,
+        ct_user_id: i32,
+        ap_tracker_id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<ApTrackerDashboardOverride>>> + Send;
+
+    /// Set a dashboard override.
+    fn upsert_ap_tracker_dashboard_override(
+        &mut self,
+        dashboard_override: ApTrackerDashboardOverride,
+    ) -> impl Future<Output = sqlx::Result<()>> + Send;
+
+    /// Delete a dashboard override.
+    fn delete_ap_tracker_dashboard_override(
+        &mut self,
+        ct_user_id: i32,
+        ap_tracker_id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<ApTrackerDashboardOverride>>> + Send;
 }
 
 /// Build values using a closure.

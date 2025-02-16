@@ -18,8 +18,9 @@ use crate::{
     auth::token::AuthenticatedUser,
     db::{
         model::{
-            ApGame, ApGameIden, ApHint, ApHintIden, ApTracker, ApTrackerIden, AvailabilityStatus,
-            CompletionStatus, HintClassification, PingPreference, ProgressionStatus,
+            ApGame, ApGameIden, ApHint, ApHintIden, ApTracker, ApTrackerDashboardOverride,
+            ApTrackerIden, AvailabilityStatus, CompletionStatus, HintClassification,
+            PingPreference, ProgressionStatus,
         },
         DataAccess, DataAccessProvider, Transactable, Transaction,
     },
@@ -136,6 +137,7 @@ impl Serialize for UrlEncodedTrackerId {
 pub async fn get_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
     Path(tracker_id): Path<UrlEncodedTrackerId>,
+    user: Option<AuthenticatedUser>,
 ) -> Result<impl IntoResponse, StatusCode>
 where
     D: DataAccessProvider + Send + Sync + 'static,
@@ -191,6 +193,8 @@ where
         pub owner_discord_username: Option<String>,
         pub games: Vec<ApGame>,
         pub hints: Vec<ApHint>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub dashboard_override_visibility: Option<bool>,
     }
 
     let upstream_url = state
@@ -263,6 +267,15 @@ where
         .await
         .unexpected()?;
 
+    let dashboard_override_visibility = match user {
+        None => None,
+        Some(u) => tx
+            .get_ap_tracker_dashboard_override(u.user.id, tracker.id)
+            .await
+            .unexpected()?
+            .map(|o| o.visibility),
+    };
+
     send_future(tx.rollback()).await.unexpected()?;
     drop(db);
 
@@ -271,6 +284,7 @@ where
         owner_discord_username,
         games,
         hints,
+        dashboard_override_visibility,
     }))
 }
 
@@ -414,7 +428,7 @@ where
         };
     }
 
-    match (tracker.owner_ct_user_id, user, tracker.lock_settings) {
+    match (tracker.owner_ct_user_id, &user, tracker.lock_settings) {
         // The current user is the owner.  They can change all settings.
         (Some(uid), Some(u), _) if uid == u.user.id => {
             tracker.lock_settings = tracker_update.lock_settings;
@@ -508,7 +522,7 @@ where
 
     send_future(tx.commit()).await.unexpected()?;
 
-    get_tracker(State(state), Path(tracker_id)).await
+    get_tracker(State(state), Path(tracker_id), user).await
 }
 
 /// Request body for [`update_hint`].
@@ -687,4 +701,95 @@ where
     send_future(tx.commit()).await.unexpected()?;
 
     Ok(Json(game))
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct DashboardOverrideStatus {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub visibility: Option<bool>,
+}
+
+/// `GET /tracker/{tracker_id}/dashboard_override`: Get dashboard override
+/// status.
+pub async fn get_tracker_dashboard_override<D>(
+    State(state): State<Arc<AppState<D>>>,
+    Path(tracker_id): Path<UrlEncodedTrackerId>,
+    user: AuthenticatedUser,
+) -> Result<impl IntoResponse, StatusCode>
+where
+    D: DataAccessProvider + Send + Sync + 'static,
+{
+    let mut db = state
+        .data_provider
+        .create_data_access()
+        .await
+        .unexpected()?;
+
+    let mut tx = db.begin().await.unexpected()?;
+
+    let tracker = tx
+        .get_tracker_by_tracker_id(tracker_id.into())
+        .await
+        .unexpected()?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let r = tx
+        .get_ap_tracker_dashboard_override(user.user.id, tracker.id)
+        .await
+        .unexpected()?;
+
+    send_future(tx.commit()).await.unexpected()?;
+
+    Ok(Json(DashboardOverrideStatus {
+        visibility: r.map(|o| o.visibility),
+    }))
+}
+
+/// `PUT /tracker/{tracker_id}/dashboard_override`: Set dashboard override
+/// status.
+pub async fn put_tracker_dashboard_override<D>(
+    State(state): State<Arc<AppState<D>>>,
+    Path(tracker_id): Path<UrlEncodedTrackerId>,
+    user: AuthenticatedUser,
+    Json(status): Json<DashboardOverrideStatus>,
+) -> Result<impl IntoResponse, StatusCode>
+where
+    D: DataAccessProvider + Send + Sync + 'static,
+{
+    let mut db = state
+        .data_provider
+        .create_data_access()
+        .await
+        .unexpected()?;
+
+    let mut tx = db.begin().await.unexpected()?;
+
+    let tracker = tx
+        .get_tracker_by_tracker_id(tracker_id.into())
+        .await
+        .unexpected()?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    match status.visibility {
+        Some(v) => {
+            tx.upsert_ap_tracker_dashboard_override(ApTrackerDashboardOverride {
+                ct_user_id: user.user.id,
+                ap_tracker_id: tracker.id,
+                visibility: v,
+            })
+            .await
+            .unexpected()?;
+        }
+
+        None => {
+            tx.delete_ap_tracker_dashboard_override(user.user.id, tracker.id)
+                .await
+                .unexpected()?;
+        }
+    };
+
+    send_future(tx.commit()).await.unexpected()?;
+
+    Ok(Json(status))
 }

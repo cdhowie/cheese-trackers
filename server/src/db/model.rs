@@ -282,7 +282,10 @@ db_struct! {
         pub owner_ct_user_id: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub owner_discord_username: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub last_activity: Option<DateTime<Utc>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub dashboard_override_visibility: Option<bool>,
     }
 }
 
@@ -387,4 +390,14 @@ db_struct! {
         pub ct_user_id: Option<i32>,
         pub error: String,
     }
+}
+
+// No db_struct! because this has a composite primary key.  Need to refactor
+// that macro into a proper proc macro with composite primary key support.
+#[sea_query::enum_def]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
+pub struct ApTrackerDashboardOverride {
+    pub ct_user_id: i32,
+    pub ap_tracker_id: i32,
+    pub visibility: bool,
 }

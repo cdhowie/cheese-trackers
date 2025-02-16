@@ -2,7 +2,7 @@ use std::{collections::HashMap, future::Future};
 
 use async_stream::stream;
 use futures::Stream;
-use sea_query::{Alias, Asterisk, Expr, Func, PostgresQueryBuilder, Query, SimpleExpr};
+use sea_query::{Alias, Asterisk, Expr, Func, OnConflict, PostgresQueryBuilder, Query, SimpleExpr};
 use sea_query_binder::SqlxBinder;
 use sqlx::{
     migrate::MigrateError, pool::PoolConnection, postgres::PgRow, FromRow, PgConnection, PgPool,
@@ -428,6 +428,80 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
                 yield r;
             }
         }
+    }
+
+    async fn get_ap_tracker_dashboard_override(
+        &mut self,
+        ct_user_id: i32,
+        ap_tracker_id: i32,
+    ) -> sqlx::Result<Option<ApTrackerDashboardOverride>> {
+        let (sql, values) = Query::select()
+            .column(Asterisk)
+            .from(ApTrackerDashboardOverrideIden::Table)
+            .and_where(
+                Expr::col(ApTrackerDashboardOverrideIden::CtUserId)
+                    .eq(ct_user_id)
+                    .and(Expr::col(ApTrackerDashboardOverrideIden::ApTrackerId).eq(ap_tracker_id)),
+            )
+            .build_sqlx(PostgresQueryBuilder);
+
+        sqlx::query_as_with(&sql, values)
+            .fetch_optional(self.0.as_mut())
+            .await
+    }
+
+    async fn upsert_ap_tracker_dashboard_override(
+        &mut self,
+        dashboard_override: ApTrackerDashboardOverride,
+    ) -> sqlx::Result<()> {
+        let (sql, values) = Query::insert()
+            .into_table(ApTrackerDashboardOverrideIden::Table)
+            .columns([
+                ApTrackerDashboardOverrideIden::CtUserId,
+                ApTrackerDashboardOverrideIden::ApTrackerId,
+                ApTrackerDashboardOverrideIden::Visibility,
+            ])
+            .values([
+                dashboard_override.ct_user_id.into(),
+                dashboard_override.ap_tracker_id.into(),
+                dashboard_override.visibility.into(),
+            ])
+            .unwrap()
+            .on_conflict(
+                OnConflict::columns([
+                    ApTrackerDashboardOverrideIden::CtUserId,
+                    ApTrackerDashboardOverrideIden::ApTrackerId,
+                ])
+                .build_with(|c| {
+                    c.update_column(ApTrackerDashboardOverrideIden::Visibility);
+                }),
+            )
+            .build_sqlx(PostgresQueryBuilder);
+
+        sqlx::query_with(&sql, values)
+            .execute(self.0.as_mut())
+            .await
+            .map(|_| ())
+    }
+
+    async fn delete_ap_tracker_dashboard_override(
+        &mut self,
+        ct_user_id: i32,
+        ap_tracker_id: i32,
+    ) -> sqlx::Result<Option<ApTrackerDashboardOverride>> {
+        let (sql, values) = Query::delete()
+            .from_table(ApTrackerDashboardOverrideIden::Table)
+            .and_where(
+                Expr::col(ApTrackerDashboardOverrideIden::CtUserId)
+                    .eq(ct_user_id)
+                    .and(Expr::col(ApTrackerDashboardOverrideIden::ApTrackerId).eq(ap_tracker_id)),
+            )
+            .returning_all()
+            .build_sqlx(PostgresQueryBuilder);
+
+        sqlx::query_as_with(&sql, values)
+            .fetch_optional(self.0.as_mut())
+            .await
     }
 }
 

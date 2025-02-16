@@ -127,8 +127,13 @@ watch(
                     <td>
                         <RouterLink :to="`/tracker/${tracker.tracker_id}`">
                             {{ tracker.title || 'Untitled tracker' }}
-                        </RouterLink>
-                        <template v-if="tracker.owner_discord_username">
+                        </RouterLink> <i
+                            v-if="tracker.dashboard_override_visibility"
+                            class="bi-eye-fill"
+                            title="Followed"
+                        /> <template
+                            v-if="tracker.owner_discord_username"
+                        >
                             by {{ tracker.owner_discord_username }}
                         </template>
                     </td>

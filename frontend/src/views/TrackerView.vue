@@ -6,8 +6,8 @@ import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includ
 import moment from 'moment';
 import { settings, currentUser } from '@/settings';
 import { now } from '@/time';
-import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker, updateHint as apiUpdateHint } from '@/api';
-import { progressionStatus, completionStatus, availabilityStatus, pingPreference, pingPolicy, hintClassification, unifiedGameStatus, getClaimingUserForGame as getClaimingUser } from '@/types';
+import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker, updateHint as apiUpdateHint, setDashboardOverrideStatus as apiSetDashboardOverrideStatus } from '@/api';
+import { progressionStatus, completionStatus, availabilityStatus, pingPreference, pingPolicy, hintClassification, unifiedGameStatus, getClaimingUserForGame as getClaimingUser, dashboardOverrideVisibilities } from '@/types';
 import { percent, synchronize } from '@/util';
 import { copy as clipboardCopy } from '@/clipboard';
 
@@ -715,6 +715,21 @@ async function updateHint(hint, mutator) {
     );
 }
 
+function setDashboardOverrideStatus(status) {
+    setTimeout(() => {
+        updateObject(
+            {},
+            () => apiSetDashboardOverrideStatus(props.aptrackerid, status),
+            undefined,
+            (r) => {
+                if (r) {
+                    trackerData.value.dashboard_override_visibility = r.visibility;
+                }
+            }
+        );
+    });
+}
+
 loadTracker();
 </script>
 
@@ -752,7 +767,7 @@ loadTracker();
             You will be unable to claim slots until you either sign in with Discord or set your Discord username in the
             <router-link to="/settings">settings</router-link>.
         </div>
-        <div  :class="(showTools || (trackerData?.description || '').length) ? 'mb-3' : 'mb-4'">
+        <div :class="(showTools || (trackerData?.description || '').length) ? 'mb-3' : 'mb-4'">
             <h2 class="text-center">
                 <span :class="{ 'text-muted': !trackerData.title, 'fst-italic': !trackerData.title }">{{
                     trackerData.title.length ?
@@ -765,8 +780,15 @@ loadTracker();
                     :class="{ active: showTools }"
                     @click="showTools = !showTools"
                 >
-                    <i :class="showTools ? 'bi-gear-fill' : 'bi-gear'"></i>
-                </button>
+                    <i :class="showTools ? 'bi-gear-fill' : 'bi-gear'"/>
+                </button> <DropdownSelector
+                    v-if="currentUser?.id !== undefined"
+                    :options="dashboardOverrideVisibilities"
+                    :value="dashboardOverrideVisibilities.byId[trackerData.dashboard_override_visibility]"
+                    :disabled="loading"
+                    :icons="true"
+                    @selected="(s) => setDashboardOverrideStatus(s.id)"
+                />
             </h2>
             <div
                 v-if="trackerData?.room_link?.length"

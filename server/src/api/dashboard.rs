@@ -34,7 +34,10 @@ where
         pub owner_ct_user_id: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub owner_discord_username: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub last_activity: Option<DateTime<Utc>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub dashboard_override_visibility: Option<bool>,
     }
 
     impl From<ApTrackerDashboard> for DashboardTracker {
@@ -46,6 +49,7 @@ where
                 owner_ct_user_id: value.owner_ct_user_id,
                 owner_discord_username: value.owner_discord_username,
                 last_activity: value.last_activity,
+                dashboard_override_visibility: value.dashboard_override_visibility,
             }
         }
     }

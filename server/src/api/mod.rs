@@ -46,6 +46,14 @@ where
             "/tracker/{tracker_id}/hint/{hint_id}",
             put(tracker::update_hint),
         )
+        .route(
+            "/tracker/{tracker_id}/dashboard_override",
+            get(tracker::get_tracker_dashboard_override),
+        )
+        .route(
+            "/tracker/{tracker_id}/dashboard_override",
+            put(tracker::put_tracker_dashboard_override),
+        )
         .route("/user/self/api_key", get(user::get_api_key))
         .route("/user/self/api_key", post(user::reset_api_key))
         .route("/user/self/api_key", delete(user::clear_api_key))

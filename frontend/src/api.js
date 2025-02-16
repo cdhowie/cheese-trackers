@@ -85,6 +85,14 @@ export async function updateTracker(tracker) {
     });
 }
 
+export async function setDashboardOverrideStatus(tracker_id, visibility) {
+    return api_http.request({
+        method: 'put',
+        url: `tracker/${tracker_id}/dashboard_override`,
+        data: { visibility }
+    });
+}
+
 export async function ping() {
     return api_http.get('ping');
 }

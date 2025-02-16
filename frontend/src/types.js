@@ -52,6 +52,12 @@ export const pingPolicy = keyed([
     { id: 'never', label: 'Never', color: 'danger', pingWhen: 'never' },
 ]);
 
+export const dashboardOverrideVisibilities = keyed([
+    { id: undefined, label: 'Auto', color: 'light', icon: 'asterisk' },
+    { id: true, label: 'Follow', color: 'light', icon: 'eye-fill' },
+    { id: false, label: 'Ignore', color: 'light', icon: 'eye-slash-fill' },
+]);
+
 // A few views show a unified game status which is a combination of the
 // completion status and progression status.  If the completion status is
 // incomplete, then we use the progression status only if it's a BK type.
