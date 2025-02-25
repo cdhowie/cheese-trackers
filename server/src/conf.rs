@@ -6,7 +6,7 @@ use base64::prelude::*;
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305};
 use config::ConfigError;
 use jsonwebtoken::Algorithm;
-use serde::{de::Error, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de::Error};
 use url::Url;
 
 /// The top-level service configuration.

@@ -3,12 +3,12 @@
 use std::{fmt::Display, str::FromStr, sync::Arc};
 
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
     response::IntoResponse,
-    Json,
 };
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, TimeDelta, Utc};
 use futures::TryStreamExt;
 use serde::{Deserialize, Serialize};
@@ -17,12 +17,12 @@ use uuid::Uuid;
 use crate::{
     auth::token::AuthenticatedUser,
     db::{
+        DataAccess, DataAccessProvider, Transactable, Transaction,
         model::{
             ApGame, ApGameIden, ApHint, ApHintIden, ApTracker, ApTrackerDashboardOverride,
             ApTrackerIden, AvailabilityStatus, CompletionStatus, HintClassification,
             PingPreference, ProgressionStatus,
         },
-        DataAccess, DataAccessProvider, Transactable, Transaction,
     },
     logging::UnexpectedResultExt,
     send_hack::send_future,
@@ -635,7 +635,7 @@ where
     if game_update.claimed_by_ct_user_id != game.claimed_by_ct_user_id
         && game_update
             .claimed_by_ct_user_id
-            .is_some_and(|id| user.as_ref().map_or(true, |u| u.user.id != id))
+            .is_some_and(|id| user.as_ref().is_none_or(|u| u.user.id != id))
     {
         return Err(match user {
             // A user is trying to claim on behalf of another user.

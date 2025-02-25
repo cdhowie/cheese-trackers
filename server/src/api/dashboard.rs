@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::{DateTime, Utc};
 use futures::TryStreamExt;
 use serde::Serialize;
@@ -10,7 +10,7 @@ use serde::Serialize;
 use crate::{
     api::tracker::UrlEncodedTrackerId,
     auth::token::AuthenticatedUser,
-    db::{model::ApTrackerDashboard, DataAccess, DataAccessProvider},
+    db::{DataAccess, DataAccessProvider, model::ApTrackerDashboard},
     logging::UnexpectedResultExt,
     state::AppState,
 };

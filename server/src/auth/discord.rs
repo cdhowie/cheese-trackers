@@ -2,14 +2,14 @@
 
 use base64::prelude::*;
 use chacha20poly1305::{
-    aead::{Aead, Nonce, OsRng, Payload},
     AeadCore, XChaCha20Poly1305,
+    aead::{Aead, Nonce, OsRng, Payload},
 };
 use oauth2::{
-    basic::{BasicClient, BasicTokenResponse},
-    reqwest::async_http_client,
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge,
     PkceCodeVerifier, RedirectUrl, Scope, TokenUrl,
+    basic::{BasicClient, BasicTokenResponse},
+    reqwest::async_http_client,
 };
 use url::Url;
 
@@ -78,7 +78,8 @@ impl AuthClient {
         code: String,
         csrf_token: &str,
         continuation_token: &str,
-    ) -> Result<BasicTokenResponse, CompleteAuthenticationError<impl std::error::Error>> {
+    ) -> Result<BasicTokenResponse, CompleteAuthenticationError<impl std::error::Error + use<>>>
+    {
         let verifier = decrypt_continuation_token(
             continuation_token,
             csrf_token,

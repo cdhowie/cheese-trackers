@@ -5,11 +5,11 @@ use futures::Stream;
 use sea_query::{Alias, Asterisk, Expr, Func, OnConflict, PostgresQueryBuilder, Query, SimpleExpr};
 use sea_query_binder::SqlxBinder;
 use sqlx::{
-    migrate::MigrateError, pool::PoolConnection, postgres::PgRow, FromRow, PgConnection, PgPool,
-    Postgres,
+    FromRow, PgConnection, PgPool, Postgres, migrate::MigrateError, pool::PoolConnection,
+    postgres::PgRow,
 };
 
-use super::{model::*, BuildWith, DataAccess, DataAccessProvider, Transactable, Transaction};
+use super::{BuildWith, DataAccess, DataAccessProvider, Transactable, Transaction, model::*};
 
 impl DataAccessProvider for PgPool {
     type DataAccess = PgDataAccess<PoolConnection<Postgres>>;

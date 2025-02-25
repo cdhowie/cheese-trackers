@@ -15,19 +15,19 @@ use url::Url;
 use uuid::Uuid;
 
 use crate::{
-    api::{tracker::UrlEncodedTrackerId, UiSettings},
+    api::{UiSettings, tracker::UrlEncodedTrackerId},
     auth::{discord::AuthClient, token::TokenProcessor},
     conf::Config,
     db::{
+        DataAccess, DataAccessProvider, Transactable, Transaction,
         model::{
             ApGame, ApGameIden, ApHint, ApHintIden, ApTracker, ApTrackerIden, AvailabilityStatus,
             CompletionStatus, HintClassification, PingPreference, ProgressionStatus,
         },
-        DataAccess, DataAccessProvider, Transactable, Transaction,
     },
     send_hack::{send_future, send_stream},
     stream::try_into_grouping_map_by,
-    tracker::{parse_tracker_html, Checks, Game, Hint, ParseTrackerError},
+    tracker::{Checks, Game, Hint, ParseTrackerError, parse_tracker_html},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -594,7 +594,9 @@ impl<D> AppState<D> {
                 Ok(None) => {}
 
                 Err(e) => {
-                    eprintln!("During tracker refresh request, failed to fetch room info for tracker {url:?}: {e}");
+                    eprintln!(
+                        "During tracker refresh request, failed to fetch room info for tracker {url:?}: {e}"
+                    );
                 }
 
                 Ok(Some(((port, next_check), mut tracker))) => {

@@ -1,11 +1,11 @@
 use std::sync::Arc;
 
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use uuid::Uuid;
 
 use crate::{
     auth::token::TokenAuthenticatedUser,
-    db::{model::CtUserIden, DataAccess, DataAccessProvider},
+    db::{DataAccess, DataAccessProvider, model::CtUserIden},
     logging::UnexpectedResultExt,
     state::AppState,
 };

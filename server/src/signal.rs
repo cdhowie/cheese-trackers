@@ -2,7 +2,7 @@
 
 use std::future::Future;
 
-use futures::{stream::FuturesUnordered, StreamExt};
+use futures::{StreamExt, stream::FuturesUnordered};
 use tokio::signal::unix::SignalKind;
 
 /// Waits for any of the provided signals to be received by the process.

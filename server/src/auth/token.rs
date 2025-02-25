@@ -4,13 +4,13 @@ use std::{borrow::Cow, convert::Infallible, sync::Arc};
 
 use axum::{
     extract::{FromRequestParts, OptionalFromRequestParts},
-    http::{header::AUTHORIZATION, StatusCode},
+    http::{StatusCode, header::AUTHORIZATION},
 };
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    db::{model::CtUser, DataAccess, DataAccessProvider},
+    db::{DataAccess, DataAccessProvider, model::CtUser},
     logging::UnexpectedResultExt,
     state::AppState,
 };

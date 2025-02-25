@@ -2,15 +2,15 @@
 
 use std::sync::Arc;
 
-use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::Utc;
 use futures::TryStreamExt;
 use oauth2::TokenResponse;
 
 use crate::{
     db::{
-        model::{CtUser, CtUserIden},
         DataAccess, DataAccessProvider, Transactable, Transaction,
+        model::{CtUser, CtUserIden},
     },
     logging::UnexpectedResultExt,
     send_hack::{send_future, send_stream},

@@ -3,17 +3,17 @@
 use std::{future::ready, sync::Arc};
 
 use axum::{
+    Json,
     extract::{Request, State},
-    http::{header, HeaderValue, StatusCode},
+    http::{HeaderValue, StatusCode, header},
     middleware,
     response::IntoResponse,
-    Json,
 };
 use futures::TryStreamExt;
 
 use crate::{
     conf::Banner,
-    db::{model::JsError, DataAccess, DataAccessProvider},
+    db::{DataAccess, DataAccessProvider, model::JsError},
     logging::UnexpectedResultExt,
     send_hack::send_stream,
     state::AppState,

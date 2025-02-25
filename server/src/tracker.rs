@@ -1,13 +1,14 @@
 //! Tracker response parsing.
 use std::{fmt::Display, iter::Fuse, str::FromStr, sync::OnceLock};
 
-use scraper::{element_ref::Select, ElementRef, Html, Selector};
+use scraper::{ElementRef, Html, Selector, element_ref::Select};
 use serde::{
+    Deserialize, Deserializer,
     de::{
-        value::{Error as DeError, MapDeserializer},
         DeserializeOwned, Error, Expected, SeqAccess,
+        value::{Error as DeError, MapDeserializer},
     },
-    forward_to_deserialize_any, Deserialize, Deserializer,
+    forward_to_deserialize_any,
 };
 
 use crate::db::model::TrackerGameStatus;
@@ -124,7 +125,7 @@ fn de_status<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TrackerGameSt
         s => {
             return Err(D::Error::custom(format!(
                 "could not parse tracker game status {s:?}",
-            )))
+            )));
         }
     })
 }
