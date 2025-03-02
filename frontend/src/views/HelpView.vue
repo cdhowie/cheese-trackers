@@ -342,7 +342,7 @@ import YesNo from '@/components/ShouldPing.vue';
                     <td><yes-no value="yes"></yes-no></td>
                 </tr>
                 <tr>
-                    <td class="fw-bold text-muted align-middle">Released</td>
+                    <td class="fw-bold text-muted align-middle">Forfeit</td>
                     <td colspan="2">
                         The owner of this slot has abandoned it and released the
                         items it held because the owner does not think they can
@@ -356,7 +356,7 @@ import YesNo from '@/components/ShouldPing.vue';
             </tbody>
         </table>
         <p>
-            If a slot is not currently marked "released," then its status will
+            If a slot is not currently marked "forfeit," then its status will
             be automatically changed to "all checks," "goal," or "done" when the
             Archipelago tracker indicates that the slot meets the relevant
             criteria.
@@ -368,7 +368,7 @@ import YesNo from '@/components/ShouldPing.vue';
             accessibilty set to "minimal" during generation, for example), which
             can be set to "done" when there is no more possible progression even
             though not all checks have been obtained. You can also always select
-            "released" -- this status supersedes all others.
+            "forfeit" -- this status supersedes all others.
         </p>
         <p>
             In particular, note that if the automatic status would be "all
@@ -537,7 +537,7 @@ import YesNo from '@/components/ShouldPing.vue';
         <p>
             <i>
                 Note that all information in the report excludes slots marked
-                "released."
+                "forfeit."
             </i>
             These slots are considered to be removed from the multiworld, so
             their checks do not count for or against progression.
