@@ -52,6 +52,15 @@ import YesNo from '@/components/ShouldPing.vue';
                 in the browser tab and/or title bar.
             </li>
             <li>
+                <b>Room link</b>: The server room link.  If this is provided,
+                the room's connection information will be displayed at the top
+                of the tracker along with a button linking to the room page.
+            </li>
+            <li>
+                <b>Inactivity thresholds</b>: The threshold in hours before a
+                slot's "last activity" value is shown in yellow or red.
+            </li>
+            <li>
                 <b>Ping policy</b>: Sets the ping policy for the tracker.  If
                 set to "none" then participants can set their own ping
                 preference per slot.  Otherwise, the effective ping preference
@@ -60,6 +69,10 @@ import YesNo from '@/components/ShouldPing.vue';
                 description of each policy.  "Custom" specifies that the async
                 has some other ping policy, which should be described in the
                 tracker description.
+            </li>
+            <li>
+                <b>Require authentication to claim</b>: If turned on, users must
+                be authenticated by Discord to claim slots.
             </li>
             <li>
                 <p>
@@ -281,7 +294,7 @@ import YesNo from '@/components/ShouldPing.vue';
             <li>
                 <span class="fw-bold text-light">Unblocked</span>: This slot has
                 available in-logic progression, or out-of-logic progression that
-                the player is not currently pursuing.
+                the player is currently pursuing.
             </li>
             <li>
                 <span class="fw-bold text-danger">BK</span>: This slot has no
