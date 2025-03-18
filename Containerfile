@@ -1,6 +1,6 @@
 ARG GIT_COMMIT
 
-FROM docker.io/rust:1.85.0-alpine3.20 AS serverbuilder
+FROM docker.io/rust:1.85.0-alpine3.21 AS serverbuilder
 
 RUN apk add --no-cache musl-dev openssl-dev
 
@@ -27,7 +27,7 @@ ENV VITE_GIT_COMMIT=$GIT_COMMIT
 
 RUN test -n "$VITE_GIT_COMMIT" && npm run build
 
-FROM docker.io/alpine:3.20
+FROM docker.io/alpine:3.21
 
 RUN apk add --no-cache ca-certificates libssl3 libgcc
 
