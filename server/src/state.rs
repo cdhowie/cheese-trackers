@@ -276,42 +276,39 @@ impl<D> AppState<D> {
                     name_to_id.insert(game.name, game.id);
                 }
 
-                send_stream(
-                    db.create_ap_hints(
-                        hints
-                            .into_iter()
-                            .map(|hint| {
-                                let receiver_game_id = name_to_id.get(&hint.receiver).copied();
+                // Creating too many hints at once can run into database limits
+                // on the number of parameters.  Unfortunately, create hints one
+                // at a time to get around this.
+                for hint in hints {
+                    let receiver_game_id = name_to_id.get(&hint.receiver).copied();
 
-                                let item_link_name = match receiver_game_id {
-                                    Some(_) => String::new(),
-                                    None => hint.receiver,
-                                };
+                    let item_link_name = match receiver_game_id {
+                        Some(_) => String::new(),
+                        None => hint.receiver,
+                    };
 
-                                Ok::<_, TrackerUpdateError>(ApHint {
-                                    id: 0,
-                                    finder_game_id: *name_to_id.get(&hint.finder).ok_or_else(
-                                        || TrackerUpdateError::HintGameMissing(hint.finder),
-                                    )?,
-                                    // If the receiving game can't be found, it's most
-                                    // likely an item link check, which means the receiver
-                                    // would be multiple games.  We record this as null in
-                                    // the database.
-                                    receiver_game_id,
-                                    item_link_name,
-                                    item: hint.item,
-                                    location: hint.location,
-                                    entrance: hint.entrance,
-                                    found: hint.found,
-                                    classification: HintClassification::Unknown,
-                                })
-                            })
-                            .collect::<Result<Vec<_>, _>>()?,
-                    ),
-                )
-                // This drives the stream to completion.
-                .try_for_each(|_| std::future::ready(Ok(())))
-                .await?;
+                    let ap_hint = ApHint {
+                        id: 0,
+                        finder_game_id: *name_to_id
+                            .get(&hint.finder)
+                            .ok_or_else(|| TrackerUpdateError::HintGameMissing(hint.finder))?,
+                        // If the receiving game can't be found, it's most
+                        // likely an item link check, which means the receiver
+                        // would be multiple games.  We record this as null in
+                        // the database.
+                        receiver_game_id,
+                        item_link_name,
+                        item: hint.item,
+                        location: hint.location,
+                        entrance: hint.entrance,
+                        found: hint.found,
+                        classification: HintClassification::Unknown,
+                    };
+
+                    send_stream(db.create_ap_hints([ap_hint]))
+                        .try_for_each(|_| std::future::ready(Ok(())))
+                        .await?;
+                }
 
                 Ok(tracker_id)
             }
@@ -463,8 +460,10 @@ impl<D> AppState<D> {
                     }
                 }
 
-                if !new_hints.is_empty() {
-                    send_stream(db.create_ap_hints(new_hints))
+                // Like when creating, we have to create these separately in
+                // case there are too many for one statement.
+                for hint in new_hints {
+                    send_stream(db.create_ap_hints([hint]))
                         .try_for_each(|_| std::future::ready(Ok(())))
                         .await?;
                 }
