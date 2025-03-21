@@ -128,3 +128,15 @@ export async function newApiKey() {
 export async function deleteApiKey() {
     return api_http.delete('user/self/api_key');
 }
+
+export async function getUserServerSettings() {
+    return api_http.get('user/self/settings');
+}
+
+export async function updateUserServerSettings(data) {
+    return api_http.request({
+        method: 'put',
+        url: 'user/self/settings',
+        data,
+    });
+}

@@ -2,12 +2,12 @@
 // This view could use some refactoring to break stuff out into components.
 
 import { computed, onUnmounted, ref, watch } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, isEqual, fromPairs, every, omit, findIndex } from 'lodash-es';
+import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, fromPairs, every, omit, findIndex } from 'lodash-es';
 import moment from 'moment';
 import { settings, currentUser } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker, updateHint as apiUpdateHint, setDashboardOverrideStatus as apiSetDashboardOverrideStatus } from '@/api';
-import { progressionStatus, completionStatus, availabilityStatus, pingPreference, pingPolicy, hintClassification, unifiedGameStatus, getClaimingUserForGame as getClaimingUser, dashboardOverrideVisibilities } from '@/types';
+import { progressionStatus, completionStatus, availabilityStatus, pingPreference, pingPolicy, hintClassification, unifiedGameStatus, getClaimingUserForGame as getClaimingUser, dashboardOverrideVisibilities, usersEqual } from '@/types';
 import { percent, synchronize } from '@/util';
 import { copy as clipboardCopy } from '@/clipboard';
 
@@ -168,7 +168,7 @@ const players = computed(() =>
 
 const playersExceptSelf = computed(() =>
     currentUser.value ?
-        filter(players.value, p => !isEqual(p, currentUser.value)) :
+        filter(players.value, p => !usersEqual(p, currentUser.value)) :
         players.value
 );
 
@@ -359,7 +359,7 @@ const filteredGames = computed(() =>
         ) && (
                 playerFilter.value === PLAYER_FILTER_ALL ? true :
                     playerFilter.value === PLAYER_FILTER_UNOWNED ? !user :
-                        isEqual(playerFilter.value, user)
+                        usersEqual(playerFilter.value, user)
             ) && (
                 gameFilter.value === undefined ||
                 gameFilter.value === g.game
@@ -429,7 +429,7 @@ function setSort(sorter, defOrder) {
 
 const SORT_MODES = {
     normal: () => 0,
-    selftop: (g) => isEqual(getClaimingUser(g), currentUser.value) ? 0 : 1,
+    selftop: (g) => usersEqual(getClaimingUser(g), currentUser.value) ? 0 : 1,
 };
 
 const sortedAndFilteredGames = computed(() =>
@@ -1122,7 +1122,7 @@ loadTracker();
                                     </li>
                                     <li>
                                         <button class="dropdown-item"
-                                            :class="{ active: isEqual(playerFilter, currentUser) }"
+                                            :class="{ active: usersEqual(playerFilter, currentUser) }"
                                             @click="playerFilter = currentUser">
                                             <UsernameDisplay :user="currentUser"></UsernameDisplay>
                                         </button>
@@ -1239,7 +1239,7 @@ loadTracker();
                 </component>
             </template>
             <template #game="{ game }">
-                <component :is="layout.slot" :item="game" :index="index" :active="active">
+                <component :is="layout.slot">
                     <template #name>
                         <a
                             :href="`${trackerData.upstream_url}/0/${game.position}`"
@@ -1270,7 +1270,7 @@ loadTracker();
                             <button v-if="canClaimGames && !game.effective_discord_username" class="btn btn-sm btn-outline-secondary"
                                 :disabled="loading" @click="claimGame(game)">Claim</button>
 
-                            <template v-else-if="canClaimGames && game.effective_discord_username && !isEqual(getClaimingUser(game), currentUser)">
+                            <template v-else-if="canClaimGames && game.effective_discord_username && !usersEqual(getClaimingUser(game), currentUser)">
                                 <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
                                     data-bs-toggle="dropdown">Claim</button>
                                 <div class="dropdown-menu text-warning p-3">
@@ -1282,7 +1282,7 @@ loadTracker();
                                 </div>
                             </template>
 
-                            <button v-else-if="isEqual(getClaimingUser(game), currentUser)"
+                            <button v-else-if="usersEqual(getClaimingUser(game), currentUser)"
                                 class="btn btn-sm btn-outline-warning" :disabled="loading"
                                 @click="unclaimGame(game)">Disclaim</button>
                         </template>
@@ -1341,6 +1341,11 @@ loadTracker();
 
                     <template #hintpane v-if="gameExpanded[game.id]">
                         <div class="row">
+                            <div class="col-12" v-if="game.user_is_away">
+                                <div class="alert alert-warning p-2">
+                                    The owner of this slot is away.
+                                </div>
+                            </div>
                             <div class="col-12 col-xl-6">
                                 <div>
                                     <div class="btn-group">

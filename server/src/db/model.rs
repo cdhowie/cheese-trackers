@@ -318,6 +318,7 @@ db_struct! {
         // changed.
         #[serde(skip_serializing_if = "Option::is_none")]
         pub effective_discord_username: Option<String>,
+        pub user_is_away: bool,
     }
 }
 
@@ -368,6 +369,7 @@ db_struct! {
         pub discord_username: String,
         pub discord_user_id: i64,
         pub api_key: Option<Uuid>,
+        pub is_away: bool,
     }
 }
 

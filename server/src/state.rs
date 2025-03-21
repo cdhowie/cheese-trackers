@@ -25,6 +25,7 @@ use crate::{
             CompletionStatus, HintClassification, PingPreference, ProgressionStatus,
         },
     },
+    logging::log,
     send_hack::{send_future, send_stream},
     stream::try_into_grouping_map_by,
     tracker::{Checks, Game, Hint, ParseTrackerError, parse_tracker_html},
@@ -256,6 +257,7 @@ impl<D> AppState<D> {
                         notes: String::new(),
                         claimed_by_ct_user_id: None,
                         effective_discord_username: None,
+                        user_is_away: false,
                     };
 
                     game.update_completion_status();
@@ -539,7 +541,7 @@ impl<D> AppState<D> {
                 _ => {}
             };
 
-            println!("{} - Requesting AP tracker {url}", Utc::now());
+            log!("Requesting AP tracker {url}");
 
             let sync_tracker_fut = async {
                 let html = self

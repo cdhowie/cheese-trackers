@@ -57,6 +57,8 @@ where
         .route("/user/self/api_key", get(user::get_api_key))
         .route("/user/self/api_key", post(user::reset_api_key))
         .route("/user/self/api_key", delete(user::clear_api_key))
+        .route("/user/self/settings", get(user::get_settings))
+        .route("/user/self/settings", put(user::put_settings))
         .route("/settings", get(get_settings))
         .route("/jserror", post(create_js_error))
         // Since UI settings are in a header added by middleware, this no-op

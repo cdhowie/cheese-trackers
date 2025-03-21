@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue';
 import * as settings from '@/settings.js';
 import { pingPreference, sortModes } from '@/types';
-import { getApiKey, newApiKey, deleteApiKey } from '@/api';
+import { getApiKey, newApiKey, deleteApiKey, getUserServerSettings, updateUserServerSettings } from '@/api';
 import { copy as clipboardCopy } from '@/clipboard';
 
 const saved = ref(false);
@@ -24,6 +24,7 @@ const currentUser = settings.currentUser;
 
 async function loadApiKey(by) {
     apiKeyLoading.value = true;
+    apiKeyError.value = undefined;
 
     try {
         apiKey.value = (await by()).data;
@@ -38,16 +39,6 @@ async function loadApiKey(by) {
     }
 }
 
-function maybeLoadApiKey(user) {
-    if (user?.id !== undefined) {
-        loadApiKey(getApiKey);
-    }
-}
-
-watch(settings.currentUser, maybeLoadApiKey);
-
-maybeLoadApiKey(settings.currentUser.value);
-
 function generateApiKey() {
     loadApiKey(newApiKey);
 }
@@ -58,6 +49,48 @@ function clearApiKey() {
         return { data: undefined };
     })
 }
+
+const serverSettings = ref({});
+const serverSettingsLoading = ref(false);
+const serverSettingsError = ref(undefined);
+
+async function serverSettingsRequest(req) {
+    serverSettingsLoading.value = true;
+    serverSettingsError.value = undefined;
+
+    try {
+        serverSettings.value = (await req()).data;
+    } catch (e) {
+        serverSettings.value = {};
+
+        if (e.response?.status !== 401) {
+            serverSettingsError.value = e;
+        }
+    } finally {
+        serverSettingsLoading.value = false;
+    }
+}
+
+async function loadServerSettings() {
+    serverSettingsRequest(getUserServerSettings);
+}
+
+async function updateUserSettings(data) {
+    const newData = { ...serverSettings.value, ...data };
+
+    serverSettingsRequest(async () => updateUserServerSettings(newData));
+}
+
+function maybeLoadUserSettings(user) {
+    if (user?.id !== undefined) {
+        loadApiKey(getApiKey);
+        loadServerSettings();
+    }
+}
+
+watch(settings.currentUser, maybeLoadUserSettings);
+
+maybeLoadUserSettings(settings.currentUser.value);
 </script>
 
 <template>
@@ -115,6 +148,37 @@ function clearApiKey() {
         </form>
 
         <template v-if="currentUser?.id">
+            <h2>Away</h2>
+
+            <p>
+                If you will be unable to play for an extended period, you can
+                set yourself away.  This will annotate your slots so that others
+                know about your absence.
+            </p>
+
+            <div v-if="serverSettingsLoading" class="text-center"><span class="spinner-border"/></div>
+            <div v-else-if="serverSettingsError" class="text-center text-danger">Could not load away status: {{ serverSettingsError }}</div>
+            <div v-else class="text-center">
+                <div class="btn-group">
+                    <button
+                        class="btn"
+                        :class="{
+                            'btn-success': !serverSettings.is_away,
+                            'btn-outline-success': serverSettings.is_away,
+                        }"
+                        @click.prevent="updateUserSettings({ is_away: false })"
+                    >Not away</button>
+                    <button
+                        class="btn"
+                        :class="{
+                            'btn-warning': serverSettings.is_away,
+                            'btn-outline-warning': !serverSettings.is_away,
+                        }"
+                        @click.prevent="updateUserSettings({ is_away: true })"
+                    >Away</button>
+                </div>
+            </div>
+
             <h2>API key</h2>
 
             <p>

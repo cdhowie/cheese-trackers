@@ -4,6 +4,14 @@ use std::{backtrace::Backtrace, fmt::Display};
 
 use axum::http::StatusCode;
 
+macro_rules! log {
+    ( $e:tt ) => {
+        println!("{} - {}", ::chrono::Utc::now(), format_args!($e))
+    };
+}
+
+pub(crate) use log;
+
 /// Extension trait for `Result` that provides ergonomic handling of unexpected
 /// errors.
 ///

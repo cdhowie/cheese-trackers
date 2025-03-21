@@ -89,11 +89,15 @@ export function getClaimingUserForGame(game) {
         return {
             id: game.claimed_by_ct_user_id,
             discordUsername: game.effective_discord_username,
+            isAway: game.user_is_away,
         };
     }
 
     if (game.effective_discord_username?.length) {
-        return { discordUsername: game.effective_discord_username };
+        return {
+            discordUsername: game.effective_discord_username,
+            isAway: game.user_is_away,
+        };
     }
 
     return undefined;
@@ -103,3 +107,7 @@ export const sortModes = keyed([
     { id: 'normal', label: 'Normal' },
     { id: 'selftop', label: 'Mine first' },
 ]);
+
+export function usersEqual(a, b) {
+    return !a ? !b : (b && a.id === b.id && a.discordUsername === b.discordUsername);
+}
