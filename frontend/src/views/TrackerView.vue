@@ -510,6 +510,7 @@ function sortedDisplayHintsByGame(id) {
 function countUnfoundReceivedHints(game) {
     return (hintsByFinder.value[game.id] || [])
         .filter(h =>
+            h.receiver_game_id !== game.id &&
             h.classification !== 'trash' &&
             hintStatus(h) === 'notfound'
         )
