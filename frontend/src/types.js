@@ -29,10 +29,12 @@ export const availabilityStatus = keyed([
 ]);
 
 export const hintClassification = keyed([
-    { id: 'unknown', label: 'Unknown', color: 'light', icon: 'question-lg' },
+    { id: 'unset', label: 'Unset', color: 'light', icon: 'envelope-exclamation-fill' },
     { id: 'critical', label: 'Critical', color: 'danger', icon: 'exclamation-triangle-fill' },
-    { id: 'useful', label: 'Useful', color: 'warning', icon: 'person-raised-hand' },
+    { id: 'progression', label: 'Progression', color: 'warning', icon: 'person-walking' },
+    { id: 'qol', label: 'Quality of life', color: 'primary', icon: 'person-raised-hand' },
     { id: 'trash', label: 'Trash', color: 'secondary', icon: 'trash-fill' },
+    { id: 'unknown', label: 'Unknown', color: 'light', icon: 'question-lg' },
 ]);
 
 export const pingPreference = keyed([

@@ -235,9 +235,11 @@ db_enum! {
 
 db_enum! {
     pub enum HintClassification as "hint_classification" {
+        Unset,
         Unknown,
         Critical,
-        Useful,
+        Progression,
+        Qol,
         Trash,
     }
 }

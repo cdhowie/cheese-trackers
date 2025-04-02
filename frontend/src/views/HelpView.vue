@@ -406,38 +406,78 @@ import YesNo from '@/components/ShouldPing.vue';
             column, which always shows received hints.)
         </p>
         <p>
-            Each hint can be classified, which communicates how important the
-            item is to the receiving slot:
+            <a name="hint-classification"/>Each hint can be classified, which
+            communicates how important the item is to the receiving slot:
         </p>
         <ul>
             <li>
-                <span class="fw-bold text-danger">Critical</span>: The item is
-                required. This could be because it's necessary for the receiving
-                slot to be able to goal, or because the receiving slot needs it
-                to obtain a critical item for another slot.
+                <span class="fw-bold text-danger">Critical</span>: This item
+                would make a huge difference in some way: enabling the receiver
+                to goal very soon, giving a (subjectively) large number of
+                checks they could send, or enabling the receiver to obtain
+                another hinted item classified as critical.  Get this by any
+                means necessary (as permitted by the async's rules regarding
+                logic/glitches).
             </li>
             <li>
-                <span class="fw-bold text-warning">Helpful</span>: The item is
-                not required but would be helpful in some capacity, so the item
-                may be worth obtaining if it is not too difficult or out of the
-                way.
+                <span class="fw-bold text-warning">Progression</span>: The
+                receiver needs this down the line to goal or this would allow
+                them to send a handful of checks.  Expend a reasonable amount of
+                effort to get this.
+            </li>
+            <li>
+                <span class="fw-bold text-primary">Quality of life</span>: This
+                makes the receiver's game easier or increases quality of life in
+                some way.  It is not needed to goal and cannot logically give
+                any extra checks even in combination with other items.  Get this
+                item if you can, but not at the expense of someone else's hint
+                classified higher.
             </li>
             <li>
                 <span class="fw-bold text-secondary">Trash</span>: The item is
                 worthless to the receiving slot and no effort should be spent on
-                obtaining it.
+                obtaining it.  Filler and traps fit this definition, but it is
+                possible that some progression items may be trash because of the
+                way the world generated, or because other items that give the
+                same result were already obtained.  A good example is a
+                MacGuffin where the required number has already been obtained,
+                and receiving more of them will yield no effect.
+            </li>
+            <li>
+                <span class="fw-bold text-light">Unknown</span>: It is not yet
+                known how to classify this hint.  It may or may not be required.
+            </li>
+            <li>
+                <span class="fw-bold text-light">Unset</span>: This is a new
+                hint that has not been classified yet.
             </li>
         </ul>
         <p>
-            There is some potential ambiguity where it's critical that a slot
-            needs one out of a set of items, but not all of them.  This
-            situation is best handled by communicating with the other players on
-            Discord or by using the notes field.  For example, if you need one
-            of two items to goal but you don't need both, you could ask the
-            sending slots' players how difficult it would be to get each item
-            and choose which one to mark critical based on which is easier to
-            obtain.  Another approach would be to mark both critical and then
-            downgrade one to helpful or trash when the other one is obtained.
+            There is some potential ambiguity where a slot needs one out of a
+            set of items, but not all of them.  This situation is best handled
+            by communicating with the other players on Discord or by using the
+            notes field.  For example, if you need one of two items to goal but
+            you don't need both, you could ask the sending slots' players how
+            difficult it would be to get each item and choose which one to mark
+            critical/progression based on which is easier to obtain.  Another
+            approach would be to mark both critical/progression and then
+            downgrade one to quality of life or trash when the other one is
+            obtained.
+        </p>
+        <p>
+            In particular, this can apply to MacGuffins.  If you need many of an
+            item, you could mark them all progression until you obtain the
+            required number and then mark the remaining ones trash.
+        </p>
+        <p>
+            A good example covering a wide variety of classifications would be A
+            Link to the Past's Progressive Swords.  If the goal is to defeat
+            Ganon, at least two swords are required.  Therefore, at the start of
+            the game, it would be reasonable to classify all hinted swords as
+            progression.  Once two are obtained, the remaining two become
+            quality of life items, increasing damage but not affecting logic.
+            However, if fewer than two have been obtained by the time the player
+            could otherwise defeat Ganon, swords could be changed to critical.
         </p>
         <p>
             By default, hints are shown only if all of the following are true.

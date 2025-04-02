@@ -302,7 +302,7 @@ impl<D> AppState<D> {
                         location: hint.location,
                         entrance: hint.entrance,
                         found: hint.found,
-                        classification: HintClassification::Unknown,
+                        classification: HintClassification::Unset,
                     };
 
                     send_stream(db.create_ap_hints([ap_hint]))
@@ -454,7 +454,7 @@ impl<D> AppState<D> {
                                 location: tracker_hint.location,
                                 entrance: tracker_hint.entrance,
                                 found: tracker_hint.found,
-                                classification: HintClassification::Unknown,
+                                classification: HintClassification::Unset,
                             });
                         }
                     }
