@@ -90,16 +90,18 @@ function dismissBanner(id) {
         </div>
     </nav>
 
-    <div
-        v-for="banner in banners"
-        class="alert text-center"
-        :class="{
-            [`alert-${banner.kind}`]: true,
-            'alert-dismissible': banner.id,
-        }"
-    >
-        <span v-html="banner.message"></span>
-        <button v-if="banner.id" type="button" class="btn-close" @click="dismissBanner(banner.id)"></button>
+    <div class="container" v-if="banners?.length">
+        <div
+            v-for="banner in banners"
+            class="alert text-center"
+            :class="{
+                [`alert-${banner.kind}`]: true,
+                'alert-dismissible': banner.id,
+            }"
+        >
+            <span v-html="banner.message"></span>
+            <button v-if="banner.id" type="button" class="btn-close" @click="dismissBanner(banner.id)"></button>
+        </div>
     </div>
 
     <RouterView />
