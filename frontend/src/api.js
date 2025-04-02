@@ -61,10 +61,13 @@ export async function getDashboardTrackers() {
     return api_http.get('/dashboard/tracker');
 }
 
-export async function updateGame(tracker_id, game) {
+export async function updateGame(tracker_id, game, priorOwner) {
     return api_http.request({
         method: 'put',
         url: `tracker/${tracker_id}/game/${game.id}`,
+        headers: {
+            'x-if-owner-is': priorOwner !== undefined ? JSON.stringify(priorOwner) : undefined,
+        },
         data: game,
     });
 }

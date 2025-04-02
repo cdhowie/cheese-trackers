@@ -2,7 +2,7 @@
 // This view could use some refactoring to break stuff out into components.
 
 import { computed, onUnmounted, ref, watch } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, fromPairs, every, omit, findIndex } from 'lodash-es';
+import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, fromPairs, every, omit, findIndex, pick } from 'lodash-es';
 import moment from 'moment';
 import { settings, currentUser } from '@/settings';
 import { now } from '@/time';
@@ -10,6 +10,7 @@ import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker
 import { progressionStatus, completionStatus, availabilityStatus, pingPreference, pingPolicy, hintClassification, unifiedGameStatus, getClaimingUserForGame as getClaimingUser, dashboardOverrideVisibilities, usersEqual } from '@/types';
 import { percent, synchronize } from '@/util';
 import { copy as clipboardCopy } from '@/clipboard';
+import { currentError as globalError } from '@/error-modal';
 
 import TrackerSummary from '@/components/TrackerSummary.vue';
 import ChecksBar from '@/components/ChecksBar.vue';
@@ -561,7 +562,7 @@ function claimGame(game) {
         }
 
         g.discord_ping = settings.value.defaultPingPreference;
-    });
+    }, true);
 }
 
 function unclaimGame(game) {
@@ -574,7 +575,7 @@ function unclaimGame(game) {
         }
 
         g.discord_ping = 'never';
-    });
+    }, true);
 }
 
 function setGameProgressionStatus(game, status) {
@@ -699,13 +700,25 @@ async function updateTracker(data) {
     }
 }
 
-async function updateGame(game, mutator) {
-    return updateObject(
-        game,
-        g => apiUpdateGame(props.aptrackerid, g),
-        mutator,
-        patchGame
-    );
+async function updateGame(game, mutator, isClaimChange) {
+    const priorOwner = isClaimChange
+        ? pick(game, 'claimed_by_ct_user_id', 'discord_username')
+        : undefined;
+
+    try {
+        return await updateObject(
+            game,
+            g => apiUpdateGame(props.aptrackerid, g, priorOwner),
+            mutator,
+            patchGame
+        );
+    } catch (e) {
+        if (e.status === 412) {
+            globalError.value = `The owner information for the slot "${game.name}" is out of date, so you cannot modify the claim.  Please refresh the tracker.`;
+        } else {
+            throw e;
+        }
+    }
 }
 
 async function updateHint(hint, mutator) {

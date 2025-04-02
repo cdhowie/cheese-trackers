@@ -6,6 +6,9 @@ import { BUILD_VERSION } from './build';
 import * as settings from '@/settings';
 import { showCopiedToast } from './clipboard';
 import { filter, includes } from 'lodash-es';
+import { currentError } from './error-modal';
+
+import Modal from './components/Modal.vue';
 
 const route = useRoute();
 
@@ -126,6 +129,8 @@ function dismissBanner(id) {
             </div>
         </div>
     </div>
+
+    <Modal title="Error" :message="currentError" @modalclosed="currentError = undefined"/>
 </template>
 
 <style scoped></style>

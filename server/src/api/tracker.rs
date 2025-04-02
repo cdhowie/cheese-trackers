@@ -5,9 +5,10 @@ use std::{fmt::Display, str::FromStr, sync::Arc};
 use axum::{
     Json,
     extract::{Path, State},
-    http::StatusCode,
+    http::{HeaderName, StatusCode},
     response::IntoResponse,
 };
+use axum_extra::{TypedHeader, headers::Header};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, TimeDelta, Utc};
 use futures::TryStreamExt;
@@ -596,11 +597,56 @@ pub struct UpdateGameRequest {
     pub notes: String,
 }
 
+pub struct IfOwnerIs {
+    pub condition: Option<IfOwnerIsCondition>,
+}
+
+#[derive(serde::Deserialize)]
+pub struct IfOwnerIsCondition {
+    pub claimed_by_ct_user_id: Option<i32>,
+    pub discord_username: Option<String>,
+}
+
+impl IfOwnerIsCondition {
+    pub fn matches(&self, game: &ApGame) -> bool {
+        self.claimed_by_ct_user_id == game.claimed_by_ct_user_id
+            && self.discord_username == game.discord_username
+    }
+}
+
+impl Header for IfOwnerIs {
+    fn name() -> &'static HeaderName {
+        static NAME: HeaderName = HeaderName::from_static("x-if-owner-is");
+
+        &NAME
+    }
+
+    fn decode<'i, I>(values: &mut I) -> Result<Self, axum_extra::headers::Error>
+    where
+        Self: Sized,
+        I: Iterator<Item = &'i axum::http::HeaderValue>,
+    {
+        let condition = values
+            .next()
+            .map(|v| serde_json::from_slice(v.as_bytes()))
+            .transpose()
+            .map_err(|_| axum_extra::headers::Error::invalid())?;
+
+        Ok(Self { condition })
+    }
+
+    fn encode<E: Extend<axum::http::HeaderValue>>(&self, _values: &mut E) {
+        // We don't need to encode this header.
+        unimplemented!()
+    }
+}
+
 /// `PUT /tracker/{tracker_id}/game/{game_id}`: Update game.
 pub async fn update_game<D>(
     State(state): State<Arc<AppState<D>>>,
     user: Option<AuthenticatedUser>,
     Path((tracker_id, game_id)): Path<(UrlEncodedTrackerId, i32)>,
+    TypedHeader(expected_owner): TypedHeader<IfOwnerIs>,
     Json(game_update): Json<UpdateGameRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
 where
@@ -628,6 +674,24 @@ where
 
     if game.tracker_id != tracker.id {
         return Err(StatusCode::NOT_FOUND);
+    }
+
+    // Test the owner precondition if it's present.
+    let has_owner_precondition = match expected_owner.condition {
+        Some(expected) if !expected.matches(&game) => return Err(StatusCode::PRECONDITION_FAILED),
+
+        Some(_) => true,
+        None => false,
+    };
+
+    // If the claim is changing hands, an owner precondition is required to
+    // prevent races where someone else may accidentally clobber an earlier
+    // claim because they are viewing old state.
+    if (game_update.claimed_by_ct_user_id != game.claimed_by_ct_user_id
+        || game_update.discord_username != game.discord_username)
+        && !has_owner_precondition
+    {
+        return Err(StatusCode::PRECONDITION_REQUIRED);
     }
 
     // If the claimed user ID is changing to a value other than None, it must
