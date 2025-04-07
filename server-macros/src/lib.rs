@@ -105,10 +105,9 @@ fn expand_derive_fieldwise_diff(input: ItemStruct) -> syn::Result<proc_macro2::T
     let output_doc = format!("A fieldwise diff of two `{ident}`s.");
 
     let output_struct = quote! {
-        #[derive(::serde::Serialize)]
         #[automatically_derived]
         #[doc = #output_doc]
-        #[derive(Debug, Default, Clone)]
+        #[derive(Debug, Default, Clone, ::serde::Serialize)]
         pub struct #output_ident {
             #(
                 #[serde(skip_serializing_if = "Option::is_none")]
