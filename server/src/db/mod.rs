@@ -6,7 +6,7 @@
 
 use std::{future::Future, net::IpAddr};
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use futures::Stream;
 use sea_query::Iden;
 use sqlx::migrate::MigrateError;
@@ -307,6 +307,7 @@ pub trait DataAccess {
 pub fn create_audit_for<V>(
     actor_ipaddr: Option<IpAddr>,
     actor_ct_user_id: Option<i32>,
+    changed_at: DateTime<Utc>,
     old: &V,
     new: &V,
 ) -> Option<Audit>
@@ -320,9 +321,7 @@ where
         id: Default::default(),
         entity: V::table().to_string(),
         entity_id: *old.primary_key_value(),
-        // TODO: Would be ideal to use the timestamp of the database transaction
-        // instead of an explicit value.
-        changed_at: Utc::now(),
+        changed_at,
         actor_ipaddr: actor_ipaddr.map(Into::into),
         actor_ct_user_id,
         diff: serde_json::to_string(&diff).unwrap(),

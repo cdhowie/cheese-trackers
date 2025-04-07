@@ -153,7 +153,7 @@ where
                 .to_owned();
             u.discord_username = user_info.name;
 
-            let audit = create_audit_for(None, None, &old_u, &u);
+            let audit = create_audit_for(None, None, Utc::now(), &old_u, &u);
 
             tx.update_ct_user(
                 u.clone(),

@@ -390,7 +390,7 @@ impl<D> AppState<D> {
                         columns.push(ApGameIden::CompletionStatus);
                     }
 
-                    let audit = create_audit_for(None, None, &old_db_game, &db_game);
+                    let audit = create_audit_for(None, None, now, &old_db_game, &db_game);
 
                     db.update_ap_game(db_game, &columns).await?;
 
@@ -453,7 +453,7 @@ impl<D> AppState<D> {
                                 let old_hint = h.clone();
                                 h.found = tracker_hint.found;
 
-                                let audit = create_audit_for(None, None, &old_hint, &h);
+                                let audit = create_audit_for(None, None, now, &old_hint, &h);
 
                                 db.update_ap_hint(h, &[ApHintIden::Found]).await?;
 
@@ -497,7 +497,7 @@ impl<D> AppState<D> {
 
                 tracker.updated_at = now;
 
-                let audit = create_audit_for(None, None, &old_tracker, &tracker);
+                let audit = create_audit_for(None, None, now, &old_tracker, &tracker);
 
                 db.update_ap_tracker(tracker, &[ApTrackerIden::UpdatedAt])
                     .await?;
