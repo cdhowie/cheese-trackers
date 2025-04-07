@@ -7,13 +7,15 @@ RUN apk add --no-cache musl-dev openssl-dev
 ARG GIT_COMMIT
 ENV GIT_COMMIT=$GIT_COMMIT
 
-WORKDIR /app
-COPY server/ /app
-RUN --mount=type=cache,target=/app/target \
+COPY server /app/server
+COPY server-macros /app/server-macros
+WORKDIR /app/server
+RUN --mount=type=cache,target=/app/server/target \
+    --mount=type=cache,target=/app/server-macros/target \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
     test -n "$GIT_COMMIT" && \
     RUSTFLAGS=-Ctarget-feature=-crt-static cargo build --release && \
-    cp target/release/cheese-trackers-server .
+    cp target/release/cheese-trackers-server /app
 
 
 FROM docker.io/node:20-bookworm AS frontendbuilder
