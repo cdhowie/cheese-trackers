@@ -542,7 +542,7 @@ impl<D> AppState<D> {
         // entirely valid.
         if url
             .path_segments()
-            .and_then(|s| s.last())
+            .and_then(|mut s| s.next_back())
             .is_none_or(|id| UrlEncodedTrackerId::from_str(id).is_err())
         {
             return Err(Arc::new(TrackerUrlParseError::TrackerId.into()));
