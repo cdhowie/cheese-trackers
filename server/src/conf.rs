@@ -2,6 +2,7 @@
 
 use std::{collections::HashSet, net::SocketAddr};
 
+use axum_client_ip::ClientIpSource;
 use base64::prelude::*;
 use chacha20poly1305::{KeyInit, XChaCha20Poly1305};
 use config::ConfigError;
@@ -16,6 +17,8 @@ pub struct Config {
     pub public_url: Url,
     /// The network endpoint the tracker should listen on for requests.
     pub http_listen: SocketAddr,
+    /// Where to get the client IP address for incoming requests.
+    pub client_ip_source: ClientIpSource,
     /// Whether to add permissive CORS headers.
     #[serde(default)]
     pub cors_permissive: bool,

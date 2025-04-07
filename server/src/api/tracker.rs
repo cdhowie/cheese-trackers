@@ -1,6 +1,6 @@
 //! Tracker endpoints.
 
-use std::{fmt::Display, str::FromStr, sync::Arc};
+use std::{fmt::Display, future::ready, str::FromStr, sync::Arc};
 
 use axum::{
     Json,
@@ -8,6 +8,7 @@ use axum::{
     http::{HeaderName, StatusCode},
     response::IntoResponse,
 };
+use axum_client_ip::ClientIp;
 use axum_extra::{TypedHeader, headers::Header};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, TimeDelta, Utc};
@@ -18,7 +19,7 @@ use uuid::Uuid;
 use crate::{
     auth::token::AuthenticatedUser,
     db::{
-        DataAccess, DataAccessProvider, Transactable, Transaction,
+        DataAccess, DataAccessProvider, Transactable, Transaction, create_audit_for,
         model::{
             ApGame, ApGameIden, ApHint, ApHintIden, ApTracker, ApTrackerDashboardOverride,
             ApTrackerIden, AvailabilityStatus, CompletionStatus, HintClassification,
@@ -26,7 +27,7 @@ use crate::{
         },
     },
     logging::UnexpectedResultExt,
-    send_hack::send_future,
+    send_hack::{send_future, send_stream},
     state::{AppState, GetRoomLinkError, TrackerUpdateError},
 };
 
@@ -372,8 +373,9 @@ pub struct UpdateTrackerRequest {
 /// `PUT /tracker/{tracker_id}`: Update tracker.
 pub async fn update_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
-    Path(tracker_id): Path<UrlEncodedTrackerId>,
+    ClientIp(ip): ClientIp,
     user: Option<AuthenticatedUser>,
+    Path(tracker_id): Path<UrlEncodedTrackerId>,
     Json(tracker_update): Json<UpdateTrackerRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
 where
@@ -395,11 +397,13 @@ where
 
     let mut tx = db.begin().await.unexpected()?;
 
-    let mut tracker = tx
+    let old_tracker = tx
         .get_tracker_by_tracker_id(tracker_id.into())
         .await
         .unexpected()?
         .ok_or(StatusCode::NOT_FOUND)?;
+
+    let mut tracker = old_tracker.clone();
 
     // Update settings.  Some settings are handled specially:
     //
@@ -502,24 +506,38 @@ where
         };
     }
 
-    tx.update_ap_tracker(
-        tracker,
-        &[
-            ApTrackerIden::Title,
-            ApTrackerIden::Description,
-            ApTrackerIden::OwnerCtUserId,
-            ApTrackerIden::LockSettings,
-            ApTrackerIden::GlobalPingPolicy,
-            ApTrackerIden::RoomLink,
-            ApTrackerIden::LastPort,
-            ApTrackerIden::NextPortCheckAt,
-            ApTrackerIden::InactivityThresholdYellowHours,
-            ApTrackerIden::InactivityThresholdRedHours,
-            ApTrackerIden::RequireAuthenticationToClaim,
-        ],
-    )
-    .await
-    .unexpected()?;
+    let audit = create_audit_for(
+        Some(ip),
+        user.as_ref().map(|u| u.user.id),
+        &old_tracker,
+        &tracker,
+    );
+
+    if let Some(audit) = audit {
+        tx.update_ap_tracker(
+            tracker,
+            &[
+                ApTrackerIden::Title,
+                ApTrackerIden::Description,
+                ApTrackerIden::OwnerCtUserId,
+                ApTrackerIden::LockSettings,
+                ApTrackerIden::GlobalPingPolicy,
+                ApTrackerIden::RoomLink,
+                ApTrackerIden::LastPort,
+                ApTrackerIden::NextPortCheckAt,
+                ApTrackerIden::InactivityThresholdYellowHours,
+                ApTrackerIden::InactivityThresholdRedHours,
+                ApTrackerIden::RequireAuthenticationToClaim,
+            ],
+        )
+        .await
+        .unexpected()?;
+
+        send_stream(tx.create_audits([audit]))
+            .try_for_each(|_| ready(Ok(())))
+            .await
+            .unexpected()?;
+    }
 
     send_future(tx.commit()).await.unexpected()?;
 
@@ -535,6 +553,8 @@ pub struct UpdateHintRequest {
 /// `PUT /tracker/{tracker_id}/hint/{hint_id}`: Update hint.
 pub async fn update_hint<D>(
     State(state): State<Arc<AppState<D>>>,
+    ClientIp(ip): ClientIp,
+    user: Option<AuthenticatedUser>,
     Path((tracker_id, hint_id)): Path<(UrlEncodedTrackerId, i32)>,
     Json(hint_update): Json<UpdateHintRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
@@ -555,14 +575,14 @@ where
         .unexpected()?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let mut hint = tx
+    let old_hint = tx
         .get_ap_hint(hint_id)
         .await
         .unexpected()?
         .ok_or(StatusCode::NOT_FOUND)?;
 
     let game = tx
-        .get_ap_game(hint.finder_game_id)
+        .get_ap_game(old_hint.finder_game_id)
         .await
         .unexpected()?
         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -571,13 +591,22 @@ where
         return Err(StatusCode::NOT_FOUND);
     }
 
+    let mut hint = old_hint.clone();
+
     hint.classification = hint_update.classification;
+
+    let audit = create_audit_for(Some(ip), user.map(|u| u.user.id), &old_hint, &hint);
 
     let hint = tx
         .update_ap_hint(hint, &[ApHintIden::Classification])
         .await
         .unexpected()?
         .ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    send_stream(tx.create_audits(audit))
+        .try_for_each(|_| ready(Ok(())))
+        .await
+        .unexpected()?;
 
     send_future(tx.commit()).await.unexpected()?;
 
@@ -644,6 +673,7 @@ impl Header for IfOwnerIs {
 /// `PUT /tracker/{tracker_id}/game/{game_id}`: Update game.
 pub async fn update_game<D>(
     State(state): State<Arc<AppState<D>>>,
+    ClientIp(ip): ClientIp,
     user: Option<AuthenticatedUser>,
     Path((tracker_id, game_id)): Path<(UrlEncodedTrackerId, i32)>,
     TypedHeader(expected_owner): TypedHeader<IfOwnerIs>,
@@ -666,7 +696,7 @@ where
         .unexpected()?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let mut game = tx
+    let game = tx
         .get_ap_game(game_id)
         .await
         .unexpected()?
@@ -710,6 +740,9 @@ where
         });
     }
 
+    let old_game = game;
+    let mut game = old_game.clone();
+
     // Update the username.
     game.discord_username = match game_update.claimed_by_ct_user_id {
         // If claimed by an authenticated user, this username is not needed and
@@ -740,6 +773,8 @@ where
 
     game.update_completion_status();
 
+    let audit = create_audit_for(Some(ip), user.map(|u| u.user.id), &old_game, &game);
+
     let game_id = game.id;
     let game = tx
         .update_ap_game(
@@ -760,6 +795,11 @@ where
         // There should be no way this is None since we're in a transaction and
         // already fetched the record.
         .ok_or_else(|| format!("ApGame {game_id} did not exist on update"))
+        .unexpected()?;
+
+    send_stream(tx.create_audits(audit))
+        .try_for_each(|_| ready(Ok(())))
+        .await
         .unexpected()?;
 
     send_future(tx.commit()).await.unexpected()?;

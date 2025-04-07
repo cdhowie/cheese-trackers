@@ -1,6 +1,6 @@
 //! Authentication endpoints.
 
-use std::sync::Arc;
+use std::{future::ready, sync::Arc};
 
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use chrono::Utc;
@@ -9,7 +9,7 @@ use oauth2::TokenResponse;
 
 use crate::{
     db::{
-        DataAccess, DataAccessProvider, Transactable, Transaction,
+        DataAccess, DataAccessProvider, Transactable, Transaction, create_audit_for,
         model::{CtUser, CtUserIden},
     },
     logging::UnexpectedResultExt,
@@ -140,6 +140,8 @@ where
                 .ok_or(MissingUserError(user_info.id.get()))
                 .unexpected()?;
 
+            let old_u = u.clone();
+
             // The user already existed.  Update their token and username.
             u.discord_access_token = token.access_token().secret().to_owned();
             u.discord_access_token_expires_at = expires_at;
@@ -150,6 +152,8 @@ where
                 .secret()
                 .to_owned();
             u.discord_username = user_info.name;
+
+            let audit = create_audit_for(None, None, &old_u, &u);
 
             tx.update_ct_user(
                 u.clone(),
@@ -162,6 +166,11 @@ where
             )
             .await
             .unexpected()?;
+
+            send_stream(tx.create_audits(audit))
+                .try_for_each(|_| ready(Ok(())))
+                .await
+                .unexpected()?;
 
             u
         }

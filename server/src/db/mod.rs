@@ -4,9 +4,11 @@
 //! This mechanism allows switching the underlying data type without any code
 //! changes, while also permitting per-backend optimizations.
 
-use std::future::Future;
+use std::{future::Future, net::IpAddr};
 
+use chrono::Utc;
 use futures::Stream;
+use sea_query::Iden;
 use sqlx::migrate::MigrateError;
 
 use uuid::Uuid;
@@ -23,6 +25,8 @@ pub mod model;
 pub mod pg;
 
 use model::*;
+
+use crate::diff::{IntoFieldwiseDiff, IsEmpty};
 
 /// Provides access to the database.
 pub trait DataAccessProvider {
@@ -286,6 +290,43 @@ pub trait DataAccess {
         ct_user_id: i32,
         ap_tracker_id: i32,
     ) -> impl Future<Output = sqlx::Result<Option<ApTrackerDashboardOverride>>> + Send;
+
+    /// Creates one or more new [`Audit`]s in the database.
+    ///
+    /// The `id` field of the value is ignored.  It will be populated with the
+    /// real IDs in the returned values.
+    fn create_audits<'s, 'v, 'f>(
+        &'s mut self,
+        audits: impl IntoIterator<Item = Audit> + Send + 'v,
+    ) -> impl Stream<Item = sqlx::Result<Audit>> + Send + 'f
+    where
+        's: 'f,
+        'v: 'f;
+}
+
+pub fn create_audit_for<V>(
+    actor_ipaddr: Option<IpAddr>,
+    actor_ct_user_id: Option<i32>,
+    old: &V,
+    new: &V,
+) -> Option<Audit>
+where
+    V: Model<PrimaryKey = i32>,
+    for<'a> &'a V: IntoFieldwiseDiff,
+{
+    let diff = old.into_fieldwise_diff(new);
+
+    (!diff.is_empty()).then(|| Audit {
+        id: Default::default(),
+        entity: V::table().to_string(),
+        entity_id: *old.primary_key_value(),
+        // TODO: Would be ideal to use the timestamp of the database transaction
+        // instead of an explicit value.
+        changed_at: Utc::now(),
+        actor_ipaddr: actor_ipaddr.map(Into::into),
+        actor_ct_user_id,
+        diff: serde_json::to_string(&diff).unwrap(),
+    })
 }
 
 /// Build values using a closure.

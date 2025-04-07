@@ -4,6 +4,8 @@ frontend/dist
 server/local
 server/target
 
+server-macros/target
+
 podman
 
 **/*.sw?

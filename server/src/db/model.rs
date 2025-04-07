@@ -3,6 +3,7 @@
 use std::{fmt::Debug, hash::Hash};
 
 use chrono::{DateTime, Utc};
+use ipnetwork::IpNetwork;
 use sea_query::{Iden, Nullable, Value};
 use sqlx::{FromRow, Row};
 use uuid::Uuid;
@@ -14,6 +15,9 @@ use sqlx::postgres::PgRow;
 pub trait Model {
     /// Identifier type.
     type Iden: Iden + Eq + Hash + Debug + Copy + 'static;
+
+    /// Primary key type.
+    type PrimaryKey: Eq + Hash + Debug + Clone + 'static;
 
     /// Returns the identifier for this model's table.
     fn table() -> Self::Iden;
@@ -28,6 +32,9 @@ pub trait Model {
 
     /// Returns the identifier of this model's primary key.
     fn primary_key() -> Self::Iden;
+
+    /// Returns the primary key of this value.
+    fn primary_key_value(&self) -> &Self::PrimaryKey;
 
     /// Converts the value into an iterator of column values.
     ///
@@ -53,7 +60,7 @@ macro_rules! db_struct {
     ) => {
         paste::paste! {
             #[sea_query::enum_def]
-            #[derive(serde::Serialize, serde::Deserialize)]
+            #[derive(serde::Serialize, serde::Deserialize, crate::diff::IntoFieldwiseDiff)]
             $( #[ $nm ] )*
             #[doc = "Model for the database table `"]
             #[doc = stringify!([< $n:snake >])]
@@ -67,6 +74,7 @@ macro_rules! db_struct {
 
             impl Model for $n {
                 type Iden = [< $n Iden >];
+                type PrimaryKey = i32;
 
                 fn table() -> Self::Iden {
                     [< $n Iden >]::Table
@@ -80,6 +88,10 @@ macro_rules! db_struct {
 
                 fn primary_key() -> Self::Iden {
                     [< $n Iden >]::Id
+                }
+
+                fn primary_key_value(&self) -> &i32 {
+                    &self.id
                 }
 
                 fn into_values(self) -> impl Iterator<Item = Value> {
@@ -249,6 +261,7 @@ db_struct! {
     pub struct ApTracker {
         pub id: i32,
         pub tracker_id: Uuid,
+        #[diff(skip)]
         pub updated_at: DateTime<Utc>,
         pub title: String,
         pub description: String,
@@ -260,8 +273,10 @@ db_struct! {
         pub global_ping_policy: Option<PingPreference>,
         pub room_link: String,
         #[serde(skip_serializing_if = "Option::is_none")]
+        #[diff(skip)]
         pub last_port: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]
+        #[diff(skip)]
         pub next_port_check_at: Option<DateTime<Utc>>,
         pub inactivity_threshold_yellow_hours: i32,
         pub inactivity_threshold_red_hours: i32,
@@ -319,7 +334,9 @@ db_struct! {
         // The following columns are computed in the ap_game view and can't be
         // changed.
         #[serde(skip_serializing_if = "Option::is_none")]
+        #[diff(skip)]
         pub effective_discord_username: Option<String>,
+        #[diff(skip)]
         pub user_is_away: bool,
     }
 }
@@ -365,11 +382,15 @@ db_struct! {
     #[derive(Clone)]
     pub struct CtUser {
         pub id: i32,
+        #[diff(skip)]
         pub discord_access_token: String,
+        #[diff(skip)]
         pub discord_access_token_expires_at: DateTime<Utc>,
+        #[diff(skip)]
         pub discord_refresh_token: String,
         pub discord_username: String,
         pub discord_user_id: i64,
+        #[diff(skip)]
         pub api_key: Option<Uuid>,
         pub is_away: bool,
     }
@@ -393,6 +414,19 @@ db_struct! {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub ct_user_id: Option<i32>,
         pub error: String,
+    }
+}
+
+db_struct! {
+    #[derive(Debug, Clone)]
+    pub struct Audit {
+        pub id: i32,
+        pub entity: String,
+        pub entity_id: i32,
+        pub changed_at: DateTime<Utc>,
+        pub actor_ipaddr: Option<IpNetwork>,
+        pub actor_ct_user_id: Option<i32>,
+        pub diff: String,
     }
 }
 

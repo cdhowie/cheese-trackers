@@ -2,6 +2,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    future::ready,
     str::FromStr,
     sync::Arc,
 };
@@ -19,7 +20,7 @@ use crate::{
     auth::{discord::AuthClient, token::TokenProcessor},
     conf::Config,
     db::{
-        DataAccess, DataAccessProvider, Transactable, Transaction,
+        DataAccess, DataAccessProvider, Transactable, Transaction, create_audit_for,
         model::{
             ApGame, ApGameIden, ApHint, ApHintIden, ApTracker, ApTrackerIden, AvailabilityStatus,
             CompletionStatus, HintClassification, PingPreference, ProgressionStatus,
@@ -314,6 +315,8 @@ impl<D> AppState<D> {
             }
 
             Some(mut tracker) => {
+                let old_tracker = tracker.clone();
+
                 let mut db_games: Vec<_> = db
                     .get_ap_games_by_tracker_id(tracker.id)
                     .try_collect()
@@ -330,7 +333,7 @@ impl<D> AppState<D> {
 
                 let mut name_to_id = HashMap::new();
 
-                for (tracker_game, mut db_game) in games.into_iter().zip(db_games.into_iter()) {
+                for (tracker_game, old_db_game) in games.into_iter().zip(db_games.into_iter()) {
                     let tracker_position: i32 = tracker_game.position.try_into().map_err(|_| {
                         TrackerUpdateError::NumericConversion(tracker_game.position)
                     })?;
@@ -339,6 +342,8 @@ impl<D> AppState<D> {
                         tracker_game.checks.try_convert().map_err(|_| {
                             TrackerUpdateError::NumericConversion(tracker_game.position)
                         })?;
+
+                    let mut db_game = old_db_game.clone();
 
                     // Sanity check that all of the existing information is the
                     // same.  If it's not, something bad probably happened.
@@ -385,7 +390,13 @@ impl<D> AppState<D> {
                         columns.push(ApGameIden::CompletionStatus);
                     }
 
+                    let audit = create_audit_for(None, None, &old_db_game, &db_game);
+
                     db.update_ap_game(db_game, &columns).await?;
+
+                    send_stream(db.create_audits(audit))
+                        .try_for_each(|_| ready(Ok(())))
+                        .await?;
                 }
 
                 // Reconcile hints.  We need to match up the hints from the
@@ -439,8 +450,16 @@ impl<D> AppState<D> {
                         Some(mut h) => {
                             // Hint exists.  Update if the found state changed.
                             if h.found != tracker_hint.found {
+                                let old_hint = h.clone();
                                 h.found = tracker_hint.found;
+
+                                let audit = create_audit_for(None, None, &old_hint, &h);
+
                                 db.update_ap_hint(h, &[ApHintIden::Found]).await?;
+
+                                send_stream(db.create_audits(audit))
+                                    .try_for_each(|_| ready(Ok(())))
+                                    .await?;
                             }
                         }
                         None => {
@@ -477,7 +496,14 @@ impl<D> AppState<D> {
                 let tracker_id = tracker.tracker_id;
 
                 tracker.updated_at = now;
+
+                let audit = create_audit_for(None, None, &old_tracker, &tracker);
+
                 db.update_ap_tracker(tracker, &[ApTrackerIden::UpdatedAt])
+                    .await?;
+
+                send_stream(db.create_audits(audit))
+                    .try_for_each(|_| ready(Ok(())))
                     .await?;
 
                 Ok(tracker_id)
@@ -609,6 +635,9 @@ impl<D> AppState<D> {
                         &[ApTrackerIden::LastPort, ApTrackerIden::NextPortCheckAt],
                     )
                     .await?;
+
+                    // No audit for this change since the port fields are not
+                    // diffed.
                 }
             };
 

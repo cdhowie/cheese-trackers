@@ -4,7 +4,7 @@
 // See https://github.com/rust-lang/rust-clippy/pull/12756
 #![allow(clippy::assigning_clones)]
 
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::http::{HeaderValue, header};
 use db::DataAccessProvider;
@@ -21,6 +21,7 @@ mod api;
 mod auth;
 mod conf;
 mod db;
+mod diff;
 mod logging;
 mod send_hack;
 mod signal;
@@ -32,6 +33,8 @@ mod tracker;
 async fn create_router_from_config(
     config: conf::Config,
 ) -> Result<axum::Router<()>, Box<dyn std::error::Error>> {
+    let client_ip_source = config.client_ip_source.clone();
+
     Ok(match &config.database {
         #[cfg(feature = "postgres")]
         conf::Database::Postgres { connection_string } => {
@@ -39,6 +42,7 @@ async fn create_router_from_config(
             data_provider.migrate().await?;
             println!("Migrations completed successfully.");
             api::create_router(Arc::new(AppState::new(config, data_provider)))
+                .layer(client_ip_source.into_extension())
         }
     })
 }
@@ -88,17 +92,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .layer(ServeDir::new("dist").fallback(ServeFile::new("dist/index.html"))),
         );
 
-    axum::serve(TcpListener::bind(listen).await?, router)
-        .with_graceful_shutdown(async {
-            match signal::any([SignalKind::interrupt(), SignalKind::terminate()]) {
-                Ok(f) => f.await,
-                Err(e) => {
-                    eprintln!("Unable to listen for shutdown signals: {e}");
-                    std::future::pending().await
-                }
+    axum::serve(
+        TcpListener::bind(listen).await?,
+        router.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(async {
+        match signal::any([SignalKind::interrupt(), SignalKind::terminate()]) {
+            Ok(f) => f.await,
+            Err(e) => {
+                eprintln!("Unable to listen for shutdown signals: {e}");
+                std::future::pending().await
             }
-        })
-        .await?;
+        }
+    })
+    .await?;
 
     Ok(())
 }

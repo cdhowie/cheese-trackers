@@ -503,6 +503,17 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
             .fetch_optional(self.0.as_mut())
             .await
     }
+
+    fn create_audits<'s, 'v, 'f>(
+        &'s mut self,
+        audits: impl IntoIterator<Item = Audit> + Send + 'v,
+    ) -> impl Stream<Item = sqlx::Result<Audit>> + Send + 'f
+    where
+        's: 'f,
+        'v: 'f,
+    {
+        pg_insert(self.0.as_mut(), audits)
+    }
 }
 
 impl<'a> Transaction<'a> for PgDataAccess<sqlx::Transaction<'a, Postgres>> {
