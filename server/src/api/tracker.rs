@@ -506,13 +506,7 @@ where
         };
     }
 
-    let audit = create_audit_for(
-        Some(ip),
-        user.as_ref().map(|u| u.user.id),
-        Utc::now(),
-        &old_tracker,
-        &tracker,
-    );
+    let audit = create_audit_for(Some(ip), user.as_ref(), Utc::now(), &old_tracker, &tracker);
 
     if let Some(audit) = audit {
         tx.update_ap_tracker(
@@ -596,13 +590,7 @@ where
 
     hint.classification = hint_update.classification;
 
-    let audit = create_audit_for(
-        Some(ip),
-        user.map(|u| u.user.id),
-        Utc::now(),
-        &old_hint,
-        &hint,
-    );
+    let audit = create_audit_for(Some(ip), user.as_ref(), Utc::now(), &old_hint, &hint);
 
     let hint = tx
         .update_ap_hint(hint, &[ApHintIden::Classification])
@@ -780,13 +768,7 @@ where
 
     game.update_completion_status();
 
-    let audit = create_audit_for(
-        Some(ip),
-        user.map(|u| u.user.id),
-        Utc::now(),
-        &old_game,
-        &game,
-    );
+    let audit = create_audit_for(Some(ip), user.as_ref(), Utc::now(), &old_game, &game);
 
     let game_id = game.id;
     let game = tx

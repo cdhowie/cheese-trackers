@@ -26,7 +26,10 @@ pub mod pg;
 
 use model::*;
 
-use crate::diff::{IntoFieldwiseDiff, IsEmpty};
+use crate::{
+    auth::token::AuthenticatedUser,
+    diff::{IntoFieldwiseDiff, IsEmpty},
+};
 
 /// Provides access to the database.
 pub trait DataAccessProvider {
@@ -306,7 +309,7 @@ pub trait DataAccess {
 
 pub fn create_audit_for<V>(
     actor_ipaddr: Option<IpAddr>,
-    actor_ct_user_id: Option<i32>,
+    actor_ct_user: Option<&AuthenticatedUser>,
     changed_at: DateTime<Utc>,
     old: &V,
     new: &V,
@@ -323,7 +326,8 @@ where
         entity_id: *old.primary_key_value(),
         changed_at,
         actor_ipaddr: actor_ipaddr.map(Into::into),
-        actor_ct_user_id,
+        actor_ct_user_id: actor_ct_user.map(|i| i.user.id),
+        auth_source: actor_ct_user.map(|i| i.source.into()),
         diff: serde_json::to_string(&diff).unwrap(),
     })
 }

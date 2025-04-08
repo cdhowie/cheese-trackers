@@ -256,6 +256,24 @@ db_enum! {
     }
 }
 
+db_enum! {
+    pub enum AuthenticationSource as "authentication_source" {
+        SessionToken,
+        ApiKey,
+    }
+}
+
+impl From<crate::auth::token::AuthenticationSource> for AuthenticationSource {
+    fn from(value: crate::auth::token::AuthenticationSource) -> Self {
+        use crate::auth::token::AuthenticationSource::*;
+
+        match value {
+            SessionToken => Self::SessionToken,
+            ApiKey => Self::ApiKey,
+        }
+    }
+}
+
 db_struct! {
     #[derive(Debug, Clone)]
     pub struct ApTracker {
@@ -427,6 +445,7 @@ db_struct! {
         pub actor_ipaddr: Option<IpNetwork>,
         pub actor_ct_user_id: Option<i32>,
         pub diff: String,
+        pub auth_source: Option<AuthenticationSource>,
     }
 }
 
