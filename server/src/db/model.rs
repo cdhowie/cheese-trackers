@@ -345,6 +345,7 @@ impl Debug for CtUser {
             .field("id", &self.id)
             .field("discord_username", &self.discord_username)
             .field("discord_user_id", &self.discord_user_id)
+            .field("is_away", &self.is_away)
             .finish_non_exhaustive()
     }
 }
