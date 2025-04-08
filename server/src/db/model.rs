@@ -2,14 +2,13 @@
 
 use std::{fmt::Debug, hash::Hash};
 
+use cheese_trackers_server_macros::IntoFieldwiseDiff;
 use chrono::{DateTime, Utc};
 use ipnetwork::IpNetwork;
 use sea_query::{Iden, Nullable, Value};
-use sqlx::{FromRow, Row};
+use serde::Serialize;
+use sqlx::FromRow;
 use uuid::Uuid;
-
-#[cfg(feature = "postgres")]
-use sqlx::postgres::PgRow;
 
 /// Database model.
 pub trait Model {
@@ -44,75 +43,7 @@ pub trait Model {
     fn into_values(self) -> impl Iterator<Item = Value>;
 }
 
-// This is a hack that should be replaced with a proper proc macro.  For
-// example, it assumes the primary key will always be called "id".
-
-/// Automatically implements several traits useful for database model structs.
-macro_rules! db_struct {
-    (
-        $( #[ $nm:meta ] )*
-        $nv:vis struct $n:ident {
-            $(
-                $( #[ $fm:meta ] )*
-                pub $f:ident: $t:ty,
-            )*
-        }
-    ) => {
-        paste::paste! {
-            #[sea_query::enum_def]
-            #[derive(serde::Serialize, serde::Deserialize, crate::diff::IntoFieldwiseDiff)]
-            $( #[ $nm ] )*
-            #[doc = "Model for the database table `"]
-            #[doc = stringify!([< $n:snake >])]
-            #[doc = "`."]
-            $nv struct $n {
-                $(
-                    $( #[ $fm ] )*
-                    pub $f: $t,
-                )*
-            }
-
-            impl Model for $n {
-                type Iden = [< $n Iden >];
-                type PrimaryKey = i32;
-
-                fn table() -> Self::Iden {
-                    [< $n Iden >]::Table
-                }
-
-                fn columns() -> &'static [Self::Iden] {
-                    &[
-                        $( [< $n Iden >]::[< $f:camel >] ),*
-                    ]
-                }
-
-                fn primary_key() -> Self::Iden {
-                    [< $n Iden >]::Id
-                }
-
-                fn primary_key_value(&self) -> &i32 {
-                    &self.id
-                }
-
-                fn into_values(self) -> impl Iterator<Item = Value> {
-                    [
-                        $( self.$f.into() ),*
-                    ]
-                    .into_iter()
-                }
-            }
-
-            #[cfg(feature = "postgres")]
-            impl<'r> FromRow<'r, PgRow> for $n {
-                fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
-                    Ok(Self {
-                        $($f: row.try_get(stringify!($f))?),*
-                    })
-                }
-            }
-        }
-    };
-}
+pub use cheese_trackers_server_macros::Model;
 
 /// Automatically implements several traits useful for database model enums.
 macro_rules! db_enum {
@@ -274,89 +205,80 @@ impl From<crate::auth::token::AuthenticationSource> for AuthenticationSource {
     }
 }
 
-db_struct! {
-    #[derive(Debug, Clone)]
-    pub struct ApTracker {
-        pub id: i32,
-        pub tracker_id: Uuid,
-        #[diff(skip)]
-        pub updated_at: DateTime<Utc>,
-        pub title: String,
-        pub description: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub owner_ct_user_id: Option<i32>,
-        pub lock_settings: bool,
-        pub upstream_url: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub global_ping_policy: Option<PingPreference>,
-        pub room_link: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        #[diff(skip)]
-        pub last_port: Option<i32>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        #[diff(skip)]
-        pub next_port_check_at: Option<DateTime<Utc>>,
-        pub inactivity_threshold_yellow_hours: i32,
-        pub inactivity_threshold_red_hours: i32,
-        pub require_authentication_to_claim: bool,
-    }
+/// Model for database table `ap_tracker`.
+#[sea_query::enum_def]
+#[derive(Debug, Clone, Model, FromRow, IntoFieldwiseDiff)]
+pub struct ApTracker {
+    #[model(primary_key)]
+    pub id: i32,
+    pub tracker_id: Uuid,
+    #[diff(skip)]
+    pub updated_at: DateTime<Utc>,
+    pub title: String,
+    pub description: String,
+    pub owner_ct_user_id: Option<i32>,
+    pub lock_settings: bool,
+    pub upstream_url: String,
+    pub global_ping_policy: Option<PingPreference>,
+    pub room_link: String,
+    #[diff(skip)]
+    pub last_port: Option<i32>,
+    #[diff(skip)]
+    pub next_port_check_at: Option<DateTime<Utc>>,
+    pub inactivity_threshold_yellow_hours: i32,
+    pub inactivity_threshold_red_hours: i32,
+    pub require_authentication_to_claim: bool,
 }
 
 // This is the result of a database function call.  There is no table backing
 // this model.
-//
-// TODO: Don't generate docs in db_struct for this type, because they refer to a
-// table that doesn't exist.
-db_struct! {
-    #[derive(Debug, Clone)]
-    pub struct ApTrackerDashboard {
-        pub id: i32,
-        pub tracker_id: Uuid,
-        pub title: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub owner_ct_user_id: Option<i32>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub owner_discord_username: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub last_activity: Option<DateTime<Utc>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub dashboard_override_visibility: Option<bool>,
-    }
+#[sea_query::enum_def]
+#[derive(Debug, Clone, Model, FromRow)]
+pub struct ApTrackerDashboard {
+    #[model(primary_key)]
+    pub id: i32,
+    pub tracker_id: Uuid,
+    pub title: String,
+    pub owner_ct_user_id: Option<i32>,
+    pub owner_discord_username: Option<String>,
+    pub last_activity: Option<DateTime<Utc>>,
+    pub dashboard_override_visibility: Option<bool>,
 }
 
-db_struct! {
-    #[derive(Debug, Clone)]
-    pub struct ApGame {
-        pub id: i32,
-        pub tracker_id: i32,
-        pub position: i32,
-        pub name: String,
-        pub game: String,
-        pub tracker_status: TrackerGameStatus,
-        pub checks_done: i32,
-        pub checks_total: i32,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub last_activity: Option<DateTime<Utc>>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub discord_username: Option<String>,
-        pub discord_ping: PingPreference,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub last_checked: Option<DateTime<Utc>>,
-        pub notes: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub claimed_by_ct_user_id: Option<i32>,
-        pub availability_status: AvailabilityStatus,
-        pub completion_status: CompletionStatus,
-        pub progression_status: ProgressionStatus,
+/// Model for database view `ap_game`.
+#[sea_query::enum_def]
+#[derive(Debug, Clone, Model, FromRow, IntoFieldwiseDiff, Serialize)]
+pub struct ApGame {
+    #[model(primary_key)]
+    pub id: i32,
+    pub tracker_id: i32,
+    pub position: i32,
+    pub name: String,
+    pub game: String,
+    pub tracker_status: TrackerGameStatus,
+    pub checks_done: i32,
+    pub checks_total: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_activity: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub discord_username: Option<String>,
+    pub discord_ping: PingPreference,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_checked: Option<DateTime<Utc>>,
+    pub notes: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub claimed_by_ct_user_id: Option<i32>,
+    pub availability_status: AvailabilityStatus,
+    pub completion_status: CompletionStatus,
+    pub progression_status: ProgressionStatus,
 
-        // The following columns are computed in the ap_game view and can't be
-        // changed.
-        #[serde(skip_serializing_if = "Option::is_none")]
-        #[diff(skip)]
-        pub effective_discord_username: Option<String>,
-        #[diff(skip)]
-        pub user_is_away: bool,
-    }
+    // The following columns are computed in the ap_game view and can't be
+    // changed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[diff(skip)]
+    pub effective_discord_username: Option<String>,
+    #[diff(skip)]
+    pub user_is_away: bool,
 }
 
 /// Force-upgrades the completion status based on whether all checks are complete
@@ -380,38 +302,40 @@ impl ApGame {
     }
 }
 
-db_struct! {
-    #[derive(Debug, Clone)]
-    pub struct ApHint {
-        pub id: i32,
-        pub finder_game_id: i32,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub receiver_game_id: Option<i32>,
-        pub item: String,
-        pub location: String,
-        pub entrance: String,
-        pub found: bool,
-        pub classification: HintClassification,
-        pub item_link_name: String,
-    }
+/// Model for database table `ap_hint`.
+#[sea_query::enum_def]
+#[derive(Debug, Clone, Model, FromRow, IntoFieldwiseDiff, Serialize)]
+pub struct ApHint {
+    #[model(primary_key)]
+    pub id: i32,
+    pub finder_game_id: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub receiver_game_id: Option<i32>,
+    pub item: String,
+    pub location: String,
+    pub entrance: String,
+    pub found: bool,
+    pub classification: HintClassification,
+    pub item_link_name: String,
 }
 
-db_struct! {
-    #[derive(Clone)]
-    pub struct CtUser {
-        pub id: i32,
-        #[diff(skip)]
-        pub discord_access_token: String,
-        #[diff(skip)]
-        pub discord_access_token_expires_at: DateTime<Utc>,
-        #[diff(skip)]
-        pub discord_refresh_token: String,
-        pub discord_username: String,
-        pub discord_user_id: i64,
-        #[diff(skip)]
-        pub api_key: Option<Uuid>,
-        pub is_away: bool,
-    }
+/// Model for database table `ct_user`.
+#[sea_query::enum_def]
+#[derive(Clone, Model, FromRow, IntoFieldwiseDiff)]
+pub struct CtUser {
+    #[model(primary_key)]
+    pub id: i32,
+    #[diff(skip)]
+    pub discord_access_token: String,
+    #[diff(skip)]
+    pub discord_access_token_expires_at: DateTime<Utc>,
+    #[diff(skip)]
+    pub discord_refresh_token: String,
+    pub discord_username: String,
+    pub discord_user_id: i64,
+    #[diff(skip)]
+    pub api_key: Option<Uuid>,
+    pub is_away: bool,
 }
 
 // Manual implementation to omit tokens.
@@ -425,32 +349,35 @@ impl Debug for CtUser {
     }
 }
 
-db_struct! {
-    #[derive(Debug, Clone)]
-    pub struct JsError {
-        pub id: i32,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        pub ct_user_id: Option<i32>,
-        pub error: String,
-    }
+/// Model for database table `js_error`.
+#[sea_query::enum_def]
+#[derive(Debug, Clone, Model, FromRow)]
+pub struct JsError {
+    #[model(primary_key)]
+    pub id: i32,
+    //#[serde(skip_serializing_if = "Option::is_none")]
+    pub ct_user_id: Option<i32>,
+    pub error: String,
 }
 
-db_struct! {
-    #[derive(Debug, Clone)]
-    pub struct Audit {
-        pub id: i32,
-        pub entity: String,
-        pub entity_id: i32,
-        pub changed_at: DateTime<Utc>,
-        pub actor_ipaddr: Option<IpNetwork>,
-        pub actor_ct_user_id: Option<i32>,
-        pub diff: String,
-        pub auth_source: Option<AuthenticationSource>,
-    }
+/// Model for database table `audit`.
+#[sea_query::enum_def]
+#[derive(Debug, Clone, Model, FromRow)]
+pub struct Audit {
+    #[model(primary_key)]
+    pub id: i32,
+    pub entity: String,
+    pub entity_id: i32,
+    pub changed_at: DateTime<Utc>,
+    pub actor_ipaddr: Option<IpNetwork>,
+    pub actor_ct_user_id: Option<i32>,
+    pub diff: String,
+    pub auth_source: Option<AuthenticationSource>,
 }
 
-// No db_struct! because this has a composite primary key.  Need to refactor
-// that macro into a proper proc macro with composite primary key support.
+// TODO: Implement composite primary key support on Model.
+
+/// Model for database table `ap_tracker_dashboard_override`.
 #[sea_query::enum_def]
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
 pub struct ApTrackerDashboardOverride {
