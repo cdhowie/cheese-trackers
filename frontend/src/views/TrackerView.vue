@@ -474,10 +474,17 @@ const hintsByGame = computed(() => {
 });
 
 function hintStatus(hint) {
+    function isDone(g) {
+        return g.checks_done === g.checks_total && (
+            g.completion_status === 'done' ||
+            g.completion_status === 'released'
+        );
+    }
+
     return hint.found ? 'found' :
         (
             hint.receiver_game_id !== undefined &&
-            gameById.value[hint.receiver_game_id].completion_status === 'done'
+            isDone(gameById.value[hint.receiver_game_id])
         ) ? 'useless' :
             'notfound';
 }
