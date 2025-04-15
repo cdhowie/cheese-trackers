@@ -232,6 +232,12 @@ function isGameCompleted(game) {
     return completionStatus.byId[game.completion_status]?.complete;
 }
 
+function canEditGame(game) {
+    return !settings.value.protectOtherSlots ||
+        currentUserIsTrackerOwner.value ||
+        usersEqual(getClaimingUser(game), currentUser.value);
+}
+
 function effectivePingPreference(game) {
     if (isGameCompleted(game)) {
         return pingPreference.byId.never;
@@ -1274,14 +1280,14 @@ loadTracker();
                             :class="`text-${effectivePingPreference(game).color}`"
                         >{{ effectivePingPreference(game).label }}</span>
                         <DropdownSelector v-else :options="pingPreference"
-                            :value="pingPreference.byId[game.discord_ping]" :disabled="loading"
+                            :value="pingPreference.byId[game.discord_ping]" :disabled="loading || !canEditGame(game)"
                             @selected="s => setPing(game, s)"></DropdownSelector>
                     </template>
                     <template #availability>
                         <DropdownSelector
                             :options="availabilityStatus"
                             :value="availabilityStatus.byId[game.availability_status]"
-                            :disabled="loading"
+                            :disabled="loading || !canEditGame(game)"
                             :icons="settings.statusIcons"
                             @selected="s => setGameAvailabilityStatus(game, s)">
                         </DropdownSelector>
@@ -1292,7 +1298,7 @@ loadTracker();
                                 :disabled="loading" @click="claimGame(game)">Claim</button>
 
                             <template v-else-if="canClaimGames && game.effective_discord_username && !usersEqual(getClaimingUser(game), currentUser)">
-                                <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
+                                <button class="btn btn-sm btn-outline-secondary" :disabled="loading || !canEditGame(game)"
                                     data-bs-toggle="dropdown">Claim</button>
                                 <div class="dropdown-menu text-warning p-3">
                                     <span class="text-warning me-2 d-inline-block align-middle">Another user has claimed
@@ -1319,7 +1325,7 @@ loadTracker();
                             v-if="!isGameCompleted(game)"
                             :options="progressionStatus"
                             :value="progressionStatus.byId[game.progression_status]"
-                            :disabled="loading"
+                            :disabled="loading || !canEditGame(game)"
                             :icons="settings.statusIcons"
                             @selected="s => setGameProgressionStatus(game, s)"
                         ></DropdownSelector>
@@ -1328,7 +1334,7 @@ loadTracker();
                         <DropdownSelector
                             :options="completionStatus"
                             :value="completionStatus.byId[game.completion_status]"
-                            :disabled="loading"
+                            :disabled="loading || !canEditGame(game)"
                             :icons="settings.statusIcons"
                             @selected="s => setGameCompletionStatus(game, s)">
                         </DropdownSelector>
@@ -1346,7 +1352,7 @@ loadTracker();
                     <template #stillbk>
                         <button class="btn btn-sm btn-outline-secondary"
                             :class="{ invisible: !progressionStatus.byId[game.progression_status].isBk || isGameCompleted(game) }"
-                            :disabled="loading"
+                            :disabled="loading || !canEditGame(game)"
                             @click="updateLastChecked(game)">Still BK</button>
                     </template>
                     <template #checks>
@@ -1405,7 +1411,14 @@ loadTracker();
                                                     :finder-game="gameById[hint.finder_game_id]"
                                                     :item-link-name="hint.item_link_name"
                                                     :global-ping-policy="trackerData.global_ping_policy && pingPolicy.byId[trackerData.global_ping_policy]"
-                                                    :disabled="loading"
+                                                    :disabled="
+                                                        loading || !(
+                                                            canEditGame(gameById[hint.finder_game_id]) || (
+                                                                hint.receiver_game_id !== undefined &&
+                                                                canEditGame(gameById[hint.receiver_game_id])
+                                                            )
+                                                        )
+                                                    "
                                                     @set-classification="s => setHintClassification(hint, s)"
                                                     @copy="clipboardCopy(hintToString(hint))"
                                                     @copy-ping="clipboardCopy(hintToStringWithPing(hint))"
@@ -1417,8 +1430,10 @@ loadTracker();
                             </div>
                             <div class="col-12 col-xl-6">
                                 <div class="fw-bold">Notes</div>
-                                <textarea placeholder="Enter any notes about your game here." class="form-control"
+                                <textarea class="form-control"
                                     rows="5" v-model="game.$newnotes" @blur="updateNotes(game)"
+                                    :placeholder="canEditGame(game) ? 'Enter any notes about your game here.' : 'There are no notes for this slot.'"
+                                    :disabled="loading || !canEditGame(game)"
                                     @keyup.esc="game.$newnotes = game.notes"></textarea>
                                 <div class="text-muted">
                                     Saves automatically when you click off of the field. Press ESC to cancel any edits.

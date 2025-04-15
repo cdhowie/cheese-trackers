@@ -138,6 +138,18 @@ maybeLoadUserSettings(settings.currentUser.value);
                         </template>
                     </div>
                 </div>
+                <div class="col-12 col-lg-6">
+                    <label class="form-label">Protect slots I haven't claimed</label>
+                    <div class="btn-group form-control border-0 p-0">
+                        <template v-for="v in [false, true]">
+                            <input type="radio" class="btn-check" name="protectOtherSlots" :id="`protect-other-slots-${v}`"
+                                v-model="editSettings.protectOtherSlots" :value="v">
+                            <label class="btn btn-outline-secondary" :for="`protect-other-slots-${v}`">
+                                {{ v ? 'Yes' : 'No' }}
+                            </label>
+                        </template>
+                    </div>
+                </div>
             </div>
             <div class="row mt-2">
                 <div class="col-12 text-center">

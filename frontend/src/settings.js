@@ -15,6 +15,8 @@ const SETTINGS_SCHEMA = Joi.object().keys({
 
     sortMode: Joi.string().valid(...map(sortModes, 'id')).default('normal'),
 
+    protectOtherSlots: Joi.boolean().default(true),
+
     auth: Joi.object().keys({
         token: Joi.string(),
         userId: Joi.number(),
