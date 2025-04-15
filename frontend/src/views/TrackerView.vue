@@ -234,6 +234,7 @@ function isGameCompleted(game) {
 
 function canEditGame(game) {
     return !settings.value.protectOtherSlots ||
+        game.availability_status === 'public' ||
         currentUserIsTrackerOwner.value ||
         usersEqual(getClaimingUser(game), currentUser.value);
 }
