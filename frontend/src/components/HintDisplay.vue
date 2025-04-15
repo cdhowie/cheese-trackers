@@ -19,6 +19,7 @@ const props = defineProps([
     'itemLinkName',
     'finderGame',
     'disabled',
+    'readonly',
     'status',
     'showStatus',
     'globalPingPolicy',
@@ -84,6 +85,7 @@ const canPing = computed(() => {
                     :options="hintClassification"
                     :value="hintClassification.byId[props.hint.classification]"
                     :disabled="props.disabled"
+                    :readonly="props.readonly"
                     :icons="true"
                     @selected="s => $emit('setClassification', s)"
                 ></DropdownSelector>

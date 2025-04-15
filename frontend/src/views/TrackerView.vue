@@ -1279,15 +1279,20 @@ loadTracker();
                             v-if="!effectivePingPreference(game).editable"
                             :class="`text-${effectivePingPreference(game).color}`"
                         >{{ effectivePingPreference(game).label }}</span>
-                        <DropdownSelector v-else :options="pingPreference"
-                            :value="pingPreference.byId[game.discord_ping]" :disabled="loading || !canEditGame(game)"
-                            @selected="s => setPing(game, s)"></DropdownSelector>
+                        <DropdownSelector
+                            v-else
+                            :options="pingPreference"
+                            :value="pingPreference.byId[game.discord_ping]"
+                            :disabled="loading"
+                            :readonly="!canEditGame(game)"
+                            @selected="s => setPing(game, s)"/>
                     </template>
                     <template #availability>
                         <DropdownSelector
                             :options="availabilityStatus"
                             :value="availabilityStatus.byId[game.availability_status]"
-                            :disabled="loading || !canEditGame(game)"
+                            :disabled="loading"
+                            :readonly="!canEditGame(game)"
                             :icons="settings.statusIcons"
                             @selected="s => setGameAvailabilityStatus(game, s)">
                         </DropdownSelector>
@@ -1297,8 +1302,13 @@ loadTracker();
                             <button v-if="canClaimGames && !game.effective_discord_username" class="btn btn-sm btn-outline-secondary"
                                 :disabled="loading" @click="claimGame(game)">Claim</button>
 
-                            <template v-else-if="canClaimGames && game.effective_discord_username && !usersEqual(getClaimingUser(game), currentUser)">
-                                <button class="btn btn-sm btn-outline-secondary" :disabled="loading || !canEditGame(game)"
+                            <template v-else-if="
+                                canClaimGames &&
+                                game.effective_discord_username &&
+                                !usersEqual(getClaimingUser(game), currentUser) &&
+                                canEditGame(game)
+                            ">
+                                <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
                                     data-bs-toggle="dropdown">Claim</button>
                                 <div class="dropdown-menu text-warning p-3">
                                     <span class="text-warning me-2 d-inline-block align-middle">Another user has claimed
@@ -1309,7 +1319,7 @@ loadTracker();
                                 </div>
                             </template>
 
-                            <button v-else-if="usersEqual(getClaimingUser(game), currentUser)"
+                            <button v-else-if="usersEqual(getClaimingUser(game), currentUser) && canEditGame(game)"
                                 class="btn btn-sm btn-outline-warning" :disabled="loading"
                                 @click="unclaimGame(game)">Disclaim</button>
                         </template>
@@ -1325,7 +1335,8 @@ loadTracker();
                             v-if="!isGameCompleted(game)"
                             :options="progressionStatus"
                             :value="progressionStatus.byId[game.progression_status]"
-                            :disabled="loading || !canEditGame(game)"
+                            :disabled="loading"
+                            :readonly="!canEditGame(game)"
                             :icons="settings.statusIcons"
                             @selected="s => setGameProgressionStatus(game, s)"
                         ></DropdownSelector>
@@ -1334,7 +1345,8 @@ loadTracker();
                         <DropdownSelector
                             :options="completionStatus"
                             :value="completionStatus.byId[game.completion_status]"
-                            :disabled="loading || !canEditGame(game)"
+                            :disabled="loading"
+                            :readonly="!canEditGame(game)"
                             :icons="settings.statusIcons"
                             @selected="s => setGameCompletionStatus(game, s)">
                         </DropdownSelector>
@@ -1350,9 +1362,11 @@ loadTracker();
                         </span>
                     </template>
                     <template #stillbk>
-                        <button class="btn btn-sm btn-outline-secondary"
+                        <button
+                            v-if="canEditGame(game)"
+                            class="btn btn-sm btn-outline-secondary"
                             :class="{ invisible: !progressionStatus.byId[game.progression_status].isBk || isGameCompleted(game) }"
-                            :disabled="loading || !canEditGame(game)"
+                            :disabled="loading"
                             @click="updateLastChecked(game)">Still BK</button>
                     </template>
                     <template #checks>
@@ -1411,14 +1425,13 @@ loadTracker();
                                                     :finder-game="gameById[hint.finder_game_id]"
                                                     :item-link-name="hint.item_link_name"
                                                     :global-ping-policy="trackerData.global_ping_policy && pingPolicy.byId[trackerData.global_ping_policy]"
-                                                    :disabled="
-                                                        loading || !(
-                                                            canEditGame(gameById[hint.finder_game_id]) || (
-                                                                hint.receiver_game_id !== undefined &&
-                                                                canEditGame(gameById[hint.receiver_game_id])
-                                                            )
+                                                    :disabled="loading"
+                                                    :readonly="!(
+                                                        canEditGame(gameById[hint.finder_game_id]) || (
+                                                            hint.receiver_game_id !== undefined &&
+                                                            canEditGame(gameById[hint.receiver_game_id])
                                                         )
-                                                    "
+                                                    )"
                                                     @set-classification="s => setHintClassification(hint, s)"
                                                     @copy="clipboardCopy(hintToString(hint))"
                                                     @copy-ping="clipboardCopy(hintToStringWithPing(hint))"
