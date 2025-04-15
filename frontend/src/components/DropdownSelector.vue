@@ -59,7 +59,7 @@ const { floatingStyles } = useFloating(reference, floating, {
                     active: props.value === option,
                     [`bg-${option.color}`]: props.value === option,
                     [`text-bg-${option.color}`]: props.value === option,
-                }" :disabled="props.loading || props.value === option" @click="$emit('selected', option)"
+                }" :disabled="props.disabled || props.value === option" @click="$emit('selected', option)"
                 ><i v-if="option.icon" :class="`bi-${option.icon}`"></i> {{ option.label }}</button>
             </li>
         </ul>
