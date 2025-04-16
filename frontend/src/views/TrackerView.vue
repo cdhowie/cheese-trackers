@@ -2,8 +2,10 @@
 // This view could use some refactoring to break stuff out into components.
 
 import { computed, onUnmounted, ref, watch } from 'vue';
-import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, fromPairs, every, omit, findIndex, pick } from 'lodash-es';
+import { debouncedRef, refDebounced } from '@vueuse/core';
+import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, fromPairs, every, omit, findIndex, pick, some } from 'lodash-es';
 import moment from 'moment';
+
 import { settings, currentUser } from '@/settings';
 import { now } from '@/time';
 import { getTracker as apiGetTracker, updateGame as apiUpdateGame, updateTracker as apiUpdateTracker, updateHint as apiUpdateHint, setDashboardOverrideStatus as apiSetDashboardOverrideStatus } from '@/api';
@@ -358,6 +360,16 @@ const progressionFilter = (() => {
     return f;
 })();
 
+const freeFilterActive = ref(false);
+
+const freeFilterText = ref('');
+const freeFilterTextDebounced = refDebounced(freeFilterText, 500);
+const freeFilterTextLowercase = computed(() =>
+    freeFilterActive.value
+        ? freeFilterTextDebounced.value.toLowerCase()
+        : ''
+);
+
 const filteredGames = computed(() =>
     filter(trackerData.value?.games, g => {
         const user = getClaimingUser(g);
@@ -365,13 +377,23 @@ const filteredGames = computed(() =>
         return every(
             [progressionFilter, completionFilter, availabilityFilter], f => f.showGame(g)
         ) && (
-                playerFilter.value === PLAYER_FILTER_ALL ? true :
-                    playerFilter.value === PLAYER_FILTER_UNOWNED ? !user :
-                        usersEqual(playerFilter.value, user)
-            ) && (
-                gameFilter.value === undefined ||
-                gameFilter.value === g.game
-            );
+            playerFilter.value === PLAYER_FILTER_ALL ? true :
+                playerFilter.value === PLAYER_FILTER_UNOWNED ? !user :
+                    usersEqual(playerFilter.value, user)
+        ) && (
+            gameFilter.value === undefined ||
+            gameFilter.value === g.game
+        ) && (
+            freeFilterTextLowercase.value === '' || some(
+                [
+                    g.name,
+                    g.effective_discord_username,
+                    g.game,
+                    g.notes,
+                ],
+                (text) => ('string' === typeof text) && text.toLowerCase().includes(freeFilterTextLowercase.value),
+            )
+        )
     })
 );
 
@@ -816,7 +838,20 @@ loadTracker();
                     :disabled="loading"
                     :icons="true"
                     @selected="(s) => setDashboardOverrideStatus(s.id)"
-                />
+                /> <div class="input-group input-group-sm d-inline-flex align-bottom w-auto">
+                    <button
+                        class="btn btn-outline-light"
+                        :class="{ active: freeFilterActive }"
+                        @click="freeFilterActive = !freeFilterActive"
+                    >
+                        <i class="bi-search"/>
+                    </button>
+                    <input
+                        v-if="freeFilterActive"
+                        class="form-control"
+                        v-model="freeFilterText"
+                    >
+                </div>
             </h2>
             <div
                 v-if="trackerData?.room_link?.length"
