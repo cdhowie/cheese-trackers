@@ -881,7 +881,7 @@ loadTracker();
                     class="badge text-bg-info border border-0"
                     @click="clipboardCopy(roomHostAndPort)"
                 >
-                    <i class="bi-ethernet"></i> <span class="font-monospace"
+                    <i class="bi-ethernet"></i> <span class="font-monospace" style="line-height: 0"
                     >
                         {{ roomHostAndPort }}
                     </span>
