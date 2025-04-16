@@ -1,5 +1,7 @@
 <script setup>
 import { breakpoints } from '@/container-breakpoints.js';
+
+const props = defineProps(['isMine']);
 </script>
 
 <template>

@@ -1267,7 +1267,7 @@ loadTracker();
                 </component>
             </template>
             <template #game="{ game }">
-                <component :is="layout.slot">
+                <component :is="layout.slot" :isMine="usersEqual(getClaimingUser(game), currentUser)">
                     <template #name>
                         <a
                             :href="`${trackerData.upstream_url}/0/${game.position}`"

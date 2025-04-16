@@ -1,5 +1,14 @@
 <script setup>
+const props = defineProps(['isMine']);
+
 const slots = defineSlots();
+
+import { settings } from '@/settings';
+import { computed } from 'vue';
+
+const effectiveIsMine = computed(() =>
+    props.isMine && settings.value.sortMode === 'selftop'
+);
 
 // Slots aren't reactive; can't use computed.
 function columns() {
@@ -13,7 +22,7 @@ function columns() {
             <slot name="banner"/>
         </td>
     </tr>
-    <tr v-else>
+    <tr v-else :class="{ 'is-mine': effectiveIsMine }">
         <td><slot name="name"/></td>
         <td><slot name="ping"/></td>
         <td><slot name="availability"/></td>
@@ -28,7 +37,7 @@ function columns() {
         <td><slot name="checks"/></td>
         <td><slot name="hints"/></td>
     </tr>
-    <tr v-if="$slots.hintpane">
+    <tr v-if="$slots.hintpane" :class="{ 'is-mine': effectiveIsMine }">
         <td :colspan="columns()" class="container-fluid">
             <slot name="hintpane"/>
         </td>
@@ -38,5 +47,9 @@ function columns() {
 <style scoped>
 td {
     vertical-align: baseline;
+}
+
+tr.is-mine:has(+ tr:not(.is-mine)) td {
+    border-bottom-width: 3px !important;
 }
 </style>
