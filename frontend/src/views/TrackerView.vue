@@ -849,6 +849,7 @@ loadTracker();
                     <input
                         v-if="freeFilterActive"
                         class="form-control"
+                        placeholder="Find slot"
                         v-model="freeFilterText"
                     >
                 </div>
