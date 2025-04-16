@@ -1,7 +1,7 @@
 <script setup>
 // This view could use some refactoring to break stuff out into components.
 
-import { computed, onUnmounted, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue';
 import { debouncedRef, refDebounced } from '@vueuse/core';
 import { groupBy, keyBy, orderBy, sumBy, uniq, map, filter, reduce, join, includes, uniqBy, fromPairs, every, omit, findIndex, pick, some } from 'lodash-es';
 import moment from 'moment';
@@ -361,6 +361,15 @@ const progressionFilter = (() => {
 })();
 
 const freeFilterActive = ref(false);
+const freeFilterInput = useTemplateRef('free-filter-input');
+
+watch(freeFilterActive, (isActive) => {
+    if (isActive) {
+        setTimeout(() => {
+            freeFilterInput.value?.focus();
+        });
+    }
+});
 
 const freeFilterText = ref('');
 const freeFilterTextDebounced = refDebounced(freeFilterText, 500);
@@ -848,6 +857,7 @@ loadTracker();
                     </button>
                     <input
                         v-if="freeFilterActive"
+                        ref="free-filter-input"
                         class="form-control"
                         placeholder="Find slot"
                         v-model="freeFilterText"
