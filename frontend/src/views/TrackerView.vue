@@ -456,6 +456,8 @@ const sortByActivity = compareByIteratee(g => {
 
 const sortByOwner = compareByIteratee(g => (g.effective_discord_username || '').toLowerCase());
 
+const sortByChecks = compareByIteratee(g => g.checks_done / g.checks_total);
+
 const activeSort = ref([sortByName, false]);
 
 function setSort(sorter, defOrder) {
@@ -475,9 +477,13 @@ const sortedAndFilteredGames = computed(() =>
     [...filteredGames.value].sort(
         chainCompare(
             compareByIteratee(SORT_MODES[settings.value.sortMode]),
+
             activeSort.value[1] ?
                 reverseCompare(activeSort.value[0]) :
-                activeSort.value[0]
+                activeSort.value[0],
+
+            // Fall back on sorting by slot name.
+            sortByName,
         )
     )
 );
@@ -1295,7 +1301,18 @@ loadTracker();
                             </form>
                         </div>
                     </template>
-                    <template #checks>Checks</template>
+                    <template #checks>
+                        <span @click="setSort(sortByChecks, false)" class="sorter">
+                            Checks
+                            <i
+                                v-if="activeSort[0] === sortByChecks"
+                                :class="{
+                                    'bi-sort-numeric-down': !activeSort[1],
+                                    'bi-sort-numeric-up': activeSort[1],
+                                }"
+                            />
+                        </span>
+                    </template>
                     <template #hints>
                         <button class="btn btn-sm btn-outline-light" @click="setAllExpanded(!allExpanded)">Hints <i
                                 :class="{ 'bi-arrows-angle-expand': !allExpanded, 'bi-arrows-angle-contract': allExpanded }"></i></button>
