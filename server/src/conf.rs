@@ -22,6 +22,9 @@ pub struct Config {
     /// Whether to add permissive CORS headers.
     #[serde(default)]
     pub cors_permissive: bool,
+    /// Name of the entity providing the instance, to properly direct support
+    /// requests.
+    pub hoster: Option<String>,
     /// Banners to display in the frontend.
     #[serde(default)]
     pub banners: Vec<Banner>,

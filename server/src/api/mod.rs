@@ -99,6 +99,9 @@ pub struct UiSettings {
     ///
     /// This will be `"dev"` in development environments.
     pub build_version: &'static str,
+    /// Name of the entity providing this instance.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hoster: Option<String>,
     /// Banners that should be displayed in the frontend.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub banners: Vec<Banner>,

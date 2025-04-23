@@ -139,6 +139,7 @@ impl<D> AppState<D> {
             upstream_tracker_prefixes: config.upstream_trackers,
             ui_settings_header: serde_json::to_string(&UiSettings {
                 banners: config.banners,
+                hoster: config.hoster,
                 build_version: option_env!("GIT_COMMIT")
                     .filter(|s| !s.is_empty())
                     .unwrap_or("dev"),

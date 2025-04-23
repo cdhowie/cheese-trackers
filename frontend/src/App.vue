@@ -111,7 +111,13 @@ function dismissBanner(id) {
 
     <footer class="mt-3 p-2 text-center bg-body-tertiary text-muted">
         <p>Built by The Incredible Wheel of Cheese for the Archipelago community. &#x1F9C0;</p>
-        <p class="m-0">Inspired by RadzPrower's tracking spreadsheet.</p>
+        <p>Inspired by RadzPrower's tracking spreadsheet.</p>
+        <p class="m-0">
+            &copy;2025 The Incredible Wheel of Cheese | <a
+            href="https://github.com/cdhowie/cheese-trackers">GitHub</a><template
+            v-if="serverSettings?.hoster"> | Hosted by {{ serverSettings.hoster
+            }}</template>
+        </p>
     </footer>
 
     <div class="toast-container position-fixed top-0 end-0 p-3">
