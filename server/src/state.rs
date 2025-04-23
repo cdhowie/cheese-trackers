@@ -4,7 +4,7 @@ use std::{
     collections::{HashMap, HashSet},
     future::ready,
     str::FromStr,
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 use arrayvec::ArrayVec;
@@ -100,6 +100,13 @@ pub enum TrackerUpdateError {
     TrackerNotFound,
 }
 
+static GIT_COMMIT_ID: LazyLock<String> = LazyLock::new(|| {
+    std::env::var("CT_GIT_COMMIT")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "dev".to_owned())
+});
+
 /// Global server state.
 pub struct AppState<D> {
     /// The server's [data access provider](crate::db::DataAccessProvider).
@@ -140,9 +147,7 @@ impl<D> AppState<D> {
             ui_settings_header: serde_json::to_string(&UiSettings {
                 banners: config.banners,
                 hoster: config.hoster,
-                build_version: option_env!("GIT_COMMIT")
-                    .filter(|s| !s.is_empty())
-                    .unwrap_or("dev"),
+                build_version: &GIT_COMMIT_ID,
             })
             .unwrap()
             .parse()
