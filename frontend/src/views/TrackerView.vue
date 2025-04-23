@@ -275,13 +275,13 @@ function lastCheckedClass(game) {
 function displayLastCheckedOrLastActivity(game) {
     const days = gameDaysSinceLastCheckedOrLastActivity(game);
 
-    return days === undefined ? 'Never' : days.toFixed(1);
+    return days === undefined ? 'Never' : `${days.toFixed(1)}d`;
 }
 
 function displayLastActivity(game) {
     const d = game.last_activity;
 
-    return d === undefined ? 'Never' : Math.max(0, dateToDays(d)).toFixed(1);
+    return d === undefined ? 'Never' : `${Math.max(0, dateToDays(d)).toFixed(1)}d`;
 }
 
 const statGames = computed(() =>
@@ -1283,7 +1283,7 @@ loadTracker();
                     <template #lastactivity>
                         <div class="dropdown">
                             <span class="sorter" @click="setSort(sortByActivity, true)">
-                                Last Activity (Days)
+                                Last Activity
                                 <i v-if="activeSort[0] === sortByActivity" class="me-1"
                                     :class="{ 'bi-sort-numeric-down': !activeSort[1], 'bi-sort-numeric-up': activeSort[1] }"></i>
                             </span>
