@@ -25,7 +25,7 @@ const props = defineProps(['items']);
                     :data-index="index"
                     watch-data
                 >
-                    <div class="container-fluid">
+                    <div class="container-fluid" v-if="active">
                         <slot name="game" :game="item"/>
                     </div>
                 </DynamicScrollerItem>
