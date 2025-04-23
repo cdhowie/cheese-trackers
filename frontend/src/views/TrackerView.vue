@@ -192,6 +192,7 @@ const uniqueGames = computed(() =>
 const gameFilter = ref(undefined);
 
 const showLastActivity = ref(false);
+const showChecksAsPercent = ref(false);
 
 const lastCheckedThresholds = computed(() => {
     const td = trackerData.value;
@@ -1302,16 +1303,24 @@ loadTracker();
                         </div>
                     </template>
                     <template #checks>
-                        <span @click="setSort(sortByChecks, false)" class="sorter">
+                        <span class="sorter" @click="setSort(sortByChecks, false)">
                             Checks
                             <i
                                 v-if="activeSort[0] === sortByChecks"
+                                class="me-1"
                                 :class="{
                                     'bi-sort-numeric-down': !activeSort[1],
                                     'bi-sort-numeric-up': activeSort[1],
                                 }"
                             />
                         </span>
+                        <button
+                            class="btn btn-sm btn-outline-light"
+                            :class="{ active: showChecksAsPercent }"
+                            @click.prevent="showChecksAsPercent = !showChecksAsPercent"
+                        >
+                            <i class="bi-percent"/>
+                        </button>
                     </template>
                     <template #hints>
                         <button class="btn btn-sm btn-outline-light" @click="setAllExpanded(!allExpanded)">Hints <i
@@ -1434,7 +1443,11 @@ loadTracker();
                             @click="updateLastChecked(game)">Still BK</button>
                     </template>
                     <template #checks>
-                        <ChecksBar :done="game.checks_done" :total="game.checks_total"></ChecksBar>
+                        <ChecksBar
+                            :done="game.checks_done"
+                            :total="game.checks_total"
+                            :show-percent="showChecksAsPercent && 'only'"
+                        />
                     </template>
                     <template #hints>
                         <button class="btn btn-sm" :class="[hintsClass(game)]"
