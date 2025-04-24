@@ -1,5 +1,8 @@
 # Cheese Trackers
 
+[![Docker Image CI](https://github.com/cdhowie/cheese-trackers/actions/workflows/docker-image.yml/badge.svg)](https://github.com/cdhowie/cheese-trackers/actions/workflows/docker-image.yml)
+[![Docker Pulls](https://img.shields.io/docker/pulls/cdhowie/cheese-trackers)](https://hub.docker.com/r/cdhowie/cheese-trackers)
+
 An enhanced async room tracker for [Archipelago](https://archipelago.gg) based
 on the fantastic Google spreadsheet built by RadzPrower.  The canonical instance
 is hosted at
