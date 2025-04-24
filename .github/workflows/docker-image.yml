@@ -1,0 +1,37 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "master" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: Compute timestamp tag
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: cdhowie/cheese-trackers
+          tags: |
+            type=raw,value=t-{{date 'YYYYMMDDHHmmss'}}
+            type=sha,format=long
+            type=raw,value=latest
+      -
+        name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      -
+        name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          build-args: |
+            GIT_COMMIT=$GITHUB_SHA
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
