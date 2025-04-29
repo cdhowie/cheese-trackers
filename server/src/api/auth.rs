@@ -10,7 +10,7 @@ use oauth2::TokenResponse;
 use crate::{
     db::{
         DataAccess, DataAccessProvider, Transactable, Transaction, create_audit_for,
-        model::{CtUser, CtUserIden},
+        model::{CtUserIden, CtUserInsertion},
     },
     logging::UnexpectedResultExt,
     send_hack::{send_future, send_stream},
@@ -93,8 +93,7 @@ where
     // below.
     let r = {
         let users = send_stream(
-            tx.create_ct_users([CtUser {
-                id: 0,
+            tx.create_ct_users([CtUserInsertion {
                 discord_access_token: token.access_token().secret().to_owned(),
                 discord_access_token_expires_at: expires_at,
                 discord_refresh_token: token

@@ -84,7 +84,7 @@ pub trait DataAccess {
     /// real IDs in the returned values.
     fn create_ap_trackers<'s, 'v, 'f>(
         &'s mut self,
-        trackers: impl IntoIterator<Item = ApTracker> + Send + 'v,
+        trackers: impl IntoIterator<Item = ApTrackerInsertion> + Send + 'v,
     ) -> impl Stream<Item = sqlx::Result<ApTracker>> + Send + 'f
     where
         's: 'f,
@@ -134,7 +134,7 @@ pub trait DataAccess {
     /// real IDs in the returned values.
     fn create_ap_games<'s, 'v, 'f>(
         &'s mut self,
-        games: impl IntoIterator<Item = ApGame> + Send + 'v,
+        games: impl IntoIterator<Item = ApGameInsertion> + Send + 'v,
     ) -> impl Stream<Item = sqlx::Result<ApGame>> + Send + 'f
     where
         's: 'f,
@@ -172,7 +172,7 @@ pub trait DataAccess {
     /// real IDs in the returned values.
     fn create_ap_hints<'s, 'v, 'f>(
         &'s mut self,
-        hints: impl IntoIterator<Item = ApHint> + Send + 'v,
+        hints: impl IntoIterator<Item = ApHintInsertion> + Send + 'v,
     ) -> impl Stream<Item = sqlx::Result<ApHint>> + Send + 'f
     where
         's: 'f,
@@ -230,7 +230,7 @@ pub trait DataAccess {
     /// real IDs in the returned values.
     fn create_ct_users<'s, 'v, 'f>(
         &'s mut self,
-        users: impl IntoIterator<Item = CtUser> + Send + 'v,
+        users: impl IntoIterator<Item = CtUserInsertion> + Send + 'v,
     ) -> impl Stream<Item = sqlx::Result<CtUser>> + Send + 'f
     where
         's: 'f,
@@ -262,7 +262,7 @@ pub trait DataAccess {
     /// real IDs in the returned values.
     fn create_js_errors<'s, 'v, 'f>(
         &'s mut self,
-        errors: impl IntoIterator<Item = JsError> + Send + 'v,
+        errors: impl IntoIterator<Item = JsErrorInsertion> + Send + 'v,
     ) -> impl Stream<Item = sqlx::Result<JsError>> + Send + 'f
     where
         's: 'f,
@@ -300,7 +300,7 @@ pub trait DataAccess {
     /// real IDs in the returned values.
     fn create_audits<'s, 'v, 'f>(
         &'s mut self,
-        audits: impl IntoIterator<Item = Audit> + Send + 'v,
+        audits: impl IntoIterator<Item = AuditInsertion> + Send + 'v,
     ) -> impl Stream<Item = sqlx::Result<Audit>> + Send + 'f
     where
         's: 'f,
@@ -313,15 +313,14 @@ pub fn create_audit_for<V>(
     changed_at: DateTime<Utc>,
     old: &V,
     new: &V,
-) -> Option<Audit>
+) -> Option<AuditInsertion>
 where
     V: Model<PrimaryKey = i32>,
     for<'a> &'a V: IntoFieldwiseDiff,
 {
     let diff = old.into_fieldwise_diff(new);
 
-    (!diff.is_empty()).then(|| Audit {
-        id: Default::default(),
+    (!diff.is_empty()).then(|| AuditInsertion {
         entity: V::table().to_string(),
         entity_id: *old.primary_key_value(),
         changed_at,

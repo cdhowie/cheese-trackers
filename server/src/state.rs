@@ -22,8 +22,9 @@ use crate::{
     db::{
         DataAccess, DataAccessProvider, Transactable, Transaction, create_audit_for,
         model::{
-            ApGame, ApGameIden, ApHint, ApHintIden, ApTracker, ApTrackerIden, AvailabilityStatus,
-            CompletionStatus, HintClassification, PingPreference, ProgressionStatus,
+            ApGameIden, ApGameInsertion, ApHintIden, ApHintInsertion, ApTrackerIden,
+            ApTrackerInsertion, AvailabilityStatus, CompletionStatus, HintClassification,
+            PingPreference, ProgressionStatus, UpdateCompletionStatus,
         },
     },
     logging::log,
@@ -206,8 +207,7 @@ impl<D> AppState<D> {
                 let tracker_id = Uuid::new_v4();
 
                 let tracker = {
-                    let trackers = send_stream(db.create_ap_trackers([ApTracker {
-                        id: 0,
+                    let trackers = send_stream(db.create_ap_trackers([ApTrackerInsertion {
                         tracker_id,
                         upstream_url: upstream_url.to_owned(),
                         updated_at: now,
@@ -242,8 +242,7 @@ impl<D> AppState<D> {
                         .try_convert()
                         .map_err(|_| TrackerUpdateError::NumericConversion(game.position))?;
 
-                    let mut game = ApGame {
-                        id: 0,
+                    let mut game = ApGameInsertion {
                         tracker_id: tracker.id,
                         position: game
                             .position
@@ -294,8 +293,7 @@ impl<D> AppState<D> {
                         None => hint.receiver,
                     };
 
-                    let ap_hint = ApHint {
-                        id: 0,
+                    let ap_hint = ApHintInsertion {
                         finder_game_id: *name_to_id
                             .get(&hint.finder)
                             .ok_or_else(|| TrackerUpdateError::HintGameMissing(hint.finder))?,
@@ -470,8 +468,7 @@ impl<D> AppState<D> {
                         }
                         None => {
                             // This is a new hint.
-                            new_hints.push(ApHint {
-                                id: 0,
+                            new_hints.push(ApHintInsertion {
                                 finder_game_id: finder,
                                 receiver_game_id: receiver,
                                 item_link_name,

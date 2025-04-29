@@ -13,7 +13,7 @@ use futures::TryStreamExt;
 
 use crate::{
     conf::Banner,
-    db::{DataAccess, DataAccessProvider, model::JsError},
+    db::{DataAccess, DataAccessProvider, model::JsErrorInsertion},
     logging::UnexpectedResultExt,
     send_hack::send_stream,
     state::AppState,
@@ -148,8 +148,7 @@ where
             .await
             .unexpected()?;
 
-        send_stream(db.create_js_errors([JsError {
-            id: 0,
+        send_stream(db.create_js_errors([JsErrorInsertion {
             ct_user_id: request.ct_user_id,
             error: request.error,
         }]))

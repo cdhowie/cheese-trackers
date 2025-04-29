@@ -43,7 +43,30 @@ pub trait Model {
     fn into_values(self) -> impl Iterator<Item = Value>;
 }
 
-pub use cheese_trackers_server_macros::Model;
+/// Models that have an automatically-generated primary key value on insert.
+pub trait ModelWithAutoPrimaryKey: Model + Into<Self::InsertionModel> {
+    /// Type for insertion.  This is a mirror of the model type but without any
+    /// primary key values.
+    type InsertionModel;
+
+    /// Returns all of the columns of the model excluding primary keys.
+    ///
+    /// The identifiers produced by this function must contain no duplicates and
+    /// exactly match the order that values are produced by
+    /// [`into_insertion_values()`](Self::into_insertion_values), which implies
+    /// the two functions must produce the same number of items.
+    fn insertion_columns() -> &'static [Self::Iden];
+
+    /// Converts the value into an iterator of column values.
+    ///
+    /// The values produced by this function must exactly match the order that
+    /// identifiers are produced by
+    /// [`insertion_columns()`](Self::insertion_columns), which implies the two
+    /// functions must produce the same number of items.
+    fn into_insertion_values(value: Self::InsertionModel) -> impl Iterator<Item = Value>;
+}
+
+pub use cheese_trackers_server_macros::{Model, ModelWithAutoPrimaryKey};
 
 /// Automatically implements several traits useful for database model enums.
 macro_rules! db_enum {
@@ -207,7 +230,7 @@ impl From<crate::auth::token::AuthenticationSource> for AuthenticationSource {
 
 /// Model for database table `ap_tracker`.
 #[sea_query::enum_def]
-#[derive(Debug, Clone, Model, FromRow, IntoFieldwiseDiff)]
+#[derive(Debug, Clone, Model, ModelWithAutoPrimaryKey, FromRow, IntoFieldwiseDiff)]
 pub struct ApTracker {
     #[model(primary_key)]
     pub id: i32,
@@ -233,7 +256,7 @@ pub struct ApTracker {
 // This is the result of a database function call.  There is no table backing
 // this model.
 #[sea_query::enum_def]
-#[derive(Debug, Clone, Model, FromRow)]
+#[derive(Debug, Clone, Model, ModelWithAutoPrimaryKey, FromRow)]
 pub struct ApTrackerDashboard {
     #[model(primary_key)]
     pub id: i32,
@@ -247,7 +270,7 @@ pub struct ApTrackerDashboard {
 
 /// Model for database view `ap_game`.
 #[sea_query::enum_def]
-#[derive(Debug, Clone, Model, FromRow, IntoFieldwiseDiff, Serialize)]
+#[derive(Debug, Clone, Model, ModelWithAutoPrimaryKey, FromRow, IntoFieldwiseDiff, Serialize)]
 pub struct ApGame {
     #[model(primary_key)]
     pub id: i32,
@@ -281,30 +304,74 @@ pub struct ApGame {
     pub user_is_away: bool,
 }
 
-/// Force-upgrades the completion status based on whether all checks are complete
-/// and whether the goal is complete.
-///
-/// Returns true if the completion status was changed.
-impl ApGame {
-    pub fn update_completion_status(&mut self) -> bool {
-        let auto_status = match (self.checks_done == self.checks_total, self.tracker_status) {
+/// Projection of a game used by [`UpdateCompletionStatus`].
+struct UpdateCompletionStatusProjection<'a> {
+    checks_done: i32,
+    checks_total: i32,
+    tracker_status: TrackerGameStatus,
+    completion_status: &'a mut CompletionStatus,
+}
+
+/// Infrastructure trait to provide a common interface for [`ApGame`] and
+/// [`ApGameInsertion`] used by [`UpdateCompletionStatus`].
+trait ProjectForUpdateCompletionStatus {
+    /// Projects the values needed by [`UpdateCompletionStatus`].
+    fn project_for_update_completion_status(&mut self) -> UpdateCompletionStatusProjection<'_>;
+}
+
+impl ProjectForUpdateCompletionStatus for ApGame {
+    fn project_for_update_completion_status(&mut self) -> UpdateCompletionStatusProjection<'_> {
+        UpdateCompletionStatusProjection {
+            checks_done: self.checks_done,
+            checks_total: self.checks_total,
+            tracker_status: self.tracker_status,
+            completion_status: &mut self.completion_status,
+        }
+    }
+}
+
+impl ProjectForUpdateCompletionStatus for ApGameInsertion {
+    fn project_for_update_completion_status(&mut self) -> UpdateCompletionStatusProjection<'_> {
+        UpdateCompletionStatusProjection {
+            checks_done: self.checks_done,
+            checks_total: self.checks_total,
+            tracker_status: self.tracker_status,
+            completion_status: &mut self.completion_status,
+        }
+    }
+}
+
+/// Allows completion status force-upgrading.
+pub trait UpdateCompletionStatus {
+    /// Force-upgrades the completion status based on whether all checks are
+    /// complete and whether the goal is complete.
+    ///
+    /// Returns true if the completion status was changed.
+    fn update_completion_status(&mut self) -> bool;
+}
+
+impl<T: ProjectForUpdateCompletionStatus> UpdateCompletionStatus for T {
+    fn update_completion_status(&mut self) -> bool {
+        let p = self.project_for_update_completion_status();
+
+        let auto_status = match (p.checks_done == p.checks_total, p.tracker_status) {
             (true, TrackerGameStatus::GoalCompleted) => CompletionStatus::Done,
             (true, _) => CompletionStatus::AllChecks,
             (false, TrackerGameStatus::GoalCompleted) => CompletionStatus::Goal,
             (false, _) => CompletionStatus::Incomplete,
         };
 
-        let new_status = auto_status.merge_with(self.completion_status);
+        let new_status = auto_status.merge_with(*p.completion_status);
 
-        let r = new_status != self.completion_status;
-        self.completion_status = new_status;
+        let r = new_status != *p.completion_status;
+        *p.completion_status = new_status;
         r
     }
 }
 
 /// Model for database table `ap_hint`.
 #[sea_query::enum_def]
-#[derive(Debug, Clone, Model, FromRow, IntoFieldwiseDiff, Serialize)]
+#[derive(Debug, Clone, Model, ModelWithAutoPrimaryKey, FromRow, IntoFieldwiseDiff, Serialize)]
 pub struct ApHint {
     #[model(primary_key)]
     pub id: i32,
@@ -321,7 +388,7 @@ pub struct ApHint {
 
 /// Model for database table `ct_user`.
 #[sea_query::enum_def]
-#[derive(Clone, Model, FromRow, IntoFieldwiseDiff)]
+#[derive(Clone, Model, ModelWithAutoPrimaryKey, FromRow, IntoFieldwiseDiff)]
 pub struct CtUser {
     #[model(primary_key)]
     pub id: i32,
@@ -352,7 +419,7 @@ impl Debug for CtUser {
 
 /// Model for database table `js_error`.
 #[sea_query::enum_def]
-#[derive(Debug, Clone, Model, FromRow)]
+#[derive(Debug, Clone, Model, ModelWithAutoPrimaryKey, FromRow)]
 pub struct JsError {
     #[model(primary_key)]
     pub id: i32,
@@ -363,7 +430,7 @@ pub struct JsError {
 
 /// Model for database table `audit`.
 #[sea_query::enum_def]
-#[derive(Debug, Clone, Model, FromRow)]
+#[derive(Debug, Clone, Model, ModelWithAutoPrimaryKey, FromRow)]
 pub struct Audit {
     #[model(primary_key)]
     pub id: i32,

@@ -55,30 +55,19 @@ fn missing_primary_key<T>() -> String {
 /// Returns a stream of the values that were inserted.
 fn pg_insert<'a, T>(
     executor: &'a mut PgConnection,
-    values: impl IntoIterator<Item = T> + 'a,
+    values: impl IntoIterator<Item = T::InsertionModel> + 'a,
 ) -> impl Stream<Item = sqlx::Result<T>> + 'a
 where
-    T: Model + for<'b> FromRow<'b, PgRow> + Send + Unpin + 'a,
+    T: ModelWithAutoPrimaryKey + for<'b> FromRow<'b, PgRow> + Send + Unpin + 'a,
 {
     stream! {
-        // Insert ignores the primary key.  To remove the matching value we need
-        // to know its position.  The contract of Model::columns() and
-        // Model::into_values() ensures that we can simply omit the value from
-        // the matching position.
-        let id_pos = T::columns()
-            .iter()
-            .position(|&i| i == T::primary_key())
-            .ok_or_else(|| missing_primary_key::<T>())
-            .unwrap();
-
         let mut query = Query::insert().build_with(|q| {
             q
                 .into_table(T::table())
                 .columns(
-                    T::columns()
+                    T::insertion_columns()
                         .iter()
                         .copied()
-                        .filter(|&i| i != T::primary_key()),
                 );
         });
 
@@ -86,10 +75,7 @@ where
         for value in values {
             any = true;
             query.values_panic(
-                value
-                    .into_values()
-                    .enumerate()
-                    .filter_map(|(pos, v)| (pos != id_pos).then_some(v.into())),
+                T::into_insertion_values(value).map(|v| v.into())
             );
         }
 
@@ -249,7 +235,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
 
     fn create_ap_trackers<'s, 'v, 'f>(
         &'s mut self,
-        trackers: impl IntoIterator<Item = ApTracker> + Send + 'v,
+        trackers: impl IntoIterator<Item = ApTrackerInsertion> + Send + 'v,
     ) -> impl Stream<Item = sqlx::Result<ApTracker>> + Send + 'f
     where
         's: 'f,
@@ -307,7 +293,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
 
     fn create_ap_games<'s, 'v, 'f>(
         &'s mut self,
-        games: impl IntoIterator<Item = ApGame> + Send + 'v,
+        games: impl IntoIterator<Item = ApGameInsertion> + Send + 'v,
     ) -> impl Stream<Item = sqlx::Result<ApGame>> + Send + 'f
     where
         's: 'f,
@@ -333,7 +319,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
 
     fn create_ap_hints<'s, 'v, 'f>(
         &'s mut self,
-        hints: impl IntoIterator<Item = ApHint> + Send + 'v,
+        hints: impl IntoIterator<Item = ApHintInsertion> + Send + 'v,
     ) -> impl Stream<Item = sqlx::Result<ApHint>> + Send + 'f
     where
         's: 'f,
@@ -383,7 +369,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
 
     fn create_ct_users<'s, 'v, 'f>(
         &'s mut self,
-        users: impl IntoIterator<Item = CtUser> + Send + 'v,
+        users: impl IntoIterator<Item = CtUserInsertion> + Send + 'v,
     ) -> impl Stream<Item = sqlx::Result<CtUser>> + Send + 'f
     where
         's: 'f,
@@ -402,7 +388,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
 
     fn create_js_errors<'s, 'v, 'f>(
         &'s mut self,
-        errors: impl IntoIterator<Item = JsError> + Send + 'v,
+        errors: impl IntoIterator<Item = JsErrorInsertion> + Send + 'v,
     ) -> impl Stream<Item = sqlx::Result<JsError>> + Send + 'f
     where
         's: 'f,
@@ -506,7 +492,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
 
     fn create_audits<'s, 'v, 'f>(
         &'s mut self,
-        audits: impl IntoIterator<Item = Audit> + Send + 'v,
+        audits: impl IntoIterator<Item = AuditInsertion> + Send + 'v,
     ) -> impl Stream<Item = sqlx::Result<Audit>> + Send + 'f
     where
         's: 'f,

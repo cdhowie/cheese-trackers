@@ -23,7 +23,7 @@ use crate::{
         model::{
             ApGame, ApGameIden, ApHint, ApHintIden, ApTracker, ApTrackerDashboardOverride,
             ApTrackerIden, AvailabilityStatus, CompletionStatus, HintClassification,
-            PingPreference, ProgressionStatus,
+            PingPreference, ProgressionStatus, UpdateCompletionStatus,
         },
     },
     logging::UnexpectedResultExt,
