@@ -15,9 +15,6 @@ pub trait Model {
     /// Identifier type.
     type Iden: Iden + Eq + Hash + Debug + Copy + 'static;
 
-    /// Primary key type.
-    type PrimaryKey: Eq + Hash + Debug + Clone + 'static;
-
     /// Returns the identifier for this model's table.
     fn table() -> Self::Iden;
 
@@ -28,12 +25,6 @@ pub trait Model {
     /// [`into_values()`](Self::into_values), which implies the two functions
     /// must produce the same number of items.
     fn columns() -> &'static [Self::Iden];
-
-    /// Returns the identifier of this model's primary key.
-    fn primary_key() -> Self::Iden;
-
-    /// Returns the primary key of this value.
-    fn primary_key_value(&self) -> &Self::PrimaryKey;
 
     /// Converts the value into an iterator of column values.
     ///
@@ -48,6 +39,9 @@ pub trait ModelWithAutoPrimaryKey: Model + Into<Self::InsertionModel> {
     /// Type for insertion.  This is a mirror of the model type but without any
     /// primary key values.
     type InsertionModel;
+
+    /// Primary key type.
+    type PrimaryKey: Eq + Hash + Debug + Clone + 'static;
 
     /// Returns all of the columns of the model excluding primary keys.
     ///
@@ -64,6 +58,12 @@ pub trait ModelWithAutoPrimaryKey: Model + Into<Self::InsertionModel> {
     /// [`insertion_columns()`](Self::insertion_columns), which implies the two
     /// functions must produce the same number of items.
     fn into_insertion_values(value: Self::InsertionModel) -> impl Iterator<Item = Value>;
+
+    /// Returns the identifier of this model's primary key.
+    fn primary_key() -> Self::Iden;
+
+    /// Returns the primary key of this value.
+    fn primary_key_value(&self) -> &Self::PrimaryKey;
 }
 
 pub use cheese_trackers_server_macros::{Model, ModelWithAutoPrimaryKey};
@@ -447,7 +447,7 @@ pub struct Audit {
 
 /// Model for database table `ap_tracker_dashboard_override`.
 #[sea_query::enum_def]
-#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Copy, Model, serde::Serialize, serde::Deserialize, sqlx::FromRow)]
 pub struct ApTrackerDashboardOverride {
     pub ct_user_id: i32,
     pub ap_tracker_id: i32,

@@ -126,11 +126,11 @@ fn expand_derive_fieldwise_diff(input: ItemStruct) -> syn::Result<proc_macro2::T
     })
 }
 
-#[proc_macro_derive(Model, attributes(model))]
+#[proc_macro_derive(Model)]
 pub fn derive_model(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemStruct);
 
-    expand_derive_model(input, Trait::Model)
+    expand_derive_model(input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
@@ -139,20 +139,78 @@ pub fn derive_model(item: TokenStream) -> TokenStream {
 pub fn derive_model_with_auto_primary_key(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemStruct);
 
-    expand_derive_model(input, Trait::ModelWithAutoPrimaryKey)
+    expand_derive_model_with_auto_primary_key(input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Trait {
-    Model,
-    ModelWithAutoPrimaryKey,
+fn expand_derive_model(input: ItemStruct) -> syn::Result<proc_macro2::TokenStream> {
+    struct ModelField<'a> {
+        pub field: &'a Field,
+        pub iden: Ident,
+    }
+
+    let ident = &input.ident;
+
+    let iden_ident = format_ident!("{ident}Iden");
+
+    let mut fields = vec![];
+
+    for field in &input.fields {
+        fields.push(ModelField {
+            iden: Ident::new(
+                &field
+                    .ident
+                    .as_ref()
+                    .unwrap()
+                    .to_string()
+                    .to_case(Case::Pascal),
+                field.ident.span(),
+            ),
+
+            field,
+        });
+    }
+
+    let model_columns = fields.iter().map(|f| {
+        let variant = &f.iden;
+
+        quote! { #iden_ident::#variant }
+    });
+
+    let model_into_values = fields.iter().map(|f| {
+        let field = f.field.ident.as_ref().unwrap();
+
+        quote! { self.#field.into() }
+    });
+
+    Ok(quote! {
+        #[automatically_derived]
+        impl crate::db::model::Model for #ident {
+            type Iden = #iden_ident;
+
+            fn table() -> Self::Iden {
+                #iden_ident::Table
+            }
+
+            fn columns() -> &'static [Self::Iden] {
+                &[
+                    #( #model_columns ),*
+                ]
+            }
+
+            fn into_values(self) -> impl Iterator<Item = ::sea_query::Value> {
+                [
+                    #( #model_into_values ),*
+                ]
+                .into_iter()
+            }
+        }
+    })
 }
 
-fn expand_derive_model(
+fn expand_derive_model_with_auto_primary_key(
     input: ItemStruct,
-    which_trait: Trait,
 ) -> syn::Result<proc_macro2::TokenStream> {
     struct ModelField<'a> {
         pub field: &'a Field,
@@ -203,7 +261,6 @@ fn expand_derive_model(
         });
     }
 
-    // TODO: Support composite keys.
     let primary_key = {
         let mut pkeys = fields.iter().filter(|f| f.is_primary_key);
 
@@ -226,117 +283,77 @@ fn expand_derive_model(
         primary_key_ident.span(),
     );
 
-    let model_columns = fields.iter().map(|f| {
-        let variant = &f.iden;
+    let insertion_model_ident = format_ident!("{ident}Insertion");
 
-        quote! { #iden_ident::#variant }
+    let insertion_model_fields = fields.iter().filter(|&f| (!f.is_primary_key));
+
+    let insertion_model_field_defs = insertion_model_fields.clone().map(|f| {
+        let mut field = f.field.clone();
+        field.attrs.clear();
+        field
     });
 
-    let model_into_values = fields.iter().map(|f| {
+    let insertion_model_from_model_fields = insertion_model_fields.clone().map(|f| {
+        let ident = f.field.ident.as_ref().unwrap();
+
+        quote! { #ident: value.#ident }
+    });
+
+    let insertion_model_column_idens = insertion_model_fields.clone().map(|f| {
+        let iden = &f.iden;
+
+        quote! { #iden_ident::#iden }
+    });
+
+    let insertion_model_into_values = insertion_model_fields.map(|f| {
         let field = f.field.ident.as_ref().unwrap();
 
-        quote! { self.#field.into() }
+        quote! { value.#field.into() }
     });
 
-    Ok(match which_trait {
-        Trait::Model => quote! {
-            #[automatically_derived]
-            impl crate::db::model::Model for #ident {
-                type Iden = #iden_ident;
-                type PrimaryKey = #primary_key_type;
+    let insertion_model_doc = format!("Insertion model for [`{ident}`].");
 
-                fn table() -> Self::Iden {
-                    #iden_ident::Table
-                }
+    Ok(quote! {
+        #[automatically_derived]
+        #[allow(unused)]
+        #[doc = #insertion_model_doc]
+        #[derive(Debug, Clone, ::serde::Deserialize)]
+        pub struct #insertion_model_ident {
+            #( #insertion_model_field_defs ),*
+        }
 
-                fn columns() -> &'static [Self::Iden] {
-                    &[
-                        #( #model_columns ),*
-                    ]
-                }
+        #[automatically_derived]
+        impl crate::db::model::ModelWithAutoPrimaryKey for #ident {
+            type InsertionModel = #insertion_model_ident;
+            type PrimaryKey = #primary_key_type;
 
-                fn primary_key() -> Self::Iden {
-                    #iden_ident::#primary_key_iden
-                }
-
-                fn primary_key_value(&self) -> &Self::PrimaryKey {
-                    &self.#primary_key_ident
-                }
-
-                fn into_values(self) -> impl Iterator<Item = ::sea_query::Value> {
-                    [
-                        #( #model_into_values ),*
-                    ]
-                    .into_iter()
-                }
+            fn insertion_columns() -> &'static [Self::Iden] {
+                &[
+                    #( #insertion_model_column_idens ),*
+                ]
             }
-        },
 
-        Trait::ModelWithAutoPrimaryKey => {
-            let insertion_model_ident = format_ident!("{ident}Insertion");
+            fn into_insertion_values(value: Self::InsertionModel) -> impl Iterator<Item = Value> {
+                [
+                    #( #insertion_model_into_values ),*
+                ]
+                .into_iter()
+            }
 
-            let insertion_model_fields = fields.iter().filter(|&f| (!f.is_primary_key));
+            fn primary_key() -> Self::Iden {
+                #iden_ident::#primary_key_iden
+            }
 
-            let insertion_model_field_defs = insertion_model_fields.clone().map(|f| {
-                let mut field = f.field.clone();
-                field.attrs.clear();
-                field
-            });
+            fn primary_key_value(&self) -> &Self::PrimaryKey {
+                &self.#primary_key_ident
+            }
+        }
 
-            let insertion_model_from_model_fields = insertion_model_fields.clone().map(|f| {
-                let ident = f.field.ident.as_ref().unwrap();
-
-                quote! { #ident: value.#ident }
-            });
-
-            let insertion_model_column_idens = insertion_model_fields.clone().map(|f| {
-                let iden = &f.iden;
-
-                quote! { #iden_ident::#iden }
-            });
-
-            let insertion_model_into_values = insertion_model_fields.map(|f| {
-                let field = f.field.ident.as_ref().unwrap();
-
-                quote! { value.#field.into() }
-            });
-
-            let insertion_model_doc = format!("Insertion model for [`{ident}`].");
-
-            quote! {
-                #[automatically_derived]
-                #[allow(unused)]
-                #[doc = #insertion_model_doc]
-                #[derive(Debug, Clone, ::serde::Deserialize)]
-                pub struct #insertion_model_ident {
-                    #( #insertion_model_field_defs ),*
-                }
-
-                #[automatically_derived]
-                impl crate::db::model::ModelWithAutoPrimaryKey for #ident {
-                    type InsertionModel = #insertion_model_ident;
-
-                    fn insertion_columns() -> &'static [Self::Iden] {
-                        &[
-                            #( #insertion_model_column_idens ),*
-                        ]
-                    }
-
-                    fn into_insertion_values(value: Self::InsertionModel) -> impl Iterator<Item = Value> {
-                        [
-                            #( #insertion_model_into_values ),*
-                        ]
-                        .into_iter()
-                    }
-                }
-
-                #[automatically_derived]
-                impl From<#ident> for #insertion_model_ident {
-                    fn from(value: #ident) -> Self {
-                        Self {
-                            #( #insertion_model_from_model_fields ),*
-                        }
-                    }
+        #[automatically_derived]
+        impl From<#ident> for #insertion_model_ident {
+            fn from(value: #ident) -> Self {
+                Self {
+                    #( #insertion_model_from_model_fields ),*
                 }
             }
         }

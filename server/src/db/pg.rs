@@ -138,7 +138,7 @@ where
 /// Deletes a row from the database by its integer primary key.
 async fn pg_delete<T>(executor: &mut PgConnection, id: i32) -> sqlx::Result<Option<T>>
 where
-    T: Model + for<'a> FromRow<'a, PgRow> + Send + Unpin,
+    T: ModelWithAutoPrimaryKey + for<'a> FromRow<'a, PgRow> + Send + Unpin,
 {
     let (sql, values) = Query::delete()
         .from_table(T::table())
@@ -170,7 +170,7 @@ async fn pg_update<T>(
     columns: &[T::Iden],
 ) -> sqlx::Result<Option<T>>
 where
-    T: Model + for<'a> FromRow<'a, PgRow> + Send + Unpin,
+    T: ModelWithAutoPrimaryKey + for<'a> FromRow<'a, PgRow> + Send + Unpin,
 {
     // Would be nice to avoid converting to a map here, but this simplifies a
     // lot of the code below.
