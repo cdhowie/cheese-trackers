@@ -299,6 +299,18 @@ fn expand_derive_model_with_auto_primary_key(
         quote! { #ident: value.#ident }
     });
 
+    let insertion_model_from_model_fields_combine = insertion_model_fields.clone().map(|f| {
+        let ident = f.field.ident.as_ref().unwrap();
+
+        quote! { #ident: data.#ident }
+    });
+
+    let insertion_model_from_model_fields_split = insertion_model_fields.clone().map(|f| {
+        let ident = f.field.ident.as_ref().unwrap();
+
+        quote! { #ident: self.#ident }
+    });
+
     let insertion_model_column_idens = insertion_model_fields.clone().map(|f| {
         let iden = &f.iden;
 
@@ -346,6 +358,22 @@ fn expand_derive_model_with_auto_primary_key(
 
             fn primary_key_value(&self) -> &Self::PrimaryKey {
                 &self.#primary_key_ident
+            }
+
+            fn split_primary_key(self) -> (Self::PrimaryKey, Self::InsertionModel) {
+                (
+                    self.#primary_key_ident,
+                    #insertion_model_ident {
+                        #( #insertion_model_from_model_fields_split ),*
+                    },
+                )
+            }
+
+            fn combine_primary_key(key: Self::PrimaryKey, data: Self::InsertionModel) -> Self {
+                Self {
+                    #primary_key_ident: key,
+                    #( #insertion_model_from_model_fields_combine ),*
+                }
             }
         }
 

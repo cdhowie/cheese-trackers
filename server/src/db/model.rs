@@ -64,6 +64,12 @@ pub trait ModelWithAutoPrimaryKey: Model + Into<Self::InsertionModel> {
 
     /// Returns the primary key of this value.
     fn primary_key_value(&self) -> &Self::PrimaryKey;
+
+    /// Split the model into its primary key and insertion model.
+    fn split_primary_key(self) -> (Self::PrimaryKey, Self::InsertionModel);
+
+    /// Create an instance from a primary key value and insertion model.
+    fn combine_primary_key(key: Self::PrimaryKey, data: Self::InsertionModel) -> Self;
 }
 
 pub use cheese_trackers_server_macros::{Model, ModelWithAutoPrimaryKey};

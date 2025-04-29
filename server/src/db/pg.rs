@@ -38,18 +38,6 @@ impl DataAccessProvider for PgPool {
 #[derive(Debug)]
 pub struct PgDataAccess<T>(T);
 
-/// Returns a string describing the error case where a type's [`Model::columns`]
-/// implementation omits the primary key.
-///
-/// This function is used in a few places to ensure a consistent panic message
-/// for this situation.
-fn missing_primary_key<T>() -> String {
-    format!(
-        "{0}::columns() does not contain {0}::primary_key()",
-        std::any::type_name::<T>()
-    )
-}
-
 /// Performs an insert of the specified values into the database.
 ///
 /// Returns a stream of the values that were inserted.
@@ -171,19 +159,17 @@ async fn pg_update<T>(
 ) -> sqlx::Result<Option<T>>
 where
     T: ModelWithAutoPrimaryKey + for<'a> FromRow<'a, PgRow> + Send + Unpin,
+    T::PrimaryKey: Into<sea_query::Value>,
 {
+    let (key, data) = value.split_primary_key();
+
     // Would be nice to avoid converting to a map here, but this simplifies a
     // lot of the code below.
-    let mut values: HashMap<_, _> = T::columns()
+    let mut values: HashMap<_, _> = T::insertion_columns()
         .iter()
         .copied()
-        .zip(value.into_values())
+        .zip(T::into_insertion_values(data))
         .collect();
-
-    let pkey = values
-        .remove(&T::primary_key())
-        .ok_or_else(|| missing_primary_key::<T>())
-        .unwrap();
 
     let columns = if columns.is_empty() {
         T::columns()
@@ -193,17 +179,17 @@ where
 
     let (sql, values) = Query::update()
         .table(T::table())
-        .values(columns.iter().copied().filter_map(|col| {
-            (col != T::primary_key()).then_some((
+        .values(columns.iter().copied().map(|col| {
+            (
                 col,
                 values
                     .remove(&col)
                     .ok_or_else(|| format!("column {col:?} appears twice"))
                     .unwrap()
                     .into(),
-            ))
+            )
         }))
-        .and_where(Expr::col(T::primary_key()).eq(pkey))
+        .and_where(Expr::col(T::primary_key()).eq(key))
         .returning_all()
         .build_sqlx(PostgresQueryBuilder);
 
