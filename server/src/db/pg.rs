@@ -1,8 +1,10 @@
-use std::{collections::HashMap, future::Future};
+use std::{collections::HashMap, future::Future, marker::PhantomData};
 
 use async_stream::stream;
 use futures::Stream;
-use sea_query::{Alias, Asterisk, Expr, Func, OnConflict, PostgresQueryBuilder, Query, SimpleExpr};
+use sea_query::{
+    Alias, Asterisk, Expr, Func, Iden, OnConflict, PostgresQueryBuilder, Query, SimpleExpr,
+};
 use sea_query_binder::SqlxBinder;
 use sqlx::{
     FromRow, PgConnection, PgPool, Postgres, migrate::MigrateError, pool::PoolConnection,
@@ -38,33 +40,59 @@ impl DataAccessProvider for PgPool {
 #[derive(Debug)]
 pub struct PgDataAccess<T>(T);
 
+trait PgInsertStrategy {
+    type Iden: Iden + Copy + 'static;
+    type InsertionModel;
+    type InsertionResult;
+
+    fn columns() -> &'static [Self::Iden];
+
+    fn table() -> Self::Iden;
+
+    fn into_values(value: Self::InsertionModel) -> impl Iterator<Item = sea_query::Value>;
+}
+
+struct ViaModelWithPrimaryKey<T>(PhantomData<fn() -> T>);
+
+impl<T: ModelWithAutoPrimaryKey> PgInsertStrategy for ViaModelWithPrimaryKey<T> {
+    type Iden = T::Iden;
+    type InsertionModel = T::InsertionModel;
+    type InsertionResult = T;
+
+    fn columns() -> &'static [Self::Iden] {
+        T::insertion_columns()
+    }
+
+    fn table() -> Self::Iden {
+        T::table()
+    }
+
+    fn into_values(value: Self::InsertionModel) -> impl Iterator<Item = sea_query::Value> {
+        T::into_insertion_values(value)
+    }
+}
+
 /// Performs an insert of the specified values into the database.
 ///
 /// Returns a stream of the values that were inserted.
-fn pg_insert<'a, T>(
+fn pg_insert<'a, T, S>(
     executor: &'a mut PgConnection,
-    values: impl IntoIterator<Item = T::InsertionModel> + 'a,
-) -> impl Stream<Item = sqlx::Result<T>> + 'a
+    values: impl IntoIterator<Item = T> + 'a,
+) -> impl Stream<Item = sqlx::Result<S::InsertionResult>> + 'a
 where
-    T: ModelWithAutoPrimaryKey + for<'b> FromRow<'b, PgRow> + Send + Unpin + 'a,
+    S: PgInsertStrategy<InsertionModel = T>,
+    S::InsertionResult: for<'b> FromRow<'b, PgRow> + Send + Unpin + 'a,
 {
     stream! {
         let mut query = Query::insert().build_with(|q| {
-            q
-                .into_table(T::table())
-                .columns(
-                    T::insertion_columns()
-                        .iter()
-                        .copied()
-                );
+            q.into_table(S::table())
+                .columns(S::columns().iter().copied());
         });
 
         let mut any = false;
         for value in values {
             any = true;
-            query.values_panic(
-                T::into_insertion_values(value).map(|v| v.into())
-            );
+            query.values_panic(S::into_values(value).map(|v| v.into()));
         }
 
         if !any {
@@ -72,9 +100,7 @@ where
             return;
         }
 
-        let (sql, values) = query
-            .returning_all()
-            .build_sqlx(PostgresQueryBuilder);
+        let (sql, values) = query.returning_all().build_sqlx(PostgresQueryBuilder);
 
         for await row in sqlx::query_as_with(&sql, values).fetch(executor) {
             yield row;
@@ -227,7 +253,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         's: 'f,
         'v: 'f,
     {
-        pg_insert(self.0.as_mut(), trackers)
+        pg_insert::<_, ViaModelWithPrimaryKey<ApTracker>>(self.0.as_mut(), trackers)
     }
 
     fn update_ap_tracker(
@@ -285,7 +311,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         's: 'f,
         'v: 'f,
     {
-        pg_insert(self.0.as_mut(), games)
+        pg_insert::<_, ViaModelWithPrimaryKey<ApGame>>(self.0.as_mut(), games)
     }
 
     fn get_ap_game(
@@ -311,7 +337,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         's: 'f,
         'v: 'f,
     {
-        pg_insert(self.0.as_mut(), hints)
+        pg_insert::<_, ViaModelWithPrimaryKey<ApHint>>(self.0.as_mut(), hints)
     }
 
     fn update_ap_hint(
@@ -361,7 +387,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         's: 'f,
         'v: 'f,
     {
-        pg_insert(self.0.as_mut(), users)
+        pg_insert::<_, ViaModelWithPrimaryKey<CtUser>>(self.0.as_mut(), users)
     }
 
     fn update_ct_user(
@@ -380,7 +406,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         's: 'f,
         'v: 'f,
     {
-        pg_insert(self.0.as_mut(), errors)
+        pg_insert::<_, ViaModelWithPrimaryKey<JsError>>(self.0.as_mut(), errors)
     }
 
     fn get_dashboard_trackers(
@@ -484,7 +510,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         's: 'f,
         'v: 'f,
     {
-        pg_insert(self.0.as_mut(), audits)
+        pg_insert::<_, ViaModelWithPrimaryKey<Audit>>(self.0.as_mut(), audits)
     }
 }
 
