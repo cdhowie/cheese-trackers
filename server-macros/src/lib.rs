@@ -1,7 +1,7 @@
 use convert_case::{Case, Casing};
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Field, Ident, ItemStruct, parse_macro_input, spanned::Spanned};
+use syn::{Field, Ident, ItemStruct, parse_macro_input, parse_str, spanned::Spanned};
 
 #[proc_macro_derive(IntoFieldwiseDiff, attributes(diff))]
 pub fn derive_fieldwise_diff(item: TokenStream) -> TokenStream {
@@ -16,6 +16,41 @@ fn expand_derive_fieldwise_diff(input: ItemStruct) -> syn::Result<proc_macro2::T
     let ident = input.ident;
 
     let output_ident = format_ident!("{ident}FieldwiseDiff");
+
+    let mut diff_derives = vec![];
+    let mut diff_serde = false;
+
+    for attr in input
+        .attrs
+        .iter()
+        .filter(|i| i.meta.path().is_ident("diff"))
+    {
+        attr.meta.require_list()?.parse_nested_meta(|m| {
+            if m.path.is_ident("derive") {
+                m.parse_nested_meta(|m| {
+                    diff_derives.push(m.path);
+                    Ok(())
+                })?;
+            } else if m.path.is_ident("serde") {
+                if diff_serde {
+                    return Err(m.error("duplicate serde attribute"));
+                }
+
+                diff_serde = true;
+            } else {
+                return Err(m.error("unsupported diff attribute"));
+            }
+
+            Ok(())
+        })?;
+    }
+
+    if diff_serde {
+        diff_derives.extend([
+            parse_str("::serde::Serialize").unwrap(),
+            parse_str("::serde::Deserialize").unwrap(),
+        ]);
+    }
 
     let fields: Vec<_> = input
         .fields
@@ -108,7 +143,8 @@ fn expand_derive_fieldwise_diff(input: ItemStruct) -> syn::Result<proc_macro2::T
     let output_struct = quote! {
         #[automatically_derived]
         #[doc = #output_doc]
-        #[derive(Debug, Default, Clone, ::serde::Serialize)]
+        #[derive(#(#diff_derives),*)]
+        #[derive(::serde::Serialize)]
         pub struct #output_ident {
             #(
                 #[serde(skip_serializing_if = "Option::is_none")]
