@@ -222,6 +222,27 @@ fn expand_derive_model_with_auto_primary_key(
 
     let iden_ident = format_ident!("{ident}Iden");
 
+    let mut insertion_model_derives = vec![];
+
+    for attr in input
+        .attrs
+        .iter()
+        .filter(|i| i.meta.path().is_ident("model"))
+    {
+        attr.meta.require_list()?.parse_nested_meta(|m| {
+            if m.path.is_ident("insertion_derive") {
+                m.parse_nested_meta(|m| {
+                    insertion_model_derives.push(m.path);
+                    Ok(())
+                })?;
+            } else {
+                return Err(m.error("unsupported model attribute"));
+            }
+
+            Ok(())
+        })?;
+    }
+
     let mut fields = vec![];
 
     for field in &input.fields {
@@ -329,7 +350,7 @@ fn expand_derive_model_with_auto_primary_key(
         #[automatically_derived]
         #[allow(unused)]
         #[doc = #insertion_model_doc]
-        #[derive(Debug, Clone, ::serde::Deserialize)]
+        #[derive(#(#insertion_model_derives),*)]
         pub struct #insertion_model_ident {
             #( #insertion_model_field_defs ),*
         }
