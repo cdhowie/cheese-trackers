@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import DashboardView from '@/views/DashboardView.vue';
-import TrackerView from '@/views/TrackerView.vue';
+import TrackerViewProxy from '@/views/TrackerViewProxy.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import HelpView from '@/views/HelpView.vue';
 import AuthComplete from '@/views/AuthComplete.vue';
@@ -21,7 +21,7 @@ const router = createRouter({
     {
       path: '/tracker/:aptrackerid',
       name: 'tracker',
-      component: TrackerView,
+      component: TrackerViewProxy,
       props: true,
     },
     {
