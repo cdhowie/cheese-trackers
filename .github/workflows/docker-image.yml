@@ -32,6 +32,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           build-args: |
-            GIT_COMMIT=$GITHUB_SHA
+            "GIT_COMMIT=${{ github.sha }}"
           push: true
           tags: ${{ steps.meta.outputs.tags }}
