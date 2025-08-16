@@ -1,6 +1,6 @@
 //! Service configuration.
 
-use std::{collections::HashSet, net::SocketAddr};
+use std::net::SocketAddr;
 
 use axum_client_ip::ClientIpSource;
 use base64::prelude::*;
@@ -29,8 +29,9 @@ pub struct Config {
     #[serde(default)]
     pub banners: Vec<Banner>,
 
-    /// Permitted list of upstream tracker prefixes.
-    pub upstream_trackers: HashSet<String>,
+    /// Permitted list of upstream trackers.
+    #[serde(deserialize_with = "deser_upstream_trackers")]
+    pub upstream_trackers: Vec<UpstreamTracker>,
 
     /// The minimum allowed time between consecutive updates of a single tracker
     /// from the upstream tracker source.
@@ -44,6 +45,42 @@ pub struct Config {
     pub database: Database,
     /// Discord authentication configuration.
     pub discord: Discord,
+}
+
+fn deser_upstream_trackers<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Vec<UpstreamTracker>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum UpstreamTrackerOrUrl {
+        Url(Url),
+        UpstreamTracker(UpstreamTracker),
+    }
+
+    let items = Vec::<UpstreamTrackerOrUrl>::deserialize(deserializer)?;
+
+    items
+        .into_iter()
+        .map(|v| match v {
+            UpstreamTrackerOrUrl::UpstreamTracker(t) => Ok(t),
+            UpstreamTrackerOrUrl::Url(u) => {
+                let host = u.host_str().ok_or_else(|| {
+                    serde::de::Error::custom(format!("upstream tracker has no host: {u}"))
+                })?;
+
+                Ok(UpstreamTracker {
+                    ap_host: host.into(),
+                    url_prefix: u,
+                })
+            }
+        })
+        .collect::<Result<_, _>>()
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UpstreamTracker {
+    pub url_prefix: Url,
+    pub ap_host: String,
 }
 
 /// A banner to be displayed in the frontend.

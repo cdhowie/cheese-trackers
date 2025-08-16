@@ -1,7 +1,7 @@
 //! Server state management.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     future::ready,
     str::FromStr,
     sync::{Arc, LazyLock},
@@ -18,7 +18,7 @@ use uuid::Uuid;
 use crate::{
     api::{UiSettings, tracker::UrlEncodedTrackerId},
     auth::{discord::AuthClient, token::TokenProcessor},
-    conf::Config,
+    conf::{self, Config},
     db::{
         DataAccess, DataAccessProvider, Transactable, Transaction, create_audit_for,
         model::{
@@ -121,8 +121,8 @@ pub struct AppState<D> {
     /// Authentication token processor.
     pub token_processor: TokenProcessor,
 
-    /// Set of valid upstream tracker prefixes.
-    upstream_tracker_prefixes: HashSet<String>,
+    /// List of valid upstream trackers.
+    upstream_trackers: Vec<conf::UpstreamTracker>,
 
     /// Client used for upstream tracker updates.
     reqwest_client: reqwest::Client,
@@ -144,7 +144,7 @@ impl<D> AppState<D> {
         Self {
             reqwest_client: reqwest::Client::builder().build().unwrap(),
             data_provider,
-            upstream_tracker_prefixes: config.upstream_trackers,
+            upstream_trackers: config.upstream_trackers,
             ui_settings_header: serde_json::to_string(&UiSettings {
                 banners: config.banners,
                 hoster: config.hoster,
@@ -172,14 +172,17 @@ impl<D> AppState<D> {
         }
     }
 
-    fn tracker_is_permitted(&self, url: impl Into<Url>) -> bool {
+    pub fn get_upstream_tracker(
+        &self,
+        url: impl Into<Url>,
+    ) -> Option<&crate::conf::UpstreamTracker> {
         let mut url = url.into();
         match url.path_segments_mut() {
             Ok(mut s) => s.pop(),
-            Err(_) => return false,
+            Err(_) => return None,
         };
 
-        self.upstream_tracker_prefixes.contains(url.as_str())
+        self.upstream_trackers.iter().find(|t| t.url_prefix == url)
     }
 
     /// Synchronize a tracker in the database with fetched state from
@@ -534,7 +537,7 @@ impl<D> AppState<D> {
             .parse()
             .map_err(|e| Arc::new(TrackerUrlParseError::Url(e).into()))?;
 
-        if !self.tracker_is_permitted(url.clone()) {
+        if self.get_upstream_tracker(url.clone()).is_none() {
             return Err(Arc::new(TrackerUpdateError::UpstreamNotWhitelisted));
         }
 
