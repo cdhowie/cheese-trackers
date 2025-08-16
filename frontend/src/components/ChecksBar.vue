@@ -1,10 +1,12 @@
 <script setup>
 import { computed } from 'vue';
 
+import { roundDown } from '@/util';
+
 const props = defineProps(['done', 'total', 'showPercent']);
 
 const percent = computed(() => {
-    return ((props.done / props.total) * 100).toFixed(1);
+    return roundDown((props.done / props.total) * 100, 1);
 });
 
 </script>
