@@ -69,7 +69,7 @@ const canPing = computed(() => {
 </script>
 
 <template>
-    <tr class="bg-transparent">
+    <tr class="bg-transparent mw-hint">
         <td class="bg-transparent text-end pe-0">
             <template v-if="props.direction === 'received'">
                 <span v-if="props.receiverGame" class="text-info">
@@ -125,7 +125,7 @@ const canPing = computed(() => {
     text-decoration: none;
 }
 
-tr tr:hover .mw-copy-hint {
+.mw-hint:hover .mw-copy-hint {
     visibility: visible;
 }
 </style>
