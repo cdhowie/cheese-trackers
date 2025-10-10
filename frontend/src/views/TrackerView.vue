@@ -459,6 +459,8 @@ const sortByOwner = compareByIteratee(g => (g.effective_discord_username || '').
 
 const sortByChecks = compareByIteratee(g => g.checks_done / g.checks_total);
 
+const sortByHints = compareByIteratee(countUnfoundReceivedHints);
+
 const activeSort = ref([sortByName, false]);
 
 function setSort(sorter, defOrder) {
@@ -1323,8 +1325,20 @@ loadTracker();
                         </button>
                     </template>
                     <template #hints>
-                        <button class="btn btn-sm btn-outline-light" @click="setAllExpanded(!allExpanded)">Hints <i
-                                :class="{ 'bi-arrows-angle-expand': !allExpanded, 'bi-arrows-angle-contract': allExpanded }"></i></button>
+                        <span class="sorter" @click="setSort(sortByHints, true)">
+                            Hints
+                            <i
+                                v-if="activeSort[0] === sortByHints"
+                                class="me-1"
+                                :class="{
+                                    'bi-sort-numeric-down': !activeSort[1],
+                                    'bi-sort-numeric-up': activeSort[1],
+                                }"
+                            />
+                        </span>
+                        <button class="btn btn-sm btn-outline-light" @click="setAllExpanded(!allExpanded)">
+                            <i :class="{ 'bi-arrows-angle-expand': !allExpanded, 'bi-arrows-angle-contract': allExpanded }"/>
+                        </button>
                     </template>
                 </component>
             </template>
