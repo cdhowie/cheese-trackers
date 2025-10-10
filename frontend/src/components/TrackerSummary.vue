@@ -90,7 +90,11 @@ const sumKeys = computed(() => {
                     </div>
                 </td>
                 <td class="align-middle">
-                    <ChecksBar :done="summaryData[key].checksDone" :total="summaryData[key].checksTotal"></ChecksBar>
+                    <ChecksBar
+                        :done="summaryData[key].checksDone"
+                        :total="summaryData[key].checksTotal"
+                        show-percent="true"
+                    />
                 </td>
             </tr>
         </tbody>
