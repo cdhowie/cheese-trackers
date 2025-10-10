@@ -38,6 +38,11 @@ where
         pub last_activity: Option<DateTime<Utc>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub dashboard_override_visibility: Option<bool>,
+        pub room_link: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub last_port: Option<i32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub last_port_is_stale: Option<bool>,
     }
 
     impl From<ApTrackerDashboard> for DashboardTracker {
@@ -50,6 +55,12 @@ where
                 owner_discord_username: value.owner_discord_username,
                 last_activity: value.last_activity,
                 dashboard_override_visibility: value.dashboard_override_visibility,
+                room_link: value.room_link,
+                last_port: value.last_port,
+                // TODO: This check is not completely accurate; it will falsely
+                // report a port as not stale if the port was checked recently,
+                // but the room is not active.
+                last_port_is_stale: value.next_port_check_at.map(|d| d < Utc::now()),
             }
         }
     }

@@ -22,6 +22,7 @@ import DropdownSelector from '@/components/DropdownSelector.vue';
 import Repeat from '@/components/Repeat.vue';
 import HintDisplay from '@/components/HintDisplay.vue';
 import CancelableEdit from '@/components/CancelableEdit.vue';
+import RoomPortButton from '@/components/RoomPortButton.vue';
 import TrackerDescription from '@/components/TrackerDescription.vue';
 
 import TrackerTable from '@/components/TrackerTable.vue';
@@ -63,12 +64,6 @@ const roomHost = computed(() => {
             const url = new URL(trackerData.value.room_link);
             return url.hostname;
         } catch (e) {}
-    }
-});
-
-const roomHostAndPort = computed(() => {
-    if (roomHost.value && trackerData.value?.last_port) {
-        return `${roomHost.value}:${trackerData.value.last_port}`;
     }
 });
 
@@ -884,17 +879,10 @@ loadTracker();
                     class="badge text-bg-info"
                 >
                     <i class="bi-door-open-fill"></i>
-                </a> <button
-                    type="button"
-                    v-if="roomHostAndPort"
-                    class="badge text-bg-info border border-0"
-                    @click="clipboardCopy(roomHostAndPort)"
-                >
-                    <i class="bi-ethernet"></i> <span class="font-monospace" style="line-height: 0"
-                    >
-                        {{ roomHostAndPort }}
-                    </span>
-                </button>
+                </a> <RoomPortButton
+                    :host="roomHost"
+                    :port="trackerData?.last_port"
+                />
             </div>
         </div>
         <TrackerDescription
