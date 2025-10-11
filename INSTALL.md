@@ -111,12 +111,24 @@ cors_permissive: false
 # fetching the AP web tracker data and return cached data from the database.
 tracker_update_interval_mins: 1
 
-# Allowed upstream trackers.  Requests for trackers that do not begin with an
-# item of this list will be denied.  This prevents a confused deputy
-# vulnerability where users could misuse the web service to send GET requests
-# to arbitrary URLs.
+# Allowed upstream trackers.  This is a list of objects containing the following
+# keys:
+#
+# * url_prefix: Web tracker URL prefix.
+# * ap_host: The hostname/IP where room servers run.
+#
+# Requests for trackers that do not begin with a prefix in this list item of
+# this list will be denied.  This prevents a confused deputy vulnerability where
+# users could misuse the web service to send GET requests to arbitrary URLs.
+#
+# For simplicity (and backwards compatibility) when the host of the tracker URL
+# prefix is also where room servers run, you can use strings instead of objects.
+# The string will be taken as the url_prefix, and the ap_host will be the host
+# component of the URL.
 upstream_trackers:
   - 'https://archipelago.gg/tracker'
+  - url_prefix: 'https://example.com/tracker'
+    ap_host: 'example.org'
 
 # List of banners to show at the top of the UI.  This is a list of objects.
 #

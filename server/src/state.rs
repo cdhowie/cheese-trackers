@@ -174,15 +174,24 @@ impl<D> AppState<D> {
 
     pub fn get_upstream_tracker(
         &self,
-        url: impl Into<Url>,
+        url: impl TryInto<Url>,
     ) -> Option<&crate::conf::UpstreamTracker> {
-        let mut url = url.into();
+        let mut url = url.try_into().ok()?;
         match url.path_segments_mut() {
             Ok(mut s) => s.pop(),
             Err(_) => return None,
         };
 
         self.upstream_trackers.iter().find(|t| t.url_prefix == url)
+    }
+
+    pub fn get_upstream_host_for_tracker_link<'a>(&'a self, room_link: &str) -> Option<&'a str> {
+        match room_link.is_empty() {
+            true => None,
+            false => self
+                .get_upstream_tracker(room_link)
+                .map(|h| h.ap_host.as_str()),
+        }
     }
 
     /// Synchronize a tracker in the database with fetched state from

@@ -29,6 +29,10 @@ async function goToTracker() {
 }
 
 function trackerHost(tracker) {
+    if (tracker.room_host) {
+        return tracker.room_host;
+    }
+    
     if (tracker.room_link?.length) {
         try {
             return (new URL(tracker.room_link)).hostname;

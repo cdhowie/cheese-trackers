@@ -40,27 +40,32 @@ where
         pub dashboard_override_visibility: Option<bool>,
         pub room_link: String,
         #[serde(skip_serializing_if = "Option::is_none")]
+        pub room_host: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub last_port: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub last_port_is_stale: Option<bool>,
     }
 
-    impl From<ApTrackerDashboard> for DashboardTracker {
-        fn from(value: ApTrackerDashboard) -> Self {
+    impl DashboardTracker {
+        fn new<T>(tracker: ApTrackerDashboard, state: &AppState<T>) -> Self {
             Self {
-                id: value.id,
-                tracker_id: value.tracker_id.into(),
-                title: value.title,
-                owner_ct_user_id: value.owner_ct_user_id,
-                owner_discord_username: value.owner_discord_username,
-                last_activity: value.last_activity,
-                dashboard_override_visibility: value.dashboard_override_visibility,
-                room_link: value.room_link,
-                last_port: value.last_port,
+                id: tracker.id,
+                tracker_id: tracker.tracker_id.into(),
+                title: tracker.title,
+                owner_ct_user_id: tracker.owner_ct_user_id,
+                owner_discord_username: tracker.owner_discord_username,
+                last_activity: tracker.last_activity,
+                dashboard_override_visibility: tracker.dashboard_override_visibility,
+                room_link: tracker.room_link,
+                room_host: state
+                    .get_upstream_host_for_tracker_link(&tracker.upstream_url)
+                    .map(str::to_owned),
+                last_port: tracker.last_port,
                 // TODO: This check is not completely accurate; it will falsely
                 // report a port as not stale if the port was checked recently,
                 // but the room is not active.
-                last_port_is_stale: value.next_port_check_at.map(|d| d < Utc::now()),
+                last_port_is_stale: tracker.next_port_check_at.map(|d| d < Utc::now()),
             }
         }
     }
@@ -73,7 +78,7 @@ where
 
     Ok(Json(
         db.get_dashboard_trackers(user.user.id)
-            .map_ok(Into::into)
+            .map_ok(|t| DashboardTracker::new(t, &state))
             .try_collect::<Vec<DashboardTracker>>()
             .await
             .unexpected()?,

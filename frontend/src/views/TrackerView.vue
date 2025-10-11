@@ -60,6 +60,10 @@ const gameById = ref(undefined);
 const updateTrackerErrorCount = ref(0);
 
 const roomHost = computed(() => {
+    if (trackerData.value?.room_host) {
+        return trackerData.value?.room_host;
+    }
+
     if (trackerData.value?.room_link?.length) {
         try {
             const url = new URL(trackerData.value.room_link);

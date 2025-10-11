@@ -275,6 +275,7 @@ pub struct ApTrackerDashboard {
     pub room_link: String,
     pub last_port: Option<i32>,
     pub next_port_check_at: Option<DateTime<Utc>>,
+    pub upstream_url: String,
 }
 
 /// Model for database view `ap_game`.

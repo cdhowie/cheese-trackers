@@ -160,29 +160,34 @@ where
         pub global_ping_policy: Option<PingPreference>,
         pub room_link: String,
         #[serde(skip_serializing_if = "Option::is_none")]
+        pub room_host: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         pub last_port: Option<i32>,
         pub inactivity_threshold_yellow_hours: i32,
         pub inactivity_threshold_red_hours: i32,
         pub require_authentication_to_claim: bool,
     }
 
-    impl From<ApTracker> for Tracker {
-        fn from(value: ApTracker) -> Self {
+    impl Tracker {
+        fn new<T>(tracker: ApTracker, state: &AppState<T>) -> Self {
             Self {
-                id: value.id,
-                tracker_id: value.tracker_id.into(),
-                updated_at: value.updated_at,
-                title: value.title,
-                description: value.description,
-                owner_ct_user_id: value.owner_ct_user_id,
-                lock_settings: value.lock_settings,
-                upstream_url: value.upstream_url,
-                global_ping_policy: value.global_ping_policy,
-                room_link: value.room_link,
-                last_port: value.last_port,
-                inactivity_threshold_yellow_hours: value.inactivity_threshold_yellow_hours,
-                inactivity_threshold_red_hours: value.inactivity_threshold_red_hours,
-                require_authentication_to_claim: value.require_authentication_to_claim,
+                id: tracker.id,
+                tracker_id: tracker.tracker_id.into(),
+                updated_at: tracker.updated_at,
+                title: tracker.title,
+                description: tracker.description,
+                owner_ct_user_id: tracker.owner_ct_user_id,
+                lock_settings: tracker.lock_settings,
+                room_host: state
+                    .get_upstream_host_for_tracker_link(&tracker.upstream_url)
+                    .map(str::to_owned),
+                upstream_url: tracker.upstream_url,
+                global_ping_policy: tracker.global_ping_policy,
+                room_link: tracker.room_link,
+                last_port: tracker.last_port,
+                inactivity_threshold_yellow_hours: tracker.inactivity_threshold_yellow_hours,
+                inactivity_threshold_red_hours: tracker.inactivity_threshold_red_hours,
+                require_authentication_to_claim: tracker.require_authentication_to_claim,
             }
         }
     }
@@ -282,7 +287,7 @@ where
     drop(db);
 
     Ok(Json(GetTrackerResponse {
-        tracker: tracker.into(),
+        tracker: Tracker::new(tracker, &state),
         owner_discord_username,
         games,
         hints,
