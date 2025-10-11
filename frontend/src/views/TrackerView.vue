@@ -23,6 +23,7 @@ import Repeat from '@/components/Repeat.vue';
 import HintDisplay from '@/components/HintDisplay.vue';
 import CancelableEdit from '@/components/CancelableEdit.vue';
 import RoomPortButton from '@/components/RoomPortButton.vue';
+import OverwriteClaimButton from '@/components/OverwriteClaimButton.vue';
 import TrackerDescription from '@/components/TrackerDescription.vue';
 
 import TrackerTable from '@/components/TrackerTable.vue';
@@ -1377,22 +1378,16 @@ loadTracker();
                             <button v-if="canClaimGames && !game.effective_discord_username" class="btn btn-sm btn-outline-secondary"
                                 :disabled="loading" @click="claimGame(game)">Claim</button>
 
-                            <template v-else-if="
-                                canClaimGames &&
-                                game.effective_discord_username &&
-                                !usersEqual(getClaimingUser(game), currentUser) &&
-                                canEditGame(game)
-                            ">
-                                <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
-                                    data-bs-toggle="dropdown">Claim</button>
-                                <div class="dropdown-menu text-warning p-3">
-                                    <span class="text-warning me-2 d-inline-block align-middle">Another user has claimed
-                                        this
-                                        slot.</span>
-                                    <button class="btn btn-sm btn-warning" @click="claimGame(game)">Claim
-                                        anyway</button>
-                                </div>
-                            </template>
+                            <OverwriteClaimButton
+                                v-else-if="
+                                    canClaimGames &&
+                                    game.effective_discord_username &&
+                                    !usersEqual(getClaimingUser(game), currentUser) &&
+                                    canEditGame(game)
+                                "
+                                :disabled="loading"
+                                @claimed="claimGame(game)"
+                            />
 
                             <button v-else-if="usersEqual(getClaimingUser(game), currentUser) && canEditGame(game)"
                                 class="btn btn-sm btn-outline-warning" :disabled="loading"
