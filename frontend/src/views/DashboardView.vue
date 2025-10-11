@@ -128,7 +128,7 @@ watch(
             <thead>
                 <tr>
                     <th>Tracker</th>
-                    <th>Server</th>
+                    <th>Room</th>
                     <th>Last activity</th>
                 </tr>
             </thead>
@@ -148,7 +148,15 @@ watch(
                         </template>
                     </td>
                     <td>
-                        <RoomPortButton
+                        <a
+                            v-if="tracker.room_link?.length"
+                            :href="tracker.room_link"
+                            target="_blank"
+                            alt="Room"
+                            class="badge text-bg-info"
+                        >
+                            <i class="bi-door-open-fill"></i>
+                        </a> <RoomPortButton
                             :host="trackerHost(tracker)"
                             :port="tracker.last_port"
                             :stale="tracker.last_port_is_stale"
