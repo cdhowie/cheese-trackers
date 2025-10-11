@@ -22,6 +22,8 @@ import DropdownSelector from '@/components/DropdownSelector.vue';
 import Repeat from '@/components/Repeat.vue';
 import HintDisplay from '@/components/HintDisplay.vue';
 import CancelableEdit from '@/components/CancelableEdit.vue';
+import RoomPortButton from '@/components/RoomPortButton.vue';
+import OverwriteClaimButton from '@/components/OverwriteClaimButton.vue';
 import TrackerDescription from '@/components/TrackerDescription.vue';
 
 import TrackerTable from '@/components/TrackerTable.vue';
@@ -63,12 +65,6 @@ const roomHost = computed(() => {
             const url = new URL(trackerData.value.room_link);
             return url.hostname;
         } catch (e) {}
-    }
-});
-
-const roomHostAndPort = computed(() => {
-    if (roomHost.value && trackerData.value?.last_port) {
-        return `${roomHost.value}:${trackerData.value.last_port}`;
     }
 });
 
@@ -458,6 +454,8 @@ const sortByActivity = compareByIteratee(g => {
 const sortByOwner = compareByIteratee(g => (g.effective_discord_username || '').toLowerCase());
 
 const sortByChecks = compareByIteratee(g => g.checks_done / g.checks_total);
+
+const sortByHints = compareByIteratee(countUnfoundReceivedHints);
 
 const activeSort = ref([sortByName, false]);
 
@@ -882,17 +880,10 @@ loadTracker();
                     class="badge text-bg-info"
                 >
                     <i class="bi-door-open-fill"></i>
-                </a> <button
-                    type="button"
-                    v-if="roomHostAndPort"
-                    class="badge text-bg-info border border-0"
-                    @click="clipboardCopy(roomHostAndPort)"
-                >
-                    <i class="bi-ethernet"></i> <span class="font-monospace" style="line-height: 0"
-                    >
-                        {{ roomHostAndPort }}
-                    </span>
-                </button>
+                </a> <RoomPortButton
+                    :host="roomHost"
+                    :port="trackerData?.last_port"
+                />
             </div>
         </div>
         <TrackerDescription
@@ -1323,8 +1314,20 @@ loadTracker();
                         </button>
                     </template>
                     <template #hints>
-                        <button class="btn btn-sm btn-outline-light" @click="setAllExpanded(!allExpanded)">Hints <i
-                                :class="{ 'bi-arrows-angle-expand': !allExpanded, 'bi-arrows-angle-contract': allExpanded }"></i></button>
+                        <span class="sorter" @click="setSort(sortByHints, true)">
+                            Hints
+                            <i
+                                v-if="activeSort[0] === sortByHints"
+                                class="me-1"
+                                :class="{
+                                    'bi-sort-numeric-down': !activeSort[1],
+                                    'bi-sort-numeric-up': activeSort[1],
+                                }"
+                            />
+                        </span>
+                        <button class="btn btn-sm btn-outline-light" @click="setAllExpanded(!allExpanded)">
+                            <i :class="{ 'bi-arrows-angle-expand': !allExpanded, 'bi-arrows-angle-contract': allExpanded }"/>
+                        </button>
                     </template>
                 </component>
             </template>
@@ -1375,22 +1378,16 @@ loadTracker();
                             <button v-if="canClaimGames && !game.effective_discord_username" class="btn btn-sm btn-outline-secondary"
                                 :disabled="loading" @click="claimGame(game)">Claim</button>
 
-                            <template v-else-if="
-                                canClaimGames &&
-                                game.effective_discord_username &&
-                                !usersEqual(getClaimingUser(game), currentUser) &&
-                                canEditGame(game)
-                            ">
-                                <button class="btn btn-sm btn-outline-secondary" :disabled="loading"
-                                    data-bs-toggle="dropdown">Claim</button>
-                                <div class="dropdown-menu text-warning p-3">
-                                    <span class="text-warning me-2 d-inline-block align-middle">Another user has claimed
-                                        this
-                                        slot.</span>
-                                    <button class="btn btn-sm btn-warning" @click="claimGame(game)">Claim
-                                        anyway</button>
-                                </div>
-                            </template>
+                            <OverwriteClaimButton
+                                v-else-if="
+                                    canClaimGames &&
+                                    game.effective_discord_username &&
+                                    !usersEqual(getClaimingUser(game), currentUser) &&
+                                    canEditGame(game)
+                                "
+                                :disabled="loading"
+                                @claimed="claimGame(game)"
+                            />
 
                             <button v-else-if="usersEqual(getClaimingUser(game), currentUser) && canEditGame(game)"
                                 class="btn btn-sm btn-outline-warning" :disabled="loading"

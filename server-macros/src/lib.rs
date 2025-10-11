@@ -342,7 +342,7 @@ fn expand_derive_model_with_auto_primary_key(
 
     let insertion_model_ident = format_ident!("{ident}Insertion");
 
-    let insertion_model_fields = fields.iter().filter(|&f| (!f.is_primary_key));
+    let insertion_model_fields = fields.iter().filter(|&f| !f.is_primary_key);
 
     let insertion_model_field_defs = insertion_model_fields.clone().map(|f| {
         let mut field = f.field.clone();

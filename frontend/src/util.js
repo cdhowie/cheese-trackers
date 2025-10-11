@@ -17,3 +17,9 @@ export function synchronize(target, source) {
 
     Object.assign(target, source);
 }
+
+export function roundDown(num, places) {
+    const factor = Math.pow(10, places);
+
+    return Math.floor(num * factor) / factor;
+}

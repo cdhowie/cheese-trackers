@@ -8,6 +8,7 @@ import moment from 'moment';
 import { orderBy } from 'lodash-es';
 
 import Repeat from '@/components/Repeat.vue';
+import RoomPortButton from '@/components/RoomPortButton.vue';
 
 const trackerLoading = ref(false);
 const trackerError = ref(undefined);
@@ -24,6 +25,14 @@ async function goToTracker() {
         trackerError.value = e;
     } finally {
         trackerLoading.value = false;
+    }
+}
+
+function trackerHost(tracker) {
+    if (tracker.room_link?.length) {
+        try {
+            return (new URL(tracker.room_link)).hostname;
+        } catch (e) {}
     }
 }
 
@@ -119,6 +128,7 @@ watch(
             <thead>
                 <tr>
                     <th>Tracker</th>
+                    <th>Room</th>
                     <th>Last activity</th>
                 </tr>
             </thead>
@@ -136,6 +146,21 @@ watch(
                         >
                             by {{ tracker.owner_discord_username }}
                         </template>
+                    </td>
+                    <td>
+                        <a
+                            v-if="tracker.room_link?.length"
+                            :href="tracker.room_link"
+                            target="_blank"
+                            alt="Room"
+                            class="badge text-bg-info"
+                        >
+                            <i class="bi-door-open-fill"></i>
+                        </a> <RoomPortButton
+                            :host="trackerHost(tracker)"
+                            :port="tracker.last_port"
+                            :stale="tracker.last_port_is_stale"
+                        />
                     </td>
                     <td>{{
                         tracker.last_activity ?
