@@ -125,3 +125,20 @@ where
 
     Ok(Json(UserSettings::from(user)))
 }
+
+// Define the response structure to expose the ID securely
+#[derive(Serialize)]
+pub struct UserProfile {
+    pub id: i32,
+    pub discord_username: String,
+}
+
+/// `GET /user/self`: Get current user details.
+pub async fn get_self(
+    auth_user: crate::auth::token::AuthenticatedUser
+) -> impl IntoResponse {
+    Json(UserProfile {
+        id: auth_user.user.id,
+        discord_username: auth_user.user.discord_username,
+    })
+}
