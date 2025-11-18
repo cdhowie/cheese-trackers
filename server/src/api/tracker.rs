@@ -4,7 +4,7 @@ use std::{fmt::Display, future::ready, str::FromStr, sync::Arc};
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, State, Query},
     http::{HeaderName, StatusCode},
     response::IntoResponse,
 };
@@ -135,10 +135,16 @@ impl Serialize for UrlEncodedTrackerId {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct GetTrackerQuery {
+    pub user_id: Option<i32>,
+}
+
 /// `GET /tracker/{tracker_id}`: Get tracker.
 pub async fn get_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
     Path(tracker_id): Path<UrlEncodedTrackerId>,
+    Query(query): Query<GetTrackerQuery>, 
     user: Option<AuthenticatedUser>,
 ) -> Result<impl IntoResponse, StatusCode>
 where
@@ -262,11 +268,15 @@ where
         }
     };
 
-    let games = tx
+    let mut games = tx
         .get_ap_games_by_tracker_id(tracker.id)
-        .try_collect()
+        .try_collect::<Vec<ApGame>>()
         .await
         .unexpected()?;
+
+    if let Some(filter_uid) = query.user_id {
+        games.retain(|g| g.claimed_by_ct_user_id == Some(filter_uid));
+    }
 
     let hints = tx
         .get_ap_hints_by_tracker_id(tracker.id)
@@ -541,8 +551,14 @@ where
 
     send_future(tx.commit()).await.unexpected()?;
 
-    get_tracker(State(state), Path(tracker_id), user).await
+    get_tracker(
+        State(state), 
+        Path(tracker_id), 
+        Query(GetTrackerQuery { user_id: None }), 
+        user
+    ).await
 }
+
 
 /// Request body for [`update_hint`].
 #[derive(Debug, serde::Deserialize)]
