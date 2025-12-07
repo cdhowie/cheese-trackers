@@ -5,9 +5,9 @@ import { roundDown } from '@/util';
 
 const props = defineProps(['done', 'total', 'showPercent']);
 
-const percent = computed(() => {
-    return roundDown((props.done / props.total) * 100, 1);
-});
+const percent = computed(() =>
+    props.total === 0 ? 100 : roundDown((props.done / props.total) * 100, 1)
+);
 
 </script>
 
