@@ -14,6 +14,20 @@ use crate::{
     state::AppState,
 };
 
+/// `GET /user/self`: Get current user details.
+pub async fn get_self(auth_user: AuthenticatedUser) -> impl IntoResponse {
+    #[derive(Serialize)]
+    pub struct UserProfile {
+        pub id: i32,
+        pub discord_username: String,
+    }
+
+    Json(UserProfile {
+        id: auth_user.user.id,
+        discord_username: auth_user.user.discord_username,
+    })
+}
+
 /// `GET /user/self/api_key`: Get current API key.
 pub async fn get_api_key(
     TokenAuthenticatedUser(user): TokenAuthenticatedUser,
