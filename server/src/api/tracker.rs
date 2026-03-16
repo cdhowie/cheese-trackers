@@ -970,7 +970,7 @@ where
             |mut items: Vec<ChecksDataPoint>, (audit, checks_done)| {
                 let minute = audit
                     .changed_at
-                    .duration_trunc(TimeDelta::minutes(1))
+                    .duration_trunc(TimeDelta::minutes(10))
                     .unwrap();
 
                 if let Some(last) = items.last_mut() {
