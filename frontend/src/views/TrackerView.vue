@@ -1617,11 +1617,17 @@ loadTracker();
                     :refreshserial="refreshSerial"
                     :totalchecks="statTotalChecks"
                 />
-                <button
-                    v-else
-                    class="btn btn-primary"
-                    @click.prevent="showChecksHistory = true"
-                >Load checks history</button>
+                <template v-else>
+                    <button
+                        class="btn btn-primary"
+                        @click.prevent="showChecksHistory = true"
+                    >Load checks history</button>
+                    <div class="text-warning">
+                        The checks history may contain a lot of data points.
+                        Rendering the chart may consume a high amount of RAM and
+                        slow down your browser.
+                    </div>
+                </template>
             </div>
         </div>
         <hr>
