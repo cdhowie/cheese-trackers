@@ -3,7 +3,7 @@ use std::{collections::HashMap, future::Future, marker::PhantomData};
 use async_stream::stream;
 use futures::Stream;
 use sea_query::{
-    Alias, Asterisk, Expr, Func, Iden, OnConflict, PostgresQueryBuilder, Query, SimpleExpr,
+    Alias, Asterisk, Expr, Func, Iden, OnConflict, Order, PostgresQueryBuilder, Query, SimpleExpr,
 };
 use sea_query_binder::SqlxBinder;
 use sqlx::{
@@ -511,6 +511,37 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
         'v: 'f,
     {
         pg_insert::<_, ViaModelWithPrimaryKey<Audit>>(self.0.as_mut(), audits)
+    }
+
+    fn get_system_audits_for_tracker(
+        &mut self,
+        ap_tracker_id: i32,
+    ) -> impl Stream<Item = sqlx::Result<Audit>> + Send {
+        let (sql, values) = Query::select()
+            .column((AuditIden::Table, Asterisk))
+            .from(ApGameIden::Table)
+            .inner_join(
+                AuditIden::Table,
+                Expr::col((AuditIden::Table, AuditIden::Entity))
+                    .eq(SimpleExpr::Constant("ap_game".into()))
+                    .and(
+                        Expr::col((AuditIden::Table, AuditIden::EntityId))
+                            .equals((ApGameIden::Table, ApGameIden::Id)),
+                    ),
+            )
+            .and_where(
+                Expr::col((ApGameIden::Table, ApGameIden::TrackerId))
+                    .eq(ap_tracker_id)
+                    .and(Expr::col((AuditIden::Table, AuditIden::ActorCtUserId)).is_null()),
+            )
+            .order_by((AuditIden::Table, AuditIden::ChangedAt), Order::Asc)
+            .build_sqlx(PostgresQueryBuilder);
+
+        stream! {
+            for await row in sqlx::query_as_with(&sql, values).fetch(self.0.as_mut()) {
+                yield row;
+            }
+        }
     }
 }
 

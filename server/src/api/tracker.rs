@@ -1,6 +1,12 @@
 //! Tracker endpoints.
 
-use std::{fmt::Display, future::ready, str::FromStr, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet, hash_map::Entry},
+    fmt::Display,
+    future::ready,
+    str::FromStr,
+    sync::Arc,
+};
 
 use axum::{
     Json,
@@ -11,8 +17,8 @@ use axum::{
 use axum_client_ip::ClientIp;
 use axum_extra::{TypedHeader, headers::Header};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use chrono::{DateTime, TimeDelta, Utc};
-use futures::TryStreamExt;
+use chrono::{DateTime, DurationRound, TimeDelta, Utc};
+use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -26,6 +32,7 @@ use crate::{
             PingPreference, ProgressionStatus, UpdateCompletionStatus,
         },
     },
+    diff::FieldDiff,
     logging::{UnexpectedResultExt, log},
     send_hack::{send_future, send_stream},
     state::{AppState, GetRoomLinkError, TrackerUpdateError},
@@ -900,4 +907,137 @@ where
     send_future(tx.commit()).await.unexpected()?;
 
     Ok(Json(status))
+}
+
+/// `GET /tracker/{tracker_id}/checks_history`: Get history of checks over time.
+pub async fn get_checks_history<D>(
+    State(state): State<Arc<AppState<D>>>,
+    Path(tracker_id): Path<UrlEncodedTrackerId>,
+) -> Result<impl IntoResponse, StatusCode>
+where
+    D: DataAccessProvider + Send + Sync + 'static,
+{
+    let mut db = state
+        .data_provider
+        .create_data_access()
+        .await
+        .unexpected()?;
+
+    let tracker = db
+        .get_tracker_by_tracker_id(tracker_id.into())
+        .await
+        .unexpected()?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    let slots: Vec<_> = db
+        .get_ap_games_by_tracker_id(tracker.id)
+        .try_collect()
+        .await
+        .unexpected()?;
+
+    #[derive(Serialize)]
+    struct ChecksDataPoint {
+        time: DateTime<Utc>,
+        slots: HashMap<i32, i32>,
+    }
+
+    #[derive(Deserialize)]
+    struct ChecksDoneAudit {
+        checks_done: Option<FieldDiff<i32>>,
+    }
+
+    let mut data_points = db
+        .get_system_audits_for_tracker(tracker.id)
+        .filter_map(|audit| {
+            let r: Result<_, sqlx::Error> = (|| {
+                let audit = audit?;
+
+                let checks_done: ChecksDoneAudit =
+                    serde_json::from_str(&audit.diff).map_err(|e| sqlx::Error::ColumnDecode {
+                        index: "diff".into(),
+                        source: e.into(),
+                    })?;
+
+                Ok(checks_done
+                    .checks_done
+                    .map(|checks_done| (audit, checks_done)))
+            })();
+
+            ready(r.transpose())
+        })
+        .try_fold(
+            vec![],
+            |mut items: Vec<ChecksDataPoint>, (audit, checks_done)| {
+                let minute = audit
+                    .changed_at
+                    .duration_trunc(TimeDelta::minutes(1))
+                    .unwrap();
+
+                if let Some(last) = items.last_mut() {
+                    let is_new;
+
+                    if last.time == minute {
+                        let entry = last.slots.entry(audit.entity_id);
+                        is_new = matches!(entry, Entry::Vacant(_));
+                        *entry.or_default() = checks_done.new;
+                    } else {
+                        let mut next = ChecksDataPoint {
+                            time: minute,
+                            slots: last.slots.clone(),
+                        };
+
+                        let entry = next.slots.entry(audit.entity_id);
+                        is_new = matches!(entry, Entry::Vacant(_));
+                        *entry.or_default() = checks_done.new;
+                        items.push(next);
+                    }
+
+                    if is_new {
+                        // If we inserted a new record, then this slot is
+                        // missing from all prior entries and the old value must
+                        // be backfilled to them.
+                        let len = items.len();
+                        for i in &mut items[0..(len - 1)] {
+                            i.slots.insert(audit.entity_id, checks_done.old);
+                        }
+                    }
+                } else {
+                    items.push(ChecksDataPoint {
+                        time: minute,
+                        slots: [(audit.entity_id, checks_done.new)].into_iter().collect(),
+                    });
+                }
+
+                ready(Ok(items))
+            },
+        )
+        .await
+        .unexpected()?;
+
+    // Patch up possibly-missing data: if there are any slots that don't appear
+    // in the audit records, populate all data points with that slot's current
+    // check count.  This situation is possible in a few scenarios:
+    //
+    // * The slot has not sent any checks since the CT tracker was first
+    //   created.
+    // * The slot has not sent any checks since CT started recording history.
+    //
+    // All data points should have exactly the same set of slots due to the
+    // backfilling performed above.
+
+    if let Some(last) = data_points.last() {
+        // Make a set of the slots in the last entry.  This is required because
+        // we are going to mutate data_points.
+        let data_point_slots: HashSet<_> = last.slots.keys().copied().collect();
+
+        for slot in slots {
+            if !data_point_slots.contains(&slot.id) {
+                for p in &mut data_points {
+                    p.slots.insert(slot.id, slot.checks_done);
+                }
+            }
+        }
+    }
+
+    Ok(Json(data_points))
 }

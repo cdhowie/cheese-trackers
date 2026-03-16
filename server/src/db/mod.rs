@@ -305,6 +305,13 @@ pub trait DataAccess {
     where
         's: 'f,
         'v: 'f;
+
+    /// Get all [`Audit`]s for a tracker that don't have an actor ID (e.g. were
+    /// performed by the system) and sorted chronologically.
+    fn get_system_audits_for_tracker(
+        &mut self,
+        ap_tracker_id: i32,
+    ) -> impl Stream<Item = sqlx::Result<Audit>> + Send;
 }
 
 pub fn create_audit_for<V>(

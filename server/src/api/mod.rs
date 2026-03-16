@@ -54,6 +54,10 @@ where
             "/tracker/{tracker_id}/dashboard_override",
             put(tracker::put_tracker_dashboard_override),
         )
+        .route(
+            "/tracker/{tracker_id}/checks_history",
+            get(tracker::get_checks_history),
+        )
         .route("/user/self", get(user::get_self))
         .route("/user/self/api_key", get(user::get_api_key))
         .route("/user/self/api_key", post(user::reset_api_key))

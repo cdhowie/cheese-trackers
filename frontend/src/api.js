@@ -61,6 +61,10 @@ export async function getDashboardTrackers() {
     return api_http.get('/dashboard/tracker');
 }
 
+export async function getTrackerChecksHistory(id) {
+    return api_http.get(`tracker/${id}/checks_history`);
+}
+
 export async function updateGame(tracker_id, game, priorOwner) {
     return api_http.request({
         method: 'put',

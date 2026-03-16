@@ -25,6 +25,7 @@ import CancelableEdit from '@/components/CancelableEdit.vue';
 import RoomPortButton from '@/components/RoomPortButton.vue';
 import OverwriteClaimButton from '@/components/OverwriteClaimButton.vue';
 import TrackerDescription from '@/components/TrackerDescription.vue';
+import TrackerChecksHistory from '@/components/TrackerChecksHistory.vue';
 
 import TrackerTable from '@/components/TrackerTable.vue';
 import TrackerTableHeader from '@/components/TrackerTableHeader.vue';
@@ -576,6 +577,9 @@ function patchGame(game) {
     game.$newnotes = game.notes;
 }
 
+const showChecksHistory = ref(false);
+const refreshSerial = ref(0);
+
 async function loadTracker() {
     if (loading.value) {
         return;
@@ -583,6 +587,8 @@ async function loadTracker() {
 
     loading.value = true;
     error.value = undefined;
+
+    refreshSerial.value += 1;
 
     try {
         const { data } = await apiGetTracker(props.aptrackerid);
@@ -1602,7 +1608,24 @@ loadTracker();
                 <TrackerSummary :tracker-data="trackerData" summarize-by="game"></TrackerSummary>
             </div>
         </div>
-        <div class="text-center">Last updated from Archipelago at {{ displayDateTime(trackerData.updated_at) }}
+        <div class="row">
+            <div class="col-12 text-center">
+                <h3>Checks history</h3>
+                <TrackerChecksHistory
+                    v-if="showChecksHistory"
+                    :trackerid="props.aptrackerid"
+                    :refreshserial="refreshSerial"
+                    :totalchecks="statTotalChecks"
+                />
+                <button
+                    v-else
+                    class="btn btn-primary"
+                    @click.prevent="showChecksHistory = true"
+                >Load checks history</button>
+            </div>
+        </div>
+        <hr>
+        <div class="text-center mt-2">Last updated from Archipelago at {{ displayDateTime(trackerData.updated_at) }}
         </div>
     </template>
 </template>
