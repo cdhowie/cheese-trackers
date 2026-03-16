@@ -33,4 +33,4 @@ podman run \
     --detach \
     --volume "$(pwd)/../frontend:/app" \
     --entrypoint /app/podman-entrypoint \
-    docker.io/node:20-bookworm
+    docker.io/node:22-trixie

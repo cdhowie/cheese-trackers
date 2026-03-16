@@ -2,7 +2,7 @@ ARG GIT_COMMIT
 
 
 
-FROM docker.io/rust:1.93.1-alpine3.21 AS serverbuilder
+FROM docker.io/rust:1.94.0-alpine3.21 AS serverbuilder
 
 RUN apk add --no-cache musl-dev openssl-dev
 
@@ -17,7 +17,7 @@ RUN --mount=type=cache,target=/app/server/target \
 
 
 
-FROM docker.io/node:20-bookworm AS frontendbuilder
+FROM docker.io/node:22-trixie AS frontendbuilder
 
 WORKDIR /app
 COPY frontend/ /app
