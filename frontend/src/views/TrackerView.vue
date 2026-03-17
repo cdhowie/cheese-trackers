@@ -218,18 +218,20 @@ function getLastCheckedOrLastActivity(game) {
     );
 }
 
-function gameDaysSinceLastCheckedOrLastActivity(game) {
+function gameDaysSinceLastCheckedOrLastActivity(game, reactive) {
     const lastUpdated = getLastCheckedOrLastActivity(game);
 
-    return lastUpdated && Math.max(0, dateToDays(lastUpdated));
+    return lastUpdated && Math.max(0, dateToDays(lastUpdated, reactive));
 }
 
-function dateToDays(d) {
+function dateToDays(d, reactive) {
     if (!moment.isMoment(d)) {
         d = moment.utc(d);
     }
 
-    return moment.duration(moment.utc(now.value).diff(d)).asDays();
+    const nowMoment = (reactive === false) ? moment.utc() : moment.utc(now.value);
+
+    return moment.duration(nowMoment.diff(d)).asDays();
 }
 
 function isGameCompleted(game) {
@@ -452,7 +454,7 @@ const sortByName = (() => {
 const sortByGame = compareByIteratee(g => g.game.toLowerCase());
 
 const sortByActivity = compareByIteratee(g => {
-    const days = gameDaysSinceLastCheckedOrLastActivity(g);
+    const days = gameDaysSinceLastCheckedOrLastActivity(g, false);
     return days === undefined ? Number.POSITIVE_INFINITY : days;
 });
 
