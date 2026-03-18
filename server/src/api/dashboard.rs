@@ -8,7 +8,7 @@ use futures::{StreamExt, TryStreamExt};
 use serde::Serialize;
 
 use crate::{
-    api::tracker::UrlEncodedTrackerId,
+    ap_api::UrlEncodedTrackerId,
     auth::token::AuthenticatedUser,
     db::{DataAccess, DataAccessProvider, model::ApTrackerDashboard},
     logging::UnexpectedResultExt,

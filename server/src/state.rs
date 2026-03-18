@@ -20,7 +20,8 @@ use url::Url;
 use uuid::Uuid;
 
 use crate::{
-    api::{UiSettings, tracker::UrlEncodedTrackerId},
+    ap_api::UrlEncodedTrackerId,
+    api::UiSettings,
     auth::{discord::AuthClient, token::TokenProcessor},
     conf::Config,
     db::{
