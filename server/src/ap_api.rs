@@ -1,4 +1,4 @@
-use std::{fmt::Display, str::FromStr};
+use std::{fmt::Display, hash::Hash, str::FromStr};
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -79,6 +79,14 @@ impl UrlEncodedUuid {
 impl PartialEq for UrlEncodedUuid {
     fn eq(&self, other: &Self) -> bool {
         self.uuid == other.uuid
+    }
+}
+
+impl Eq for UrlEncodedUuid {}
+
+impl Hash for UrlEncodedUuid {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.uuid.hash(state);
     }
 }
 
