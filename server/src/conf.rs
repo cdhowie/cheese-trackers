@@ -8,6 +8,7 @@ use chacha20poly1305::{KeyInit, XChaCha20Poly1305};
 use config::ConfigError;
 use jsonwebtoken::Algorithm;
 use serde::{Deserialize, Deserializer, Serialize, de::Error};
+use serde_cow::CowStr;
 use url::Url;
 
 /// The top-level service configuration.
@@ -197,7 +198,7 @@ fn de_token_cipher<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<XChaCha20Poly1305, D::Error> {
     let key = BASE64_STANDARD
-        .decode(String::deserialize(deserializer)?)
+        .decode(CowStr::deserialize(deserializer)?.0.as_bytes())
         .map_err(|e| D::Error::custom(format!("cannot decode token cipher key: {e}")))?;
 
     XChaCha20Poly1305::new_from_slice(&key)

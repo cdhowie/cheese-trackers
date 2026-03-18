@@ -3,6 +3,7 @@ use std::{fmt::Display, str::FromStr};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
+use serde_cow::CowStr;
 use url::Url;
 use uuid::Uuid;
 
@@ -46,7 +47,7 @@ fn deser_last_activity<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<DateTime<Utc>, D::Error> {
     Ok(
-        NaiveDateTime::parse_from_str(&String::deserialize(deserializer)?, "%a, %-d %b %Y %T %Z")
+        NaiveDateTime::parse_from_str(&CowStr::deserialize(deserializer)?.0, "%a, %-d %b %Y %T %Z")
             .map_err(serde::de::Error::custom)?
             .and_utc(),
     )
@@ -141,7 +142,8 @@ impl<'de> Deserialize<'de> for UrlEncodedTrackerId {
     {
         use serde::de::Error;
 
-        String::deserialize(deserializer)?
+        CowStr::deserialize(deserializer)?
+            .0
             .parse()
             .map_err(D::Error::custom)
     }

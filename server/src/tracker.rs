@@ -10,6 +10,7 @@ use serde::{
     },
     forward_to_deserialize_any,
 };
+use serde_cow::CowStr;
 
 use crate::db::model::TrackerGameStatus;
 
@@ -116,7 +117,7 @@ pub struct Game {
 /// `Deserialize` is already implemented on `TrackerGameStatus` with a different
 /// representation, so this function handles parsing from HTML tables.
 fn de_status<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TrackerGameStatus, D::Error> {
-    Ok(match String::deserialize(deserializer)?.as_str() {
+    Ok(match &*CowStr::deserialize(deserializer)?.0 {
         "Disconnected" => TrackerGameStatus::Disconnected,
         "Connected" => TrackerGameStatus::Connected,
         "Ready" => TrackerGameStatus::Ready,
@@ -200,7 +201,7 @@ where
     T: FromStr,
     T::Err: Display,
 {
-    let s = String::deserialize(deserializer)?;
+    let s = CowStr::deserialize(deserializer)?.0;
 
     s.parse()
         .map_err(|e| D::Error::custom(format!("unable to parse value {s:?}: {e}")))
@@ -212,7 +213,7 @@ where
 fn de_last_activity<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<chrono::Duration>, D::Error> {
-    let s = String::deserialize(deserializer)?;
+    let s = CowStr::deserialize(deserializer)?.0;
 
     if s == "None" {
         Ok(None)
@@ -247,7 +248,7 @@ pub struct Hint {
 
 /// Deserializes values in the Found column.
 fn de_found<'de, D: Deserializer<'de>>(deserializer: D) -> Result<bool, D::Error> {
-    String::deserialize(deserializer).map(|s| !s.is_empty())
+    CowStr::deserialize(deserializer).map(|s| !s.0.is_empty())
 }
 
 /// Deserialization error caused when not all rows are consumed from the table

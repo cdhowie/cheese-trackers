@@ -419,6 +419,7 @@ dependencies = [
  "sea-query",
  "sea-query-binder",
  "serde",
+ "serde_cow",
  "serde_json",
  "serenity",
  "sqlx",
