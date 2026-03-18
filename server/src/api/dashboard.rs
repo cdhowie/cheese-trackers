@@ -8,7 +8,7 @@ use futures::{StreamExt, TryStreamExt};
 use serde::Serialize;
 
 use crate::{
-    ap_api::UrlEncodedTrackerId,
+    ap_api::UrlEncodedUuid,
     auth::token::AuthenticatedUser,
     db::{DataAccess, DataAccessProvider, model::ApTrackerDashboard},
     logging::UnexpectedResultExt,
@@ -28,7 +28,7 @@ where
     #[derive(Debug, Clone, Serialize)]
     pub struct DashboardTracker {
         pub id: i32,
-        pub tracker_id: UrlEncodedTrackerId,
+        pub tracker_id: UrlEncodedUuid,
         pub title: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub owner_ct_user_id: Option<i32>,

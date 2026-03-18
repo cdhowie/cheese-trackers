@@ -41,7 +41,7 @@ pub struct RoomStatusResponse {
     pub last_port: u16,
     #[serde(rename = "timeout")]
     pub timeout_sec: u32,
-    pub tracker: UrlEncodedTrackerId,
+    pub tracker: UrlEncodedUuid,
 }
 
 fn deser_last_activity<'de, D: Deserializer<'de>>(
@@ -58,7 +58,7 @@ const URLSAFE_BASE64_UUID_LEN: usize = 22;
 
 /// URL-safe base64-encoded UUID.
 #[derive(Debug, Clone, Copy)]
-pub struct UrlEncodedTrackerId {
+pub struct UrlEncodedUuid {
     /// The UUID value.
     uuid: Uuid,
     /// Pre-encoded URL-safe base64 string representation of the UUID.  Storing
@@ -68,7 +68,7 @@ pub struct UrlEncodedTrackerId {
     string: [u8; URLSAFE_BASE64_UUID_LEN],
 }
 
-impl UrlEncodedTrackerId {
+impl UrlEncodedUuid {
     pub fn as_str(&self) -> &str {
         std::str::from_utf8(&self.string).unwrap()
     }
@@ -76,13 +76,13 @@ impl UrlEncodedTrackerId {
 
 // We can skip the string field because it's derived from the uuid, so this
 // winds up being more efficient.
-impl PartialEq for UrlEncodedTrackerId {
+impl PartialEq for UrlEncodedUuid {
     fn eq(&self, other: &Self) -> bool {
         self.uuid == other.uuid
     }
 }
 
-impl From<Uuid> for UrlEncodedTrackerId {
+impl From<Uuid> for UrlEncodedUuid {
     fn from(value: Uuid) -> Self {
         let mut string = [0; URLSAFE_BASE64_UUID_LEN];
 
@@ -97,13 +97,13 @@ impl From<Uuid> for UrlEncodedTrackerId {
     }
 }
 
-impl From<UrlEncodedTrackerId> for Uuid {
-    fn from(value: UrlEncodedTrackerId) -> Self {
+impl From<UrlEncodedUuid> for Uuid {
+    fn from(value: UrlEncodedUuid) -> Self {
         value.uuid
     }
 }
 
-impl AsRef<str> for UrlEncodedTrackerId {
+impl AsRef<str> for UrlEncodedUuid {
     fn as_ref(&self) -> &str {
         self.as_str()
     }
@@ -117,7 +117,7 @@ pub enum UrlEncodedTrackerIdDecodeError {
     UuidDecode(#[from] uuid::Error),
 }
 
-impl FromStr for UrlEncodedTrackerId {
+impl FromStr for UrlEncodedUuid {
     type Err = UrlEncodedTrackerIdDecodeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -130,13 +130,13 @@ impl FromStr for UrlEncodedTrackerId {
     }
 }
 
-impl Display for UrlEncodedTrackerId {
+impl Display for UrlEncodedUuid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
     }
 }
 
-impl<'de> Deserialize<'de> for UrlEncodedTrackerId {
+impl<'de> Deserialize<'de> for UrlEncodedUuid {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -150,7 +150,7 @@ impl<'de> Deserialize<'de> for UrlEncodedTrackerId {
     }
 }
 
-impl Serialize for UrlEncodedTrackerId {
+impl Serialize for UrlEncodedUuid {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,

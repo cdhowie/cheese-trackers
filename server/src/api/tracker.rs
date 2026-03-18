@@ -19,7 +19,7 @@ use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ap_api::UrlEncodedTrackerId,
+    ap_api::UrlEncodedUuid,
     auth::token::AuthenticatedUser,
     db::{
         DataAccess, DataAccessProvider, Transactable, Transaction, create_audit_for,
@@ -38,7 +38,7 @@ use crate::{
 /// `GET /tracker/{tracker_id}`: Get tracker.
 pub async fn get_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
-    Path(tracker_id): Path<UrlEncodedTrackerId>,
+    Path(tracker_id): Path<UrlEncodedUuid>,
     user: Option<AuthenticatedUser>,
 ) -> Result<impl IntoResponse, StatusCode>
 where
@@ -48,7 +48,7 @@ where
     #[derive(Debug, Clone, serde::Serialize)]
     pub struct Tracker {
         pub id: i32,
-        pub tracker_id: UrlEncodedTrackerId,
+        pub tracker_id: UrlEncodedUuid,
         pub updated_at: DateTime<Utc>,
         pub title: String,
         pub description: String,
@@ -212,7 +212,7 @@ where
 {
     #[derive(serde::Serialize)]
     struct CreateTrackerResponse {
-        pub tracker_id: UrlEncodedTrackerId,
+        pub tracker_id: UrlEncodedUuid,
     }
 
     let tracker_id = match state.upsert_tracker(&body.url).await {
@@ -283,7 +283,7 @@ pub async fn update_tracker<D>(
     State(state): State<Arc<AppState<D>>>,
     ClientIp(ip): ClientIp,
     user: Option<AuthenticatedUser>,
-    Path(tracker_id): Path<UrlEncodedTrackerId>,
+    Path(tracker_id): Path<UrlEncodedUuid>,
     Json(tracker_update): Json<UpdateTrackerRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
 where
@@ -459,7 +459,7 @@ pub async fn update_hint<D>(
     State(state): State<Arc<AppState<D>>>,
     ClientIp(ip): ClientIp,
     user: Option<AuthenticatedUser>,
-    Path((tracker_id, hint_id)): Path<(UrlEncodedTrackerId, i32)>,
+    Path((tracker_id, hint_id)): Path<(UrlEncodedUuid, i32)>,
     Json(hint_update): Json<UpdateHintRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
 where
@@ -579,7 +579,7 @@ pub async fn update_game<D>(
     State(state): State<Arc<AppState<D>>>,
     ClientIp(ip): ClientIp,
     user: Option<AuthenticatedUser>,
-    Path((tracker_id, game_id)): Path<(UrlEncodedTrackerId, i32)>,
+    Path((tracker_id, game_id)): Path<(UrlEncodedUuid, i32)>,
     TypedHeader(expected_owner): TypedHeader<IfOwnerIs>,
     Json(game_update): Json<UpdateGameRequest>,
 ) -> Result<impl IntoResponse, StatusCode>
@@ -722,7 +722,7 @@ pub struct DashboardOverrideStatus {
 /// status.
 pub async fn get_tracker_dashboard_override<D>(
     State(state): State<Arc<AppState<D>>>,
-    Path(tracker_id): Path<UrlEncodedTrackerId>,
+    Path(tracker_id): Path<UrlEncodedUuid>,
     user: AuthenticatedUser,
 ) -> Result<impl IntoResponse, StatusCode>
 where
@@ -758,7 +758,7 @@ where
 /// status.
 pub async fn put_tracker_dashboard_override<D>(
     State(state): State<Arc<AppState<D>>>,
-    Path(tracker_id): Path<UrlEncodedTrackerId>,
+    Path(tracker_id): Path<UrlEncodedUuid>,
     user: AuthenticatedUser,
     Json(status): Json<DashboardOverrideStatus>,
 ) -> Result<impl IntoResponse, StatusCode>
@@ -805,7 +805,7 @@ where
 /// `GET /tracker/{tracker_id}/checks_history`: Get history of checks over time.
 pub async fn get_checks_history<D>(
     State(state): State<Arc<AppState<D>>>,
-    Path(tracker_id): Path<UrlEncodedTrackerId>,
+    Path(tracker_id): Path<UrlEncodedUuid>,
 ) -> Result<impl IntoResponse, StatusCode>
 where
     D: DataAccessProvider + Send + Sync + 'static,

@@ -20,7 +20,7 @@ use url::Url;
 use uuid::Uuid;
 
 use crate::{
-    ap_api::UrlEncodedTrackerId,
+    ap_api::UrlEncodedUuid,
     api::UiSettings,
     auth::{discord::AuthClient, token::TokenProcessor},
     conf::Config,
@@ -714,7 +714,7 @@ impl<D> AppState<D> {
         if url
             .path_segments()
             .and_then(|mut s| s.next_back())
-            .is_none_or(|id| UrlEncodedTrackerId::from_str(id).is_err())
+            .is_none_or(|id| UrlEncodedUuid::from_str(id).is_err())
         {
             return Err(Arc::new(TrackerUrlParseError::TrackerId.into()));
         }
@@ -872,7 +872,7 @@ impl<D> AppState<D> {
     }
 
     async fn get_tracker_link_from_room_link(&self, room_link: &Url) -> Option<Url> {
-        let room_id: UrlEncodedTrackerId = {
+        let room_id: UrlEncodedUuid = {
             let mut segments = room_link.path_segments()?;
 
             match (segments.next()?, segments.next()?, segments.next()) {
