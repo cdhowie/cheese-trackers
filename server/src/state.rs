@@ -679,7 +679,7 @@ impl<D> AppState<D> {
     where
         D: DataAccessProvider + Send + Sync + 'static,
     {
-        let url: Url = url
+        let mut url: Url = url
             .parse()
             .map_err(|e| Arc::new(TrackerUrlParseError::Url(e).into()))?;
 
@@ -688,7 +688,22 @@ impl<D> AppState<D> {
             .await
             .is_none()
         {
-            return Err(Arc::new(TrackerUpdateError::UpstreamNotWhitelisted));
+            // Check if we were given a room link by mistake.
+            let is_whitelisted = match self.get_tracker_link_from_room_link(&url).await {
+                Some(u) => {
+                    url = u;
+
+                    self.get_upstream_host_for_tracker_link(&url)
+                        .await
+                        .is_some()
+                }
+
+                None => false,
+            };
+
+            if !is_whitelisted {
+                return Err(Arc::new(TrackerUpdateError::UpstreamNotWhitelisted));
+            }
         }
 
         // The AP tracker endpoint accepts tracker IDs that have a suffix
@@ -854,6 +869,37 @@ impl<D> AppState<D> {
             );
 
         Ok((r.last_port, next_check))
+    }
+
+    async fn get_tracker_link_from_room_link(&self, room_link: &Url) -> Option<Url> {
+        let room_id: UrlEncodedTrackerId = {
+            let mut segments = room_link.path_segments()?;
+
+            match (segments.next()?, segments.next()?, segments.next()) {
+                ("room", room_id, None) => room_id.parse().ok()?,
+                _ => return None,
+            }
+        };
+
+        let mut api_base = room_link.clone();
+        api_base.set_path("/api/");
+
+        let ap_client =
+            crate::ap_api::Client::new_with_client(api_base, self.reqwest_client.clone());
+
+        let room_status = ap_client.get_room_status(room_id.as_str()).await.ok()?;
+
+        let mut tracker_url = room_link.clone();
+
+        {
+            let mut segments = tracker_url.path_segments_mut().ok()?;
+
+            segments.clear();
+            segments.push("tracker");
+            segments.push(room_status.tracker.as_str());
+        }
+
+        Some(tracker_url)
     }
 }
 

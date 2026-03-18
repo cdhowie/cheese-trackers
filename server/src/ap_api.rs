@@ -41,6 +41,7 @@ pub struct RoomStatusResponse {
     pub last_port: u16,
     #[serde(rename = "timeout")]
     pub timeout_sec: u32,
+    pub tracker: UrlEncodedTrackerId,
 }
 
 fn deser_last_activity<'de, D: Deserializer<'de>>(
