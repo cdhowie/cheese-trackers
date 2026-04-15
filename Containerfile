@@ -2,7 +2,7 @@ ARG GIT_COMMIT
 
 
 
-FROM docker.io/rust:1.94.0-alpine3.21 AS serverbuilder
+FROM docker.io/rust:1.94.1-alpine3.21 AS serverbuilder
 
 RUN apk add --no-cache musl-dev openssl-dev
 
