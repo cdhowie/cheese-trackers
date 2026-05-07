@@ -212,6 +212,7 @@ fn de_token_cipher<'de, D: Deserializer<'de>>(
 pub fn load() -> Result<Config, ConfigError> {
     config::Config::builder()
         .add_source(config::File::with_name("config"))
+        .add_source(config::Environment::with_prefix("CHEESETRACKERS").separator("__"))
         .build()?
         .try_deserialize()
 }
