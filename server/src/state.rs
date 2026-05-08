@@ -486,7 +486,7 @@ impl<D> AppState<D> {
 
                 let mut name_to_id = HashMap::new();
 
-                for (tracker_game, old_db_game) in games.into_iter().zip(db_games.into_iter()) {
+                for (tracker_game, old_db_game) in games.into_iter().zip(db_games) {
                     let tracker_position: i32 = tracker_game.position.try_into().map_err(|_| {
                         TrackerUpdateError::NumericConversion(tracker_game.position)
                     })?;
