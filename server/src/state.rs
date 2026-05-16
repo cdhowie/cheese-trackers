@@ -413,6 +413,7 @@ impl<D> AppState<D> {
                         claimed_by_ct_user_id: None,
                         effective_discord_username: None,
                         user_is_away: false,
+                        effective_discord_user_id: None,
                     };
 
                     game.update_completion_status();

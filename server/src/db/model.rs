@@ -312,6 +312,9 @@ pub struct ApGame {
     pub effective_discord_username: Option<String>,
     #[diff(skip)]
     pub user_is_away: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[diff(skip)]
+    pub effective_discord_user_id: Option<String>,
 }
 
 /// Projection of a game used by [`UpdateCompletionStatus`].
