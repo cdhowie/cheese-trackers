@@ -117,7 +117,9 @@ pub struct Game {
 /// `Deserialize` is already implemented on `TrackerGameStatus` with a different
 /// representation, so this function handles parsing from HTML tables.
 fn de_status<'de, D: Deserializer<'de>>(deserializer: D) -> Result<TrackerGameStatus, D::Error> {
-    Ok(match &*CowStr::deserialize(deserializer)?.0 {
+    let s = CowStr::deserialize(deserializer)?.0;
+
+    Ok(match s.strip_suffix(" (via override)").unwrap_or(&s) {
         "Disconnected" => TrackerGameStatus::Disconnected,
         "Connected" => TrackerGameStatus::Connected,
         "Ready" => TrackerGameStatus::Ready,
