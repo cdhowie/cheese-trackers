@@ -18,7 +18,7 @@ CREATE OR REPLACE VIEW ap_game WITH (security_barrier='false', security_invoker=
     g.progression_status,
     COALESCE(u.discord_username, g.discord_username) AS effective_discord_username,
     COALESCE(u.is_away, FALSE) AS user_is_away,
-    u.discord_user_id::text AS effective_discord_user_id
+    u.discord_user_id AS effective_discord_user_id
    FROM (public.ap_game_store g
      LEFT JOIN public.ct_user u ON ((u.id = g.claimed_by_ct_user_id)));
 
@@ -49,7 +49,7 @@ CREATE OR REPLACE RULE ap_game_delete_store AS
         (SELECT is_away FROM ct_user u WHERE u.id = ap_game_store.claimed_by_ct_user_id),
         FALSE
     ) AS user_is_away,
-    (SELECT discord_user_id::text FROM ct_user u WHERE u.id = ap_game_store.claimed_by_ct_user_id) AS effective_discord_user_id;
+    (SELECT discord_user_id FROM ct_user u WHERE u.id = ap_game_store.claimed_by_ct_user_id) AS effective_discord_user_id;
 
 CREATE OR REPLACE RULE ap_game_insert_store AS
     ON INSERT TO public.ap_game DO INSTEAD  INSERT INTO public.ap_game_store (id, tracker_id, name, game, checks_done, checks_total, last_activity, discord_username, last_checked, "position", tracker_status, notes, discord_ping, claimed_by_ct_user_id, availability_status, completion_status, progression_status)
@@ -78,7 +78,7 @@ CREATE OR REPLACE RULE ap_game_insert_store AS
         (SELECT is_away FROM ct_user u WHERE u.id = ap_game_store.claimed_by_ct_user_id),
         FALSE
     ) AS user_is_away,
-    (SELECT discord_user_id::text FROM ct_user u WHERE u.id = ap_game_store.claimed_by_ct_user_id) AS effective_discord_user_id;
+    (SELECT discord_user_id FROM ct_user u WHERE u.id = ap_game_store.claimed_by_ct_user_id) AS effective_discord_user_id;
 
 CREATE OR REPLACE RULE ap_game_update_store AS
     ON UPDATE TO public.ap_game DO INSTEAD  UPDATE public.ap_game_store SET id = new.id, tracker_id = new.tracker_id, name = new.name, game = new.game, checks_done = new.checks_done, checks_total = new.checks_total, last_activity = new.last_activity, discord_username = new.discord_username, last_checked = new.last_checked, "position" = new."position", tracker_status = new.tracker_status, notes = new.notes, discord_ping = new.discord_ping, claimed_by_ct_user_id = new.claimed_by_ct_user_id, availability_status = new.availability_status, completion_status = new.completion_status, progression_status = new.progression_status
@@ -107,4 +107,4 @@ CREATE OR REPLACE RULE ap_game_update_store AS
         (SELECT is_away FROM ct_user u WHERE u.id = ap_game_store.claimed_by_ct_user_id),
         FALSE
     ) AS user_is_away,
-    (SELECT discord_user_id::text FROM ct_user u WHERE u.id = ap_game_store.claimed_by_ct_user_id) AS effective_discord_user_id;
+    (SELECT discord_user_id FROM ct_user u WHERE u.id = ap_game_store.claimed_by_ct_user_id) AS effective_discord_user_id;
