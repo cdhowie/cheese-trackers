@@ -1,12 +1,15 @@
 //! Database model types.
 
-use std::{fmt::Debug, hash::Hash};
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 
 use cheese_trackers_server_macros::IntoFieldwiseDiff;
 use chrono::{DateTime, Utc};
 use ipnetwork::IpNetwork;
 use sea_query::{Iden, Nullable, Value};
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use sqlx::FromRow;
 use uuid::Uuid;
 
@@ -312,6 +315,12 @@ pub struct ApGame {
     pub effective_discord_username: Option<String>,
     #[diff(skip)]
     pub user_is_away: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    // Serialize as a string since f64 cannot represent all i64 values, and
+    // JavaScript always parses as f64.
+    #[serde(serialize_with = "ser_opt_as_string")]
+    #[diff(skip)]
+    pub effective_discord_user_id: Option<i64>,
 }
 
 /// Projection of a game used by [`UpdateCompletionStatus`].
@@ -462,4 +471,30 @@ pub struct ApTrackerDashboardOverride {
     pub ct_user_id: i32,
     pub ap_tracker_id: i32,
     pub visibility: bool,
+}
+
+fn ser_opt_as_string<T, S>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    T: Display,
+    S: Serializer,
+{
+    match value {
+        None => serializer.serialize_none(),
+        Some(v) => {
+            // Inline buffer avoids an allocation.  20 characters is the max
+            // needed.
+            use std::io::Write;
+
+            let mut buf = [0u8; 20];
+
+            let bufused = {
+                let mut cursor = &mut buf[..];
+                write!(cursor, "{v}").unwrap();
+                let cursorlen = cursor.len();
+                &buf[..(buf.len() - cursorlen)]
+            };
+
+            serializer.serialize_str(str::from_utf8(bufused).unwrap())
+        }
+    }
 }
