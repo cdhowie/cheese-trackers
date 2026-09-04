@@ -54,7 +54,7 @@ trait PgInsertStrategy {
 
 struct ViaModelWithPrimaryKey<T>(PhantomData<fn() -> T>);
 
-impl<T: ModelWithAutoPrimaryKey> PgInsertStrategy for ViaModelWithPrimaryKey<T> {
+impl<T: ModelWithPrimaryKey> PgInsertStrategy for ViaModelWithPrimaryKey<T> {
     type Iden = T::Iden;
     type InsertionModel = T::InsertionModel;
     type InsertionResult = T;
@@ -152,7 +152,7 @@ where
 /// Deletes a row from the database by its integer primary key.
 async fn pg_delete<T>(executor: &mut PgConnection, id: i32) -> sqlx::Result<Option<T>>
 where
-    T: ModelWithAutoPrimaryKey + for<'a> FromRow<'a, PgRow> + Send + Unpin,
+    T: ModelWithPrimaryKey + for<'a> FromRow<'a, PgRow> + Send + Unpin,
 {
     let (sql, values) = Query::delete()
         .from_table(T::table())
@@ -184,17 +184,17 @@ async fn pg_update<T>(
     columns: &[T::Iden],
 ) -> sqlx::Result<Option<T>>
 where
-    T: ModelWithAutoPrimaryKey + for<'a> FromRow<'a, PgRow> + Send + Unpin,
+    T: ModelWithPrimaryKey + for<'a> FromRow<'a, PgRow> + Send + Unpin,
     T::PrimaryKey: Into<sea_query::Value>,
 {
-    let (key, data) = value.split_primary_key();
+    let (key, data) = value.into_primary_key_and_values();
 
     // Would be nice to avoid converting to a map here, but this simplifies a
     // lot of the code below.
-    let mut values: HashMap<_, _> = T::insertion_columns()
+    let mut values: HashMap<_, _> = T::columns_without_primary_key()
         .iter()
         .copied()
-        .zip(T::into_insertion_values(data))
+        .zip(data)
         .collect();
 
     let columns = if columns.is_empty() {

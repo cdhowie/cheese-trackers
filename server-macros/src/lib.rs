@@ -171,11 +171,11 @@ pub fn derive_model(item: TokenStream) -> TokenStream {
         .into()
 }
 
-#[proc_macro_derive(ModelWithAutoPrimaryKey, attributes(model))]
-pub fn derive_model_with_auto_primary_key(item: TokenStream) -> TokenStream {
+#[proc_macro_derive(ModelWithPrimaryKey, attributes(model))]
+pub fn derive_model_with_primary_key(item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemStruct);
 
-    expand_derive_model_with_auto_primary_key(input)
+    expand_derive_model_with_primary_key(input)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
 }
@@ -245,13 +245,14 @@ fn expand_derive_model(input: ItemStruct) -> syn::Result<proc_macro2::TokenStrea
     })
 }
 
-fn expand_derive_model_with_auto_primary_key(
+fn expand_derive_model_with_primary_key(
     input: ItemStruct,
 ) -> syn::Result<proc_macro2::TokenStream> {
     struct ModelField<'a> {
         pub field: &'a Field,
         pub iden: Ident,
         pub is_primary_key: bool,
+        pub is_projected: bool,
     }
 
     let ident = &input.ident;
@@ -280,9 +281,11 @@ fn expand_derive_model_with_auto_primary_key(
     }
 
     let mut fields = vec![];
+    let mut pk_is_auto = false;
 
     for field in &input.fields {
         let mut is_primary_key = false;
+        let mut is_projected = false;
 
         for attr in &field.attrs {
             if attr.meta.path().is_ident("model") {
@@ -293,6 +296,28 @@ fn expand_derive_model_with_auto_primary_key(
                         }
 
                         is_primary_key = true;
+
+                        if meta.input.peek(syn::token::Paren) {
+                            meta.parse_nested_meta(|meta| {
+                                if meta.path.is_ident("auto") {
+                                    if pk_is_auto {
+                                        return Err(meta.error("duplicate auto"));
+                                    }
+
+                                    pk_is_auto = true;
+                                } else {
+                                    return Err(meta.error("unsupported primary_key attribute"));
+                                }
+
+                                Ok(())
+                            })?;
+                        }
+                    } else if meta.path.is_ident("projected") {
+                        if is_projected {
+                            return Err(meta.error("duplicate projected"));
+                        }
+
+                        is_projected = true;
                     } else {
                         return Err(meta.error("unsupported model attribute"));
                     }
@@ -315,6 +340,7 @@ fn expand_derive_model_with_auto_primary_key(
 
             field,
             is_primary_key,
+            is_projected,
         });
     }
 
@@ -342,7 +368,11 @@ fn expand_derive_model_with_auto_primary_key(
 
     let insertion_model_ident = format_ident!("{ident}Insertion");
 
-    let insertion_model_fields = fields.iter().filter(|&f| !f.is_primary_key);
+    let insertion_model_fields = fields
+        .iter()
+        .filter(|f| (!f.is_primary_key || !pk_is_auto) && !f.is_projected);
+
+    let fields_without_pk = fields.iter().filter(|f| !f.is_primary_key);
 
     let insertion_model_field_defs = insertion_model_fields.clone().map(|f| {
         let mut field = f.field.clone();
@@ -356,16 +386,10 @@ fn expand_derive_model_with_auto_primary_key(
         quote! { #ident: value.#ident }
     });
 
-    let insertion_model_from_model_fields_combine = insertion_model_fields.clone().map(|f| {
-        let ident = f.field.ident.as_ref().unwrap();
+    let columns_without_primary_key_column_idens = fields_without_pk.clone().map(|f| {
+        let iden = &f.iden;
 
-        quote! { #ident: data.#ident }
-    });
-
-    let insertion_model_from_model_fields_split = insertion_model_fields.clone().map(|f| {
-        let ident = f.field.ident.as_ref().unwrap();
-
-        quote! { #ident: self.#ident }
+        quote! { #iden_ident::#iden }
     });
 
     let insertion_model_column_idens = insertion_model_fields.clone().map(|f| {
@@ -374,10 +398,16 @@ fn expand_derive_model_with_auto_primary_key(
         quote! { #iden_ident::#iden }
     });
 
-    let insertion_model_into_values = insertion_model_fields.map(|f| {
+    let insertion_model_into_values = insertion_model_fields.clone().map(|f| {
         let field = f.field.ident.as_ref().unwrap();
 
         quote! { value.#field.into() }
+    });
+
+    let pk_model_into_values = fields_without_pk.map(|f| {
+        let field = f.field.ident.as_ref().unwrap();
+
+        quote! { self.#field.into() }
     });
 
     let insertion_model_doc = format!("Insertion model for [`{ident}`].");
@@ -392,9 +422,34 @@ fn expand_derive_model_with_auto_primary_key(
         }
 
         #[automatically_derived]
-        impl crate::db::model::ModelWithAutoPrimaryKey for #ident {
+        impl crate::db::model::ModelWithPrimaryKey for #ident {
             type InsertionModel = #insertion_model_ident;
+
             type PrimaryKey = #primary_key_type;
+
+            fn primary_key() -> Self::Iden {
+                #iden_ident::#primary_key_iden
+            }
+
+            fn primary_key_value(&self) -> &Self::PrimaryKey {
+                &self.#primary_key_ident
+            }
+
+            fn into_primary_key_and_values(self) -> (Self::PrimaryKey, impl Iterator<Item = Value>) {
+                (
+                    self.#primary_key_ident,
+                    [
+                        #( #pk_model_into_values ),*
+                    ]
+                    .into_iter()
+                )
+            }
+
+            fn columns_without_primary_key() -> &'static [Self::Iden] {
+                &[
+                    #( #columns_without_primary_key_column_idens ),*
+                ]
+            }
 
             fn insertion_columns() -> &'static [Self::Iden] {
                 &[
@@ -407,30 +462,6 @@ fn expand_derive_model_with_auto_primary_key(
                     #( #insertion_model_into_values ),*
                 ]
                 .into_iter()
-            }
-
-            fn primary_key() -> Self::Iden {
-                #iden_ident::#primary_key_iden
-            }
-
-            fn primary_key_value(&self) -> &Self::PrimaryKey {
-                &self.#primary_key_ident
-            }
-
-            fn split_primary_key(self) -> (Self::PrimaryKey, Self::InsertionModel) {
-                (
-                    self.#primary_key_ident,
-                    #insertion_model_ident {
-                        #( #insertion_model_from_model_fields_split ),*
-                    },
-                )
-            }
-
-            fn combine_primary_key(key: Self::PrimaryKey, data: Self::InsertionModel) -> Self {
-                Self {
-                    #primary_key_ident: key,
-                    #( #insertion_model_from_model_fields_combine ),*
-                }
             }
         }
 

@@ -322,7 +322,7 @@ pub fn create_audit_for<V>(
     new: &V,
 ) -> Option<AuditInsertion>
 where
-    V: ModelWithAutoPrimaryKey<PrimaryKey = i32>,
+    V: ModelWithPrimaryKey<PrimaryKey = i32>,
     for<'a> &'a V: IntoFieldwiseDiff,
 {
     let diff = old.into_fieldwise_diff(new);

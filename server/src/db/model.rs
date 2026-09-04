@@ -37,30 +37,14 @@ pub trait Model {
     fn into_values(self) -> impl Iterator<Item = Value>;
 }
 
-/// Models that have an automatically-generated primary key value on insert.
-pub trait ModelWithAutoPrimaryKey: Model + Into<Self::InsertionModel> {
+/// Models that have a primary key.
+pub trait ModelWithPrimaryKey: Model + Into<Self::InsertionModel> {
     /// Type for insertion.  This is a mirror of the model type but without any
-    /// primary key values.
+    /// auto primary key values or projected fields.
     type InsertionModel;
 
     /// Primary key type.
     type PrimaryKey: Eq + Hash + Debug + Clone + 'static;
-
-    /// Returns all of the columns of the model excluding primary keys.
-    ///
-    /// The identifiers produced by this function must contain no duplicates and
-    /// exactly match the order that values are produced by
-    /// [`into_insertion_values()`](Self::into_insertion_values), which implies
-    /// the two functions must produce the same number of items.
-    fn insertion_columns() -> &'static [Self::Iden];
-
-    /// Converts the value into an iterator of column values.
-    ///
-    /// The values produced by this function must exactly match the order that
-    /// identifiers are produced by
-    /// [`insertion_columns()`](Self::insertion_columns), which implies the two
-    /// functions must produce the same number of items.
-    fn into_insertion_values(value: Self::InsertionModel) -> impl Iterator<Item = Value>;
 
     /// Returns the identifier of this model's primary key.
     fn primary_key() -> Self::Iden;
@@ -68,14 +52,34 @@ pub trait ModelWithAutoPrimaryKey: Model + Into<Self::InsertionModel> {
     /// Returns the primary key of this value.
     fn primary_key_value(&self) -> &Self::PrimaryKey;
 
-    /// Split the model into its primary key and insertion model.
-    fn split_primary_key(self) -> (Self::PrimaryKey, Self::InsertionModel);
+    /// Split the model into its primary key and an iterator of its values.
+    ///
+    /// The values produced by the iterator must exactly match the order that
+    /// identifiers are produced by
+    /// [`columns_without_primary_key()`](Self::columns_without_primary_key),
+    /// which implies the two functions must produce the same number of items.
+    fn into_primary_key_and_values(self) -> (Self::PrimaryKey, impl Iterator<Item = Value>);
 
-    /// Create an instance from a primary key value and insertion model.
-    fn combine_primary_key(key: Self::PrimaryKey, data: Self::InsertionModel) -> Self;
+    /// Returns all of the columns of the model excluding primary keys.
+    ///
+    /// The identifiers produced by this function must contain no duplicates.
+    fn columns_without_primary_key() -> &'static [Self::Iden];
+
+    /// Returns all of the columns of the insertion model.
+    ///
+    /// The identifiers produced by this function must contain no duplicates.
+    fn insertion_columns() -> &'static [Self::Iden];
+
+    /// Converts the value into an iterator of column values.
+    ///
+    /// The values produced by this function must exactly match the order that
+    /// identifiers are produced by
+    /// [`ModelWithPrimaryKey::insertion_columns()`], which implies the two
+    /// functions must produce the same number of items.
+    fn into_insertion_values(value: Self::InsertionModel) -> impl Iterator<Item = Value>;
 }
 
-pub use cheese_trackers_server_macros::{Model, ModelWithAutoPrimaryKey};
+pub use cheese_trackers_server_macros::{Model, ModelWithPrimaryKey};
 
 /// Automatically implements several traits useful for database model enums.
 macro_rules! db_enum {
@@ -239,9 +243,9 @@ impl From<crate::auth::token::AuthenticationSource> for AuthenticationSource {
 
 /// Model for database table `ap_tracker`.
 #[sea_query::enum_def]
-#[derive(Debug, Clone, Model, ModelWithAutoPrimaryKey, FromRow, IntoFieldwiseDiff)]
+#[derive(Debug, Clone, Model, ModelWithPrimaryKey, FromRow, IntoFieldwiseDiff)]
 pub struct ApTracker {
-    #[model(primary_key)]
+    #[model(primary_key(auto))]
     pub id: i32,
     pub tracker_id: Uuid,
     #[diff(skip)]
@@ -265,9 +269,9 @@ pub struct ApTracker {
 // This is the result of a database function call.  There is no table backing
 // this model.
 #[sea_query::enum_def]
-#[derive(Debug, Clone, Model, ModelWithAutoPrimaryKey, FromRow)]
+#[derive(Debug, Clone, Model, ModelWithPrimaryKey, FromRow)]
 pub struct ApTrackerDashboard {
-    #[model(primary_key)]
+    #[model(primary_key(auto))]
     pub id: i32,
     pub tracker_id: Uuid,
     pub title: String,
@@ -283,9 +287,9 @@ pub struct ApTrackerDashboard {
 
 /// Model for database view `ap_game`.
 #[sea_query::enum_def]
-#[derive(Debug, Clone, Model, ModelWithAutoPrimaryKey, FromRow, IntoFieldwiseDiff, Serialize)]
+#[derive(Debug, Clone, Model, ModelWithPrimaryKey, FromRow, IntoFieldwiseDiff, Serialize)]
 pub struct ApGame {
-    #[model(primary_key)]
+    #[model(primary_key(auto))]
     pub id: i32,
     pub tracker_id: i32,
     pub position: i32,
@@ -312,14 +316,17 @@ pub struct ApGame {
     // changed.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[diff(skip)]
+    #[model(projected)]
     pub effective_discord_username: Option<String>,
     #[diff(skip)]
+    #[model(projected)]
     pub user_is_away: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     // Serialize as a string since f64 cannot represent all i64 values, and
     // JavaScript always parses as f64.
     #[serde(serialize_with = "ser_opt_as_string")]
     #[diff(skip)]
+    #[model(projected)]
     pub effective_discord_user_id: Option<i64>,
 }
 
@@ -390,9 +397,9 @@ impl<T: ProjectForUpdateCompletionStatus> UpdateCompletionStatus for T {
 
 /// Model for database table `ap_hint`.
 #[sea_query::enum_def]
-#[derive(Debug, Clone, Model, ModelWithAutoPrimaryKey, FromRow, IntoFieldwiseDiff, Serialize)]
+#[derive(Debug, Clone, Model, ModelWithPrimaryKey, FromRow, IntoFieldwiseDiff, Serialize)]
 pub struct ApHint {
-    #[model(primary_key)]
+    #[model(primary_key(auto))]
     pub id: i32,
     pub finder_game_id: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -407,9 +414,9 @@ pub struct ApHint {
 
 /// Model for database table `ct_user`.
 #[sea_query::enum_def]
-#[derive(Clone, Model, ModelWithAutoPrimaryKey, FromRow, IntoFieldwiseDiff)]
+#[derive(Clone, Model, ModelWithPrimaryKey, FromRow, IntoFieldwiseDiff)]
 pub struct CtUser {
-    #[model(primary_key)]
+    #[model(primary_key(auto))]
     pub id: i32,
     #[diff(skip)]
     pub discord_access_token: String,
@@ -438,9 +445,9 @@ impl Debug for CtUser {
 
 /// Model for database table `js_error`.
 #[sea_query::enum_def]
-#[derive(Debug, Clone, Model, ModelWithAutoPrimaryKey, FromRow)]
+#[derive(Debug, Clone, Model, ModelWithPrimaryKey, FromRow)]
 pub struct JsError {
-    #[model(primary_key)]
+    #[model(primary_key(auto))]
     pub id: i32,
     //#[serde(skip_serializing_if = "Option::is_none")]
     pub ct_user_id: Option<i32>,
@@ -449,9 +456,9 @@ pub struct JsError {
 
 /// Model for database table `audit`.
 #[sea_query::enum_def]
-#[derive(Debug, Clone, Model, ModelWithAutoPrimaryKey, FromRow)]
+#[derive(Debug, Clone, Model, ModelWithPrimaryKey, FromRow)]
 pub struct Audit {
-    #[model(primary_key)]
+    #[model(primary_key(auto))]
     pub id: i32,
     pub entity: String,
     pub entity_id: i32,
