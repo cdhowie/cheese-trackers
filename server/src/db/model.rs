@@ -480,6 +480,44 @@ pub struct ApTrackerDashboardOverride {
     pub visibility: bool,
 }
 
+#[sea_query::enum_def]
+#[derive(Debug, Clone, Model, ModelWithPrimaryKey, FromRow)]
+pub struct CollectionRoom {
+    #[model(primary_key)]
+    pub id: Uuid,
+    pub owner_ct_user_id: i32,
+    pub title: String,
+    pub created_at: DateTime<Utc>,
+    pub closes_at: Option<DateTime<Utc>>,
+    pub is_closed: bool,
+
+    #[model(projected)]
+    pub owner_discord_username: String,
+}
+
+impl CollectionRoom {
+    pub fn is_effectively_closed(&self) -> bool {
+        self.is_closed || self.closes_at.is_some_and(|d| d <= Utc::now())
+    }
+}
+
+#[sea_query::enum_def]
+#[derive(Debug, Clone, Model, ModelWithPrimaryKey, FromRow, serde::Serialize)]
+pub struct CollectionRoomSlot {
+    #[model(primary_key(auto))]
+    pub id: i32,
+    pub collection_room_id: Uuid,
+    pub owner_ct_user_id: i32,
+    pub changed_at: DateTime<Utc>,
+    pub slot_name: String,
+    pub slot_game: String,
+    pub notes: String,
+    pub yaml: String,
+
+    #[model(projected)]
+    pub owner_discord_username: String,
+}
+
 fn ser_opt_as_string<T, S>(value: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
 where
     T: Display,

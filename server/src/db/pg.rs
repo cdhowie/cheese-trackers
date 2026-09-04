@@ -10,6 +10,7 @@ use sqlx::{
     FromRow, PgConnection, PgPool, Postgres, migrate::MigrateError, pool::PoolConnection,
     postgres::PgRow,
 };
+use uuid::Uuid;
 
 use super::{BuildWith, DataAccess, DataAccessProvider, Transactable, Transaction, model::*};
 
@@ -542,6 +543,93 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
                 yield row;
             }
         }
+    }
+
+    fn get_collection_room_by_id(
+        &mut self,
+        id: Uuid,
+    ) -> impl Future<Output = sqlx::Result<Option<CollectionRoom>>> + Send {
+        pg_select_one(self.0.as_mut(), Expr::col(CollectionRoomIden::Id).eq(id))
+    }
+
+    fn get_collection_rooms_by_owner(
+        &mut self,
+        owner_ct_user_id: i32,
+    ) -> impl Stream<Item = sqlx::Result<CollectionRoom>> + Send {
+        pg_select_many(
+            self.0.as_mut(),
+            Expr::col(CollectionRoomIden::OwnerCtUserId).eq(owner_ct_user_id),
+        )
+    }
+
+    fn create_collection_rooms<'s, 'v, 'f>(
+        &'s mut self,
+        collection_rooms: impl IntoIterator<Item = CollectionRoomInsertion> + Send + 'v,
+    ) -> impl Stream<Item = sqlx::Result<CollectionRoom>> + Send + 'f
+    where
+        's: 'f,
+        'v: 'f,
+    {
+        pg_insert::<_, ViaModelWithPrimaryKey<CollectionRoom>>(self.0.as_mut(), collection_rooms)
+    }
+
+    fn update_collection_room(
+        &mut self,
+        collection_room: CollectionRoom,
+        columns: &[CollectionRoomIden],
+    ) -> impl Future<Output = sqlx::Result<Option<CollectionRoom>>> + Send {
+        pg_update(self.0.as_mut(), collection_room, columns)
+    }
+
+    fn get_collection_room_slots_by_collection_room_id(
+        &mut self,
+        collection_room_id: Uuid,
+    ) -> impl Stream<Item = sqlx::Result<CollectionRoomSlot>> + Send {
+        pg_select_many(
+            self.0.as_mut(),
+            Expr::col(CollectionRoomSlotIden::CollectionRoomId).eq(collection_room_id),
+        )
+    }
+
+    fn get_collection_room_slots_by_owner(
+        &mut self,
+        owner_ct_user_id: i32,
+    ) -> impl Stream<Item = sqlx::Result<CollectionRoomSlot>> + Send {
+        pg_select_many(
+            self.0.as_mut(),
+            Expr::col(CollectionRoomSlotIden::OwnerCtUserId).eq(owner_ct_user_id),
+        )
+    }
+
+    fn create_collection_room_slots<'s, 'v, 'f>(
+        &'s mut self,
+        collection_room_slots: impl IntoIterator<Item = CollectionRoomSlotInsertion> + Send + 'v,
+    ) -> impl Stream<Item = sqlx::Result<CollectionRoomSlot>> + Send + 'f
+    where
+        's: 'f,
+        'v: 'f,
+    {
+        pg_insert::<_, ViaModelWithPrimaryKey<CollectionRoomSlot>>(
+            self.0.as_mut(),
+            collection_room_slots,
+        )
+    }
+
+    fn get_collection_room_slot_by_id(
+        &mut self,
+        id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<CollectionRoomSlot>>> + Send {
+        pg_select_one(
+            self.0.as_mut(),
+            Expr::col(CollectionRoomSlotIden::Id).eq(id),
+        )
+    }
+
+    fn delete_collection_room_slot(
+        &mut self,
+        id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<CollectionRoomSlot>>> + Send {
+        pg_delete(self.0.as_mut(), id)
     }
 }
 

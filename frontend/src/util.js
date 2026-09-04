@@ -23,3 +23,7 @@ export function roundDown(num, places) {
 
     return Math.floor(num * factor) / factor;
 }
+
+export function makeFilenameSafe(name) {
+    return name.replace(/[<>:"/\\|?*]/g, '_');
+}

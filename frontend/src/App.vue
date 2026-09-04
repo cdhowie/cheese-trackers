@@ -72,7 +72,10 @@ function dismissBanner(id) {
             <div class="collapse navbar-collapse" id="navbar">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <RouterLink class="nav-link" active-class="active" to="/">Dashboard</RouterLink>
+                        <RouterLink class="nav-link" active-class="active" to="/">Trackers</RouterLink>
+                    </li>
+                    <li class="nav-item" v-if="localSettings.auth?.token">
+                        <RouterLink class="nav-link" active-class="active" to="/collection_room">Collection Rooms</RouterLink>
                     </li>
                     <li class="nav-item">
                         <RouterLink class="nav-link" active-class="active" to="/settings">Settings</RouterLink>

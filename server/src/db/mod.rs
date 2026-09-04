@@ -312,6 +312,58 @@ pub trait DataAccess {
         &mut self,
         ap_tracker_id: i32,
     ) -> impl Stream<Item = sqlx::Result<Audit>> + Send;
+
+    fn get_collection_room_by_id(
+        &mut self,
+        id: Uuid,
+    ) -> impl Future<Output = sqlx::Result<Option<CollectionRoom>>> + Send;
+
+    fn get_collection_rooms_by_owner(
+        &mut self,
+        owner_ct_user_id: i32,
+    ) -> impl Stream<Item = sqlx::Result<CollectionRoom>> + Send;
+
+    fn create_collection_rooms<'s, 'v, 'f>(
+        &'s mut self,
+        collection_rooms: impl IntoIterator<Item = CollectionRoomInsertion> + Send + 'v,
+    ) -> impl Stream<Item = sqlx::Result<CollectionRoom>> + Send + 'f
+    where
+        's: 'f,
+        'v: 'f;
+
+    fn update_collection_room(
+        &mut self,
+        collection_room: CollectionRoom,
+        columns: &[CollectionRoomIden],
+    ) -> impl Future<Output = sqlx::Result<Option<CollectionRoom>>> + Send;
+
+    fn get_collection_room_slots_by_collection_room_id(
+        &mut self,
+        collection_room_id: Uuid,
+    ) -> impl Stream<Item = sqlx::Result<CollectionRoomSlot>> + Send;
+
+    fn get_collection_room_slots_by_owner(
+        &mut self,
+        owner_ct_user_id: i32,
+    ) -> impl Stream<Item = sqlx::Result<CollectionRoomSlot>> + Send;
+
+    fn create_collection_room_slots<'s, 'v, 'f>(
+        &'s mut self,
+        collection_room_slots: impl IntoIterator<Item = CollectionRoomSlotInsertion> + Send + 'v,
+    ) -> impl Stream<Item = sqlx::Result<CollectionRoomSlot>> + Send + 'f
+    where
+        's: 'f,
+        'v: 'f;
+
+    fn get_collection_room_slot_by_id(
+        &mut self,
+        id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<CollectionRoomSlot>>> + Send;
+
+    fn delete_collection_room_slot(
+        &mut self,
+        id: i32,
+    ) -> impl Future<Output = sqlx::Result<Option<CollectionRoomSlot>>> + Send;
 }
 
 pub fn create_audit_for<V>(

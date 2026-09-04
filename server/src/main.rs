@@ -25,6 +25,7 @@ mod conf;
 mod db;
 mod diff;
 mod logging;
+mod response;
 mod send_hack;
 mod signal;
 mod state;

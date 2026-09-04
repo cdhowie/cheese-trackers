@@ -147,3 +147,46 @@ export async function updateUserServerSettings(data) {
         data,
     });
 }
+
+export async function getUserCollectionRooms() {
+    return api_http.get('user/self/collection_room');
+}
+
+export async function getCollectionRoom(id) {
+    return api_http.get(`collection_room/${id}`);
+}
+
+export async function getCollectionRoomSlots(id) {
+    return api_http.get(`collection_room/${id}/slot`);
+}
+
+export async function createCollectionRoom(data) {
+    return api_http.request({
+        method: 'post',
+        url: 'collection_room',
+        data,
+    });
+}
+
+export async function updateCollectionRoom(data) {
+    return api_http.request({
+        method: 'put',
+        url: `collection_room/${data.id}`,
+        data,
+    });
+}
+
+export async function createCollectionRoomSlots(room_id, data) {
+    return api_http.request({
+        method: 'post',
+        url: `collection_room/${room_id}/slot`,
+        data,
+    });
+}
+
+export async function deleteCollectionRoomSlot(room_id, slot_id) {
+    return api_http.request({
+        method: 'delete',
+        url: `collection_room/${room_id}/slot/${slot_id}`,
+    });
+}

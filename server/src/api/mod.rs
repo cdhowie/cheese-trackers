@@ -20,6 +20,7 @@ use crate::{
 };
 
 pub mod auth;
+pub mod collection_room;
 pub mod dashboard;
 pub mod tracker;
 pub mod user;
@@ -64,6 +65,34 @@ where
         .route("/user/self/api_key", delete(user::clear_api_key))
         .route("/user/self/settings", get(user::get_settings))
         .route("/user/self/settings", put(user::put_settings))
+        .route(
+            "/collection_room/{room_id}",
+            get(collection_room::get_collection_room),
+        )
+        .route(
+            "/collection_room/{room_id}",
+            put(collection_room::update_collection_room),
+        )
+        .route(
+            "/collection_room",
+            post(collection_room::create_collection_room),
+        )
+        .route(
+            "/collection_room/{room_id}/slot",
+            get(collection_room::get_collection_room_slots),
+        )
+        .route(
+            "/collection_room/{room_id}/slot",
+            post(collection_room::create_collection_room_slots),
+        )
+        .route(
+            "/collection_room/{room_id}/slot/{slot_id}",
+            delete(collection_room::delete_collection_room_slot),
+        )
+        .route(
+            "/user/self/collection_room",
+            get(collection_room::get_own_collection_rooms),
+        )
         .route("/settings", get(get_settings))
         .route("/jserror", post(create_js_error))
         // Since UI settings are in a header added by middleware, this no-op

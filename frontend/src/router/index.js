@@ -4,6 +4,8 @@ import TrackerViewProxy from '@/views/TrackerViewProxy.vue';
 import SettingsView from '@/views/SettingsView.vue';
 import HelpView from '@/views/HelpView.vue';
 import AuthComplete from '@/views/AuthComplete.vue';
+import CollectionRoomsView from '@/views/CollectionRoomsView.vue';
+import CollectionRoomView from '@/views/CollectionRoomView.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -12,6 +14,17 @@ const router = createRouter({
       path: '/',
       name: 'dashboard',
       component: DashboardView,
+    },
+    {
+      path: '/collection_room',
+      name: 'collectionrooms',
+      component: CollectionRoomsView,
+    },
+    {
+      path: '/collection_room/:roomid',
+      name: 'collectionroom',
+      component: CollectionRoomView,
+      props: true,
     },
     {
       path: '/settings',
