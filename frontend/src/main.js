@@ -15,8 +15,23 @@ app.use(router)
 
 app.mount('#app')
 
+function shouldReportError(error) {
+    // Don't report network errors, they are very unlikely to be code bugs.
+    return error?.name !== 'AxiosError';
+}
+
 window.onerror = async (event, source, lineno, colno, error) => {
     try {
+        if (!shouldReportError(error)) {
+            return;
+        }
+
+        // Don't log errors without a source or that came from an extension.
+        // (Errors without a source typically come from extensions, too.)
+        if (!source || /(chrome|moz)-extension/.test(source)) {
+            return;
+        }
+
         const msg = JSON.stringify({
             event: `${event}`,
             source,
@@ -37,6 +52,10 @@ window.onerror = async (event, source, lineno, colno, error) => {
 
 window.addEventListener('unhandledrejection', async (event) => {
     try {
+        if (!shouldReportError(event.reason)) {
+            return;
+        }
+
         const msg = JSON.stringify({
             error: `${event.reason}`,
             stack: event.reason?.stack,
