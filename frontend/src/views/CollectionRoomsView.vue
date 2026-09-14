@@ -4,15 +4,19 @@ import { computed, ref } from 'vue';
 import Repeat from '@/components/Repeat.vue';
 
 import { createCollectionRoom, getUserCollectionRooms } from '@/api';
-import moment from 'moment';
-import { trim } from 'lodash-es';
+import { orderBy, trim } from 'lodash-es';
 import router from '@/router';
 import { RouterLink } from 'vue-router';
 import DateTimeEdit from '@/components/DateTimeEdit.vue';
+import CollectionRoomBadges from '@/components/CollectionRoomBadges.vue';
 
 const rooms = ref([]);
 const loading = ref(false);
 const error = ref(undefined);
+
+const sortedRooms = computed(() =>
+  orderBy(rooms.value, ['closes_at', 'title'], ['desc', 'asc'])
+);
 
 async function loadRooms() {
   if (loading.value) {
@@ -128,9 +132,14 @@ async function createNewRoom() {
             You do not have any collection rooms.
           </td>
         </tr>
-        <tr v-for="room in rooms">
+        <tr v-for="room in sortedRooms" :key="room.id">
           <td>
             <RouterLink :to="`/collection_room/${room.id}`">{{ room.title }}</RouterLink>
+            <div class="d-inline-block ms-1">
+              <div class="d-flex gap-1 justify-content-left">
+                <CollectionRoomBadges :room="room"/>
+              </div>
+            </div>
           </td>
         </tr>
       </tbody>

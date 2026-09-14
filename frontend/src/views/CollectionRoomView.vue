@@ -11,6 +11,7 @@ import { now } from '@/time';
 import DateTimeEdit from '@/components/DateTimeEdit.vue';
 import DownloadLink from '@/components/DownloadLink.vue';
 import { makeFilenameSafe } from '@/util';
+import CollectionRoomBadges from '@/components/CollectionRoomBadges.vue';
 
 const props = defineProps(['roomid']);
 
@@ -36,10 +37,6 @@ const isClosed = computed(() =>
       room.value.closes_at && moment(room.value.closes_at).isSameOrBefore(now.value)
     )
   )
-);
-
-const closesAt = computed(() =>
-  room.value.closes_at && moment(room.value.closes_at)
 );
 
 const sortedSlots = computed(() => orderBy(roomSlots.value, 'slot_name'));
@@ -256,15 +253,7 @@ watch(() => props.roomid, () => loadRoom());
       </h2>
 
       <div class="d-flex gap-1 justify-content-center">
-        <span class="badge text-bg-success" v-if="isOwner">
-          Yours
-        </span>
-        <span class="badge text-bg-warning" v-if="isClosed">
-          Closed
-        </span>
-        <span class="badge text-bg-info" v-if="!isClosed && closesAt" :title="closesAt.toLocaleString()">
-          Closes {{ closesAt.from(now) }}
-        </span>
+        <CollectionRoomBadges :room="room"/>
       </div>
 
       <div v-if="saveError" class="alert alert-danger">Failed to save changes: {{ saveError }}</div>
