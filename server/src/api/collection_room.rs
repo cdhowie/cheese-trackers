@@ -391,6 +391,15 @@ fn yaml_has_game_object(yaml: &str, game: &str) -> bool {
         .is_ok()
 }
 
+fn remove_prefix(s: &mut String, prefix: &str) -> bool {
+    if s.starts_with(prefix) {
+        s.drain(..prefix.len());
+        true
+    } else {
+        false
+    }
+}
+
 fn uploaded_bytes_to_slot_yamls(bytes: Bytes) -> Result<Vec<UploadedSlot>, YamlUploadError> {
     let yaml_files = match zip_to_slot_yamls(bytes.as_ref()) {
         Ok(slots) => slots,
@@ -418,15 +427,16 @@ fn uploaded_bytes_to_slot_yamls(bytes: Bytes) -> Result<Vec<UploadedSlot>, YamlU
                 // Normalize newlines.
                 doc = doc.replace("\r\n", "\n").replace("\r", "\n");
 
+                remove_prefix(&mut doc, "\u{FEFF}");
+
                 // Strip document separator from the beginning, if present.
-                if doc.starts_with("---\n") {
-                    doc.drain(..4);
-                } else if let Some(pos) = doc.find("\n---\n") {
-                    // There is a separator somewhere in the document.  What
-                    // comes before is a YAML header (such as a %YAML
-                    // directive).  Discard this completely; we don't support
-                    // headers, and they will make concatenating files
-                    // problematic.
+                // Otherwise, look for a separator somewhere in the document.
+                // What comes before it would be a YAML header (such as a %YAML
+                // directive).  Discard this completely; we don't support
+                // headers, and they will make concatenating files problematic.
+                if !remove_prefix(&mut doc, "---\n")
+                    && let Some(pos) = doc.find("\n---\n")
+                {
                     doc.drain(..(pos + 5));
                 }
 
