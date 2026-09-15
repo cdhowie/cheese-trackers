@@ -12,6 +12,8 @@ import DateTimeEdit from '@/components/DateTimeEdit.vue';
 import DownloadLink from '@/components/DownloadLink.vue';
 import { makeFilenameSafe } from '@/util';
 import CollectionRoomBadges from '@/components/CollectionRoomBadges.vue';
+import CancelableEdit from '@/components/CancelableEdit.vue';
+import TrackerDescription from '@/components/TrackerDescription.vue';
 
 const props = defineProps(['roomid']);
 
@@ -127,6 +129,7 @@ function updateLocalRoom(data) {
     title: data.title,
     is_closed: data.is_closed,
     closes_at: data.closes_at && moment(data.closes_at),
+    notes: data.notes,
   };  
 }
 
@@ -290,8 +293,41 @@ watch(() => props.roomid, () => loadRoom());
               </button>
             </div>
           </div>
+
+          <div class="col-12 mb-3">
+            <CancelableEdit
+              :model-value="editRoom.notes"
+              @update:model-value="(n) => {
+                editRoom.notes = n;
+                updateRoom();
+              }"
+              v-slot="props"
+            >
+              <label for="collectionRoomNotes" class="form-label">Notes</label>
+              <textarea
+                id="collectionRoomNotes"
+                :disabled="busy"
+                class="form-control"
+                rows="10"
+                :value="props.value"
+                @input="(e) => props.edited(e.target.value)"
+                placeholder="Notes"
+                @blur="props.save()"
+                @keyup.esc="props.cancel()"
+              />
+              <label class="form-label mt-3">Preview</label>
+              <TrackerDescription
+                class="form-control pt-3 pb-3"
+                :source="props.value"
+              />
+            </CancelableEdit>
+          </div>
         </div>
       </form>
+
+      <div v-else-if="room.notes?.length" class="container bg-dark-subtle mt-3 pt-3 pb-3 rounded">
+        <TrackerDescription :source="room.notes"/>
+      </div>
 
       <form v-if="!isClosed && settings.auth?.userId" class="mb-4">
         <label for="collectionRoomUpload" class="form-label">Upload slot(s)</label>
@@ -348,7 +384,7 @@ watch(() => props.roomid, () => loadRoom());
                 ><i class="bi-download"/></DownloadLink>
                 <button
                   class="btn btn-sm btn-danger"
-                  :disabled="saving"
+                  :disabled="busy"
                   v-if="isOwner || (!isClosed && slot.owner_ct_user_id === settings.auth?.userId)"
                   @click.prevent="deleteSlot(slot)"
                 ><i class="bi-trash"/></button>

@@ -62,6 +62,7 @@ async function createNewRoom() {
       title: newTitle.value,
       closes_at: newClosure.value?.toISOString(),
       is_closed: false,
+      notes: '',
     });
 
     router.push(`/collection_room/${data.id}`);

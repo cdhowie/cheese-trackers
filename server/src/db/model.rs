@@ -490,6 +490,7 @@ pub struct CollectionRoom {
     pub created_at: DateTime<Utc>,
     pub closes_at: Option<DateTime<Utc>>,
     pub is_closed: bool,
+    pub notes: String,
 
     #[model(projected)]
     pub owner_discord_username: String,

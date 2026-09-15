@@ -44,6 +44,7 @@ pub struct ApiCollectionRoom {
     pub created_at: DateTime<Utc>,
     pub closes_at: Option<DateTime<Utc>>,
     pub is_closed: bool,
+    pub notes: String,
 }
 
 impl From<CollectionRoom> for ApiCollectionRoom {
@@ -56,6 +57,7 @@ impl From<CollectionRoom> for ApiCollectionRoom {
             created_at: value.created_at,
             closes_at: value.closes_at,
             is_closed: value.is_closed,
+            notes: value.notes,
         }
     }
 }
@@ -89,6 +91,7 @@ pub struct CollectionRoomRequestBody {
     pub title: String,
     pub closes_at: Option<DateTime<Utc>>,
     pub is_closed: bool,
+    pub notes: String,
 }
 
 /// `POST /collection_room`: Create a new collection room.
@@ -113,6 +116,7 @@ where
         created_at: Utc::now(),
         closes_at: room.closes_at,
         is_closed: room.is_closed,
+        notes: room.notes,
     };
 
     tokio::pin! {
@@ -160,6 +164,7 @@ where
     existing.title = room.title;
     existing.closes_at = room.closes_at;
     existing.is_closed = room.is_closed;
+    existing.notes = room.notes;
 
     let updated: ApiCollectionRoom = tx
         .update_collection_room(
@@ -168,6 +173,7 @@ where
                 CollectionRoomIden::Title,
                 CollectionRoomIden::ClosesAt,
                 CollectionRoomIden::IsClosed,
+                CollectionRoomIden::Notes,
             ],
         )
         .await

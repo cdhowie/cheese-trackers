@@ -16,7 +16,7 @@ const plugins = [
 <template>
     <VueMarkdown
         :source="props.source"
-        :options="{ linkify: true}"
+        :options="{ linkify: true }"
         :plugins="plugins"
     />
 </template>
