@@ -426,14 +426,17 @@ fn uploaded_bytes_to_slot_yamls(bytes: Bytes) -> Result<Vec<UploadedSlot>, YamlU
 
     yaml_files
         .into_iter()
-        .flat_map(|yaml| {
+        .flat_map(|mut yaml| {
+            // Strip UTF-8 BOM if present.
+            if yaml.starts_with(&[0xef, 0xbb, 0xbf]) {
+                yaml = yaml.slice(3..);
+            }
+
             yaml_split::DocumentIterator::new(Cursor::new(yaml)).map(|doc| {
                 let mut doc = doc?;
 
                 // Normalize newlines.
                 doc = doc.replace("\r\n", "\n").replace("\r", "\n");
-
-                remove_prefix(&mut doc, "\u{FEFF}");
 
                 // Strip document separator from the beginning, if present.
                 // Otherwise, look for a separator somewhere in the document.
