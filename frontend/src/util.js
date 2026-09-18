@@ -27,3 +27,10 @@ export function roundDown(num, places) {
 export function makeFilenameSafe(name) {
     return name.replace(/[<>:"/\\|?*]/g, '_');
 }
+
+export function asciiSafeJsonStringify(value) {
+    return JSON.stringify(value).replace(
+        /[^\x20-\x7F]/g,
+        (x) => "\\u" + ("000" + x.codePointAt(0).toString(16)).slice(-4)
+    );
+}

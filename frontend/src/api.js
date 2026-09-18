@@ -2,6 +2,7 @@ import axios from 'axios';
 import { ref } from 'vue';
 
 import * as settings from './settings';
+import { asciiSafeJsonStringify } from './util';
 
 const api_http = axios.create({
     baseURL: import.meta.env.DEV ? 'http://127.0.0.1:3000/api/' : '/api/',
@@ -70,7 +71,9 @@ export async function updateGame(tracker_id, game, priorOwner) {
         method: 'put',
         url: `tracker/${tracker_id}/game/${game.id}`,
         headers: {
-            'x-if-owner-is': priorOwner !== undefined ? JSON.stringify(priorOwner) : undefined,
+            // We use asciiSafeJsonStringify here because HTTP headers can only
+            // contain ASCII characters.
+            'x-if-owner-is': priorOwner !== undefined ? asciiSafeJsonStringify(priorOwner) : undefined,
         },
         data: game,
     });
