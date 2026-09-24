@@ -1,5 +1,8 @@
 use std::{
+    collections::HashSet,
+    fmt::Debug,
     io::{Cursor, Read},
+    marker::PhantomData,
     sync::Arc,
 };
 
@@ -323,7 +326,9 @@ struct UploadedSlot {
     yaml: String,
 }
 
-fn yaml_has_game_object(yaml: &str, game: &str) -> bool {
+// &[&str] would be more idiomatic, but we start with a Vec<String>.  Producing
+// a &[&str] would require another allocation.
+fn yaml_has_game_objects(yaml: &str, games: &[String]) -> bool {
     struct IgnoredMap;
 
     impl<'de> Visitor<'de> for IgnoredMap {
@@ -352,18 +357,17 @@ fn yaml_has_game_object(yaml: &str, game: &str) -> bool {
         }
     }
 
-    struct HasGameObjectVisitor<'a> {
-        game: &'a str,
+    struct HasGameObjectsVisitor<'a> {
+        games: &'a [String],
     }
 
-    impl<'de> Visitor<'de> for HasGameObjectVisitor<'_> {
+    impl<'de> Visitor<'de> for HasGameObjectsVisitor<'_> {
         type Value = ();
 
         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
             write!(
                 formatter,
-                "a map with a single key \"{}\", containing a map",
-                self.game,
+                "a map with multiple specific keys, each containing a map",
             )
         }
 
@@ -371,29 +375,38 @@ fn yaml_has_game_object(yaml: &str, game: &str) -> bool {
         where
             A: MapAccess<'de>,
         {
-            let mut has_game = false;
+            let mut has_game = HashSet::new();
 
             while let Some(key) = map.next_key::<String>()? {
-                if key == self.game {
+                if let Some(game_key) = self.games.iter().find(|&i| *i == key) {
+                    if !has_game.insert(game_key) {
+                        return Err(serde::de::Error::custom(format!(
+                            "duplicate key {game_key}"
+                        )));
+                    }
+
                     let IgnoredMap = map.next_value()?;
-                    has_game = true;
                 } else {
                     let IgnoredAny = map.next_value()?;
                 }
             }
 
-            match has_game {
-                true => Ok(()),
-                false => Err(serde::de::Error::custom(format!(
-                    "document does not have a map at key {:?}",
-                    self.game
-                ))),
+            // "games" is guaranteed to be unique as it comes from a
+            // deserialized MapKeys, which rejects duplicate values.  We can
+            // therefore test if we saw every game just by comparing the number
+            // of values.
+            if has_game.len() == self.games.len() {
+                Ok(())
+            } else {
+                Err(serde::de::Error::custom(
+                    "document does not have all required keys",
+                ))
             }
         }
     }
 
     yaml_serde::Deserializer::from_str(yaml)
-        .deserialize_map(HasGameObjectVisitor { game })
+        .deserialize_map(HasGameObjectsVisitor { games })
         .is_ok()
 }
 
@@ -421,7 +434,61 @@ fn uploaded_bytes_to_slot_yamls(bytes: Bytes) -> Result<Vec<UploadedSlot>, YamlU
     #[derive(Deserialize)]
     struct ArchipelagoSlot {
         name: String,
-        game: String,
+        game: ArchipelagoSlotGame,
+    }
+
+    // Deserializes a map as a Vec of its keys.  Map values are discarded.
+    #[derive(Debug)]
+    struct MapKeys<T>(Vec<T>);
+
+    impl<'de, T> Deserialize<'de> for MapKeys<T>
+    where
+        T: Deserialize<'de> + PartialEq + Debug,
+    {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            struct MapKeysVisitor<T>(PhantomData<fn() -> T>);
+
+            impl<'de, T> Visitor<'de> for MapKeysVisitor<T>
+            where
+                T: Deserialize<'de> + PartialEq + Debug,
+            {
+                type Value = MapKeys<T>;
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    write!(formatter, "a map")
+                }
+
+                fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+                where
+                    A: MapAccess<'de>,
+                {
+                    let mut keys = vec![];
+
+                    while let Some(key) = map.next_key()? {
+                        if keys.iter().any(|k| k == &key) {
+                            return Err(serde::de::Error::custom(format!("duplicate key {key:?}")));
+                        }
+
+                        keys.push(key);
+                        let IgnoredAny = map.next_value()?;
+                    }
+
+                    Ok(MapKeys(keys))
+                }
+            }
+
+            deserializer.deserialize_map(MapKeysVisitor(PhantomData))
+        }
+    }
+
+    #[derive(Deserialize, Debug)]
+    #[serde(untagged)]
+    enum ArchipelagoSlotGame {
+        Single(String),
+        Multiple(MapKeys<String>),
     }
 
     yaml_files
@@ -458,10 +525,35 @@ fn uploaded_bytes_to_slot_yamls(bytes: Bytes) -> Result<Vec<UploadedSlot>, YamlU
 
                 let slot: ArchipelagoSlot = yaml_serde::from_str(&doc)?;
 
-                match yaml_has_game_object(&doc, &slot.game) {
+                let games = match &slot.game {
+                    ArchipelagoSlotGame::Single(g) => std::slice::from_ref(g),
+
+                    ArchipelagoSlotGame::Multiple(MapKeys(g)) if g.is_empty() => {
+                        return Err(YamlUploadError::MissingGameObject);
+                    }
+
+                    ArchipelagoSlotGame::Multiple(MapKeys(g)) => &g[..],
+                };
+
+                match yaml_has_game_objects(&doc, games) {
                     true => Ok(UploadedSlot {
                         name: slot.name,
-                        game: slot.game,
+                        game: match slot.game {
+                            ArchipelagoSlotGame::Single(g) => g,
+
+                            ArchipelagoSlotGame::Multiple(MapKeys(g)) => {
+                                let mut iter = g.into_iter();
+
+                                // We already know it's not empty, or we would
+                                // have returned above.
+                                let first = iter.next().unwrap();
+
+                                match iter.next() {
+                                    None => first,
+                                    Some(_) => "[random]".into(),
+                                }
+                            }
+                        },
                         yaml: doc,
                     }),
 
