@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import moment from 'moment';
-import { filter, forEach, groupBy, join, map, orderBy } from 'lodash-es';
+import { filter, forEach, groupBy, join, map, orderBy, toUpper } from 'lodash-es';
 import JSZip from 'jszip';
 
 import { createCollectionRoomSlots, deleteCollectionRoomSlot, getCollectionRoom, getCollectionRoomSlots, updateCollectionRoom } from '@/api';
@@ -45,7 +45,12 @@ const isClosed = computed(() =>
   )
 );
 
-const sortedSlots = computed(() => orderBy(roomSlots.value, 'slot_name'));
+const sortedSlots = computed(() =>
+  orderBy(roomSlots.value, (s) => [
+    toUpper(s.slot_name),
+    s.id,
+  ])
+);
 
 const allSlotsYaml = computed(() =>
   join(
