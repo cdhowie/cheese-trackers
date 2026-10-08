@@ -139,7 +139,11 @@ function dismissBanner(id) {
         </div>
     </div>
 
-    <Modal title="Error" :message="currentError" @modalclosed="currentError = undefined"/>
+    <Modal
+        v-if="currentError?.length"
+        title="Error"
+        @modalclosed="currentError = undefined"
+    >{{ currentError }}</Modal>
 </template>
 
 <style scoped></style>

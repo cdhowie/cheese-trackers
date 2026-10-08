@@ -14,6 +14,8 @@ import { makeFilenameSafe } from '@/util';
 import CollectionRoomBadges from '@/components/CollectionRoomBadges.vue';
 import CancelableEdit from '@/components/CancelableEdit.vue';
 import TrackerDescription from '@/components/TrackerDescription.vue';
+import Modal from '@/components/Modal.vue';
+import { VCodeBlock } from '@wdns/vue-code-block';
 
 const props = defineProps(['roomid']);
 
@@ -27,6 +29,8 @@ const saving = ref(false);
 const saveError = ref(undefined);
 
 const busy = computed(() => loading.value || saving.value);
+
+const viewSlotContents = ref(undefined);
 
 const isOwner = computed(() =>
   room.value &&
@@ -225,6 +229,9 @@ async function loadRoom() {
 loadRoom();
 
 watch(() => props.roomid, () => loadRoom());
+watch(roomSlots, () => { 
+  viewSlotContents.value = undefined;
+});
 </script>
 
 <template>
@@ -376,6 +383,11 @@ watch(() => props.roomid, () => loadRoom());
             <td>{{ slot.owner_discord_username }}</td>
             <td>
               <div class="btn-group">
+                <button
+                  class="btn btn-sm btn-primary"
+                  :disabled="busy"
+                  @click.prevent="viewSlotContents = slot"
+                ><i class="bi-eye-fill"/></button>
                 <DownloadLink
                   class="btn btn-sm btn-primary"
                   :content="slot.yaml"
@@ -398,6 +410,20 @@ watch(() => props.roomid, () => loadRoom());
           </tr>
         </tbody>
       </table>
+
+      <Modal
+        v-if="viewSlotContents"
+        :title="viewSlotContents.slot_name"
+        dialog-class="modal-xl"
+        @modalclosed="viewSlotContents = undefined"
+      >
+        <VCodeBlock
+          :code="viewSlotContents.yaml"
+          highlightjs
+          lang="yaml"
+          theme="atom-one-dark"
+        />
+      </Modal>
     </div>
   </div>
 </template>

@@ -11,6 +11,7 @@
   "dependencies": {
     "@floating-ui/vue": "^1.0.6",
     "@vueuse/core": "^14.2.1",
+    "@wdns/vue-code-block": "^2.3.5",
     "axios": "^1.6.7",
     "chart.js": "^4.5.1",
     "chartjs-adapter-moment": "^1.0.1",
