@@ -630,7 +630,7 @@ where
                 .is_some_and(|e| e.is_unique_violation()) =>
         {
             // TODO: Figure out which slot.
-            return Err(StatusCode::UNPROCESSABLE_ENTITY.into_response());
+            return Err((StatusCode::UNPROCESSABLE_ENTITY, "Duplicate slot name").into_response());
         }
 
         // Likely a slot name that is too long.
@@ -639,7 +639,7 @@ where
                 .is_some_and(|e| e.is_check_violation()) =>
         {
             // TODO: Figure out which slot.
-            return Err(StatusCode::UNPROCESSABLE_ENTITY.into_response());
+            return Err((StatusCode::UNPROCESSABLE_ENTITY, "Slot name too long").into_response());
         }
 
         v => v,

@@ -28,6 +28,13 @@ const editRoom = ref(undefined);
 const saving = ref(false);
 const saveError = ref(undefined);
 
+const saveErrorMessage = computed(() =>
+  (
+    saveError.value?.response?.status === 422 &&
+    'string' === typeof saveError.value.response.data
+  ) ? saveError.value.response.data : `${saveError.value}`
+);
+
 const busy = computed(() => loading.value || saving.value);
 
 const viewSlotContents = ref(undefined);
@@ -271,7 +278,9 @@ watch(roomSlots, () => {
         <CollectionRoomBadges :room="room"/>
       </div>
 
-      <div v-if="saveError" class="alert alert-danger">Failed to save changes: {{ saveError }}</div>
+      <div v-if="saveError" class="alert alert-danger">
+        Failed to save changes: {{ saveErrorMessage }}
+      </div>
 
       <form class="container bg-dark-subtle rounded pt-3 mb-4 mt-4" v-if="isOwner">
         <div class="row">
