@@ -309,7 +309,7 @@ watch(roomSlots, () => {
             <label for="collectionRoomClosesAt" class="form-label">Closes at</label>
             <div class="input-group">
               <DateTimeEdit id="collectionRoomClosesAt" class="form-control" v-model="editRoom.closes_at" @blur="updateRoom"/>
-              <button class="btn btn-outline-secondary" type="button" @click.prevent="editRoom.closes_at = undefined; updateRoom();">
+              <button class="btn btn-outline-secondary" type="button" @click.prevent="editRoom.closes_at = undefined; updateRoom();" :disabled="busy">
                 <i class="bi-trash"/>
               </button>
             </div>
@@ -361,20 +361,21 @@ watch(roomSlots, () => {
       <div class="text-end" v-if="roomSlots?.length">
         <DownloadLink
           class="btn btn-primary"
+          :class="{ disabled: busy }"
           :content="allSlotsYaml"
           content-type="application/yaml"
           :filename="`${room.title} slots.yaml`"
         ><i class="bi-download"/> Download single YAML</DownloadLink>
         <DownloadLink
           class="btn btn-primary ms-1"
-          :class="{ disabled: !slotsByPlayerZip }"
+          :class="{ disabled: busy || !slotsByPlayerZip }"
           :content="slotsByPlayerZip"
           content-type="application/zip"
           :filename="`${room.title} slots.zip`"
         ><i class="bi-download"/> Download ZIP (file per player)</DownloadLink>
         <DownloadLink
           class="btn btn-primary ms-1"
-          :class="{ disabled: !allSlotsZip }"
+          :class="{ disabled: busy || !allSlotsZip }"
           :content="allSlotsZip"
           content-type="application/zip"
           :filename="`${room.title} slots.zip`"
@@ -404,6 +405,7 @@ watch(roomSlots, () => {
                 ><i class="bi-eye-fill"/></button>
                 <DownloadLink
                   class="btn btn-sm btn-primary"
+                  :class="{ disabled: busy }"
                   :content="slot.yaml"
                   :filename="`${room.title} - ${idx + 1} - ${slot.slot_name}.yaml`"
                   content-type="application/yaml"
