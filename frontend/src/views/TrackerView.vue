@@ -888,7 +888,7 @@ loadTracker();
                 <a
                     :href="trackerData.room_link"
                     target="_blank"
-                    alt="Room"
+                    title="Open Archipelago room page"
                     class="badge text-bg-info"
                 >
                     <i class="bi-door-open-fill"></i>
@@ -1154,15 +1154,17 @@ loadTracker();
             <template #head>
                 <component :is="layout.header" :show-last-activity="showLastActivity">
                     <template #name>
-                        <span @click="setSort(sortByName, false)" class="sorter">
+                        <span @click="setSort(sortByName, false)" class="sorter" title="The slot name in the Archipelago multiworld game — click to open it on the tracker site">
                             Name
                             <i v-if="activeSort[0] === sortByName"
                                 :class="{ 'bi-sort-alpha-down': !activeSort[1], 'bi-sort-alpha-up': activeSort[1] }"></i>
                         </span>
                     </template>
-                    <template #ping>Ping</template>
+                    <template #ping>
+                        <span title="Whether and how the player wants to be pinged on Discord when they have hints or need attention">Ping</span>
+                    </template>
                     <template #availability>
-                        Availability
+                        <span title="Whether this slot is open to claim, already claimed by a player, or public (anyone can send checks)">Availability</span>
                         <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown" data-bs-auto-close="outside">
                             <i :class="[availabilityFilter.isActive.value ? 'bi-funnel-fill' : 'bi-funnel']"></i>
                         </button>
@@ -1177,7 +1179,7 @@ loadTracker();
                     </template>
                     <template #owner>
                         <div class="dropdown">
-                            <span @click="setSort(sortByOwner, false)" class="sorter">
+                            <span @click="setSort(sortByOwner, false)" class="sorter" title="The Discord username of the player who claimed this slot">
                                 Owner (Discord Username)
                                 <i v-if="activeSort[0] === sortByOwner" class="me-1"
                                     :class="{ 'bi-sort-alpha-down': !activeSort[1], 'bi-sort-alpha-up': activeSort[1] }"></i>
@@ -1228,7 +1230,7 @@ loadTracker();
                     </template>
                     <template #game>
                         <div class="dropdown">
-                            <span @click="setSort(sortByGame, false)" class="sorter">
+                            <span @click="setSort(sortByGame, false)" class="sorter" title="The Archipelago game being played for this slot">
                                 Game
                                 <i v-if="activeSort[0] === sortByGame" class="me-1"
                                     :class="{ 'bi-sort-alpha-down': !activeSort[1], 'bi-sort-alpha-up': activeSort[1] }"></i>
@@ -1255,7 +1257,7 @@ loadTracker();
                     </template>
                     <template #status>
                         <div class="dropdown">
-                            Status
+                            <span title="Left: progression (BK = blocked, Soft BK = partially blocked, Unblocked, Go mode). Right: completion (Incomplete → All checks → Goal → Done)">Status</span>
                             <button class="btn btn-sm btn-outline-light" data-bs-toggle="dropdown"
                                 data-bs-auto-close="outside">
                                 <i :class="[
@@ -1285,7 +1287,7 @@ loadTracker();
                     </template>
                     <template #lastactivity>
                         <div class="dropdown">
-                            <span class="sorter" @click="setSort(sortByActivity, true)">
+                            <span class="sorter" @click="setSort(sortByActivity, true)" title="Days since this slot was last checked or had activity. Color indicates staleness based on the tracker's inactivity thresholds">
                                 Last Activity
                                 <i v-if="activeSort[0] === sortByActivity" class="me-1"
                                     :class="{ 'bi-sort-numeric-down': !activeSort[1], 'bi-sort-numeric-up': activeSort[1] }"></i>
@@ -1306,7 +1308,7 @@ loadTracker();
                         </div>
                     </template>
                     <template #checks>
-                        <span class="sorter" @click="setSort(sortByChecks, false)">
+                        <span class="sorter" @click="setSort(sortByChecks, false)" title="Location checks completed out of total available in this slot">
                             Checks
                             <i
                                 v-if="activeSort[0] === sortByChecks"
@@ -1326,7 +1328,7 @@ loadTracker();
                         </button>
                     </template>
                     <template #hints>
-                        <span class="sorter" @click="setSort(sortByHints, true)">
+                        <span class="sorter" @click="setSort(sortByHints, true)" title="Number of unfound hints for this slot. * means the slot has notes. Click to expand hint details">
                             Hints
                             <i
                                 v-if="activeSort[0] === sortByHints"
@@ -1460,6 +1462,7 @@ loadTracker();
                     </template>
                     <template #hints>
                         <button class="btn btn-sm" :class="[hintsClass(game)]"
+                            :title="`${countUnfoundReceivedHints(game)} unfound hint(s)${game.notes !== '' ? ' · * means this slot has notes' : ''} — click to ${gameExpanded[game.id] ? 'collapse' : 'expand'}`"
                             @click="gameExpanded[game.id] = !gameExpanded[game.id]">
                             {{ countUnfoundReceivedHints(game) }}<template v-if="game.notes !== ''">*</template> <i
                                 :class="{ 'bi-arrows-angle-expand': !gameExpanded[game.id], 'bi-arrows-angle-contract': gameExpanded[game.id] }"></i>

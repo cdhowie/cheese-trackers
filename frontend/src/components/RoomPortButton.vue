@@ -20,6 +20,7 @@ const roomHostAndPort = computed(() => {
         'text-bg-info': !props.stale,
         'text-bg-warning': props.stale,
       }"
+      :title="`Archipelago server address${props.stale ? ' (may be outdated)' : ''} — click to copy`"
       @click="clipboardCopy(roomHostAndPort)"
   >
       <i class="bi-ethernet"></i> <span class="font-monospace" style="line-height: 0"
