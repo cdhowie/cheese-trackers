@@ -565,6 +565,7 @@ fn uploaded_bytes_to_slot_yamls(bytes: Bytes) -> Result<Vec<UploadedSlot>, YamlU
 }
 
 /// `POST: /collection_room/{room_id}/slot`: Create slots.
+#[allow(clippy::result_large_err)]
 pub async fn create_collection_room_slots<D>(
     State(state): State<Arc<AppState<D>>>,
     user: AuthenticatedUser,

@@ -3,9 +3,10 @@ use std::{collections::HashMap, future::Future, marker::PhantomData};
 use async_stream::stream;
 use futures::Stream;
 use sea_query::{
-    Alias, Asterisk, Expr, Func, Iden, OnConflict, Order, PostgresQueryBuilder, Query, SimpleExpr,
+    Alias, Asterisk, Expr, ExprTrait, Func, Iden, OnConflict, Order, PostgresQueryBuilder, Query,
+    SimpleExpr,
 };
-use sea_query_binder::SqlxBinder;
+use sea_query_sqlx::SqlxBinder;
 use sqlx::{
     FromRow, PgConnection, PgPool, Postgres, migrate::MigrateError, pool::PoolConnection,
     postgres::PgRow,
@@ -24,7 +25,7 @@ impl DataAccessProvider for PgPool {
         // of being returned to the pool.
         let mut conn = self.acquire().await?.detach();
         sqlx::migrate!("migrations/psql")
-            .run_direct(&mut conn)
+            .run_direct(None, &mut conn, false)
             .await
     }
 
@@ -103,7 +104,7 @@ where
 
         let (sql, values) = query.returning_all().build_sqlx(PostgresQueryBuilder);
 
-        for await row in sqlx::query_as_with(&sql, values).fetch(executor) {
+        for await row in sqlx::query_as_with(sqlx::AssertSqlSafe(sql), values).fetch(executor) {
             yield row;
         }
     }
@@ -124,7 +125,7 @@ where
         .limit(1)
         .build_sqlx(PostgresQueryBuilder);
 
-    sqlx::query_as_with(&sql, values)
+    sqlx::query_as_with(sqlx::AssertSqlSafe(sql), values)
         .fetch_optional(executor)
         .await
 }
@@ -144,7 +145,7 @@ where
         .build_sqlx(PostgresQueryBuilder);
 
     stream! {
-        for await row in sqlx::query_as_with(&sql, values).fetch(executor) {
+        for await row in sqlx::query_as_with(sqlx::AssertSqlSafe(sql), values).fetch(executor) {
             yield row;
         }
     }
@@ -161,7 +162,7 @@ where
         .returning_all()
         .build_sqlx(PostgresQueryBuilder);
 
-    sqlx::query_as_with(&sql, values)
+    sqlx::query_as_with(sqlx::AssertSqlSafe(sql), values)
         .fetch_optional(executor)
         .await
 }
@@ -220,7 +221,7 @@ where
         .returning_all()
         .build_sqlx(PostgresQueryBuilder);
 
-    sqlx::query_as_with(&sql, values)
+    sqlx::query_as_with(sqlx::AssertSqlSafe(sql), values)
         .fetch_optional(executor)
         .await
 }
@@ -291,7 +292,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
             .build_sqlx(PostgresQueryBuilder);
 
         stream! {
-            for await row in sqlx::query_as_with(&sql, values).fetch(self.0.as_mut()) {
+            for await row in sqlx::query_as_with(sqlx::AssertSqlSafe(sql), values).fetch(self.0.as_mut()) {
                 yield row;
             }
         }
@@ -423,7 +424,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
             .build_sqlx(PostgresQueryBuilder);
 
         stream! {
-            for await r in sqlx::query_as_with(&sql, values).fetch(self.0.as_mut()) {
+            for await r in sqlx::query_as_with(sqlx::AssertSqlSafe(sql), values).fetch(self.0.as_mut()) {
                 yield r;
             }
         }
@@ -444,7 +445,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
             )
             .build_sqlx(PostgresQueryBuilder);
 
-        sqlx::query_as_with(&sql, values)
+        sqlx::query_as_with(sqlx::AssertSqlSafe(sql), values)
             .fetch_optional(self.0.as_mut())
             .await
     }
@@ -477,7 +478,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
             )
             .build_sqlx(PostgresQueryBuilder);
 
-        sqlx::query_with(&sql, values)
+        sqlx::query_with(sqlx::AssertSqlSafe(sql), values)
             .execute(self.0.as_mut())
             .await
             .map(|_| ())
@@ -498,7 +499,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
             .returning_all()
             .build_sqlx(PostgresQueryBuilder);
 
-        sqlx::query_as_with(&sql, values)
+        sqlx::query_as_with(sqlx::AssertSqlSafe(sql), values)
             .fetch_optional(self.0.as_mut())
             .await
     }
@@ -539,7 +540,7 @@ impl<T: AsMut<<Postgres as sqlx::Database>::Connection> + Send> DataAccess for P
             .build_sqlx(PostgresQueryBuilder);
 
         stream! {
-            for await row in sqlx::query_as_with(&sql, values).fetch(self.0.as_mut()) {
+            for await row in sqlx::query_as_with(sqlx::AssertSqlSafe(sql), values).fetch(self.0.as_mut()) {
                 yield row;
             }
         }

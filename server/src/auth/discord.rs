@@ -2,8 +2,8 @@
 
 use base64::prelude::*;
 use chacha20poly1305::{
-    AeadCore, XChaCha20Poly1305,
-    aead::{Aead, Nonce, OsRng, Payload},
+    XChaCha20Poly1305, XNonce,
+    aead::{Aead, Generate, Payload},
 };
 use oauth2::{
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge,
@@ -133,7 +133,7 @@ fn encrypt_continuation_token(
     verifier_secret: &str,
     csrf_token: &str,
 ) -> Result<String, chacha20poly1305::Error> {
-    let nonce = XChaCha20Poly1305::generate_nonce(&mut OsRng);
+    let nonce = XNonce::generate();
 
     let claims = cipher.encrypt(
         &nonce,
@@ -167,6 +167,9 @@ pub enum ContinuationTokenDecryptError {
     /// sequence.
     #[error("invalid verifier secret UTF-8")]
     InvalidVerifierSecretUtf8,
+    /// The nonce in the token is not the right length.
+    #[error("invalid nonce")]
+    InvalidNonce,
 }
 
 /// Decrypts a continuation token.
@@ -193,7 +196,9 @@ fn decrypt_continuation_token(
 
     let verifier_secret = cipher
         .decrypt(
-            Nonce::<XChaCha20Poly1305>::from_slice(nonce),
+            nonce
+                .try_into()
+                .map_err(|_| ContinuationTokenDecryptError::InvalidNonce)?,
             Payload {
                 msg: message,
                 aad: csrf_token.as_bytes(),
