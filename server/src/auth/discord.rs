@@ -1,17 +1,28 @@
 //! Discord authentication.
 
+use std::sync::LazyLock;
+
 use base64::prelude::*;
 use chacha20poly1305::{
     XChaCha20Poly1305, XNonce,
     aead::{Aead, Generate, Payload},
 };
 use oauth2::{
-    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge,
-    PkceCodeVerifier, RedirectUrl, Scope, TokenUrl,
+    AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, EndpointNotSet, EndpointSet,
+    PkceCodeChallenge, PkceCodeVerifier, RedirectUrl, Scope, TokenUrl,
     basic::{BasicClient, BasicTokenResponse},
-    reqwest::async_http_client,
 };
 use url::Url;
+
+static OAUTH_HTTP_CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .unwrap()
+});
+
+type OauthClient =
+    BasicClient<EndpointSet, EndpointNotSet, EndpointNotSet, EndpointNotSet, EndpointSet>;
 
 /// Discord authentication client.
 ///
@@ -19,7 +30,7 @@ use url::Url;
 /// decrypt continuation tokens.
 pub struct AuthClient {
     /// The OAuth2 client.
-    client: BasicClient,
+    client: OauthClient,
     /// The cipher used to encrypt and decrypt continuation tokens.
     continuation_token_cipher: XChaCha20Poly1305,
 }
@@ -32,15 +43,15 @@ impl AuthClient {
         public_url: &Url,
         continuation_token_cipher: XChaCha20Poly1305,
     ) -> Self {
-        let client = BasicClient::new(
-            ClientId::new(client_id),
-            Some(ClientSecret::new(client_secret)),
-            AuthUrl::new("https://discord.com/oauth2/authorize".to_owned()).unwrap(),
-            Some(TokenUrl::new("https://discord.com/api/oauth2/token".to_owned()).unwrap()),
-        )
-        .set_redirect_uri(RedirectUrl::from_url(
-            public_url.join("auth/complete").unwrap(),
-        ));
+        let client = BasicClient::new(ClientId::new(client_id))
+            .set_client_secret(ClientSecret::new(client_secret))
+            .set_auth_uri(AuthUrl::new("https://discord.com/oauth2/authorize".to_owned()).unwrap())
+            .set_token_uri(
+                TokenUrl::new("https://discord.com/api/oauth2/token".to_owned()).unwrap(),
+            )
+            .set_redirect_uri(RedirectUrl::from_url(
+                public_url.join("auth/complete").unwrap(),
+            ));
 
         Self {
             client,
@@ -90,7 +101,7 @@ impl AuthClient {
         self.client
             .exchange_code(AuthorizationCode::new(code))
             .set_pkce_verifier(verifier)
-            .request_async(async_http_client)
+            .request_async(&*OAUTH_HTTP_CLIENT)
             .await
             .map_err(CompleteAuthenticationError::RequestToken)
     }
