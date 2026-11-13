@@ -13,6 +13,10 @@ function emitClosed() {
     emit('modalclosed');
 }
 
+function hide() {
+    modal?.hide();
+}
+
 watch(modalElement, (e, old) => {
     if (old) {
         old.removeEventListener('hidden.bs.modal', emitClosed);
@@ -44,7 +48,9 @@ onUnmounted(() => {
                 </div>
                 <div class="modal-body"><slot/></div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary" @click="modal.hide()">Close</button>
+                    <slot name="buttons" :hide="hide">
+                        <button type="button" class="btn btn-primary" @click="hide()">Close</button>
+                    </slot>
                 </div>
             </div>
         </div>

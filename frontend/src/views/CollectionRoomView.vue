@@ -171,6 +171,8 @@ async function uploadFiles(files) {
   }
 }
 
+const deletingSlot = ref(undefined);
+
 async function deleteSlot(slot) {
   if (saving.value) {
     return;
@@ -414,7 +416,7 @@ watch(roomSlots, () => {
                   class="btn btn-sm btn-danger"
                   :disabled="busy"
                   v-if="isOwner || (!isClosed && slot.owner_ct_user_id === settings.auth?.userId)"
-                  @click.prevent="deleteSlot(slot)"
+                  @click.prevent="deletingSlot = slot"
                 ><i class="bi-trash"/></button>
               </div>
             </td>
@@ -439,6 +441,29 @@ watch(roomSlots, () => {
           lang="yaml"
           theme="atom-one-dark"
         />
+      </Modal>
+
+      <Modal
+        v-if="deletingSlot"
+        title="Confirm slot deletion"
+        @modalclosed="deletingSlot = undefined"
+      >
+        Really delete the slot "{{ deletingSlot.slot_name }}"?
+        <template #buttons="{ hide }">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            @click.prevent="hide()"
+          >Cancel</button>
+          <button
+            type="button"
+            class="btn btn-danger"
+            @click.prevent="
+              deleteSlot(deletingSlot);
+              hide();
+            "
+          >Delete</button>
+        </template>
       </Modal>
     </div>
   </div>
