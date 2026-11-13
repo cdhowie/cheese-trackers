@@ -1399,7 +1399,11 @@ loadTracker();
                                 "
                                 :disabled="loading"
                                 @claimed="claimGame(game)"
-                            />
+                            >
+                                The slot "{{ game.name }}" is already claimed by
+                                {{ game.effective_discord_username }}.  Claiming
+                                this slot will remove them as the owner.
+                            </OverwriteClaimButton>
 
                             <button v-else-if="usersEqual(getClaimingUser(game), currentUser) && canEditGame(game)"
                                 class="btn btn-sm btn-outline-warning" :disabled="loading"
