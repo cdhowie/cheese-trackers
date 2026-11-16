@@ -6,26 +6,26 @@ function keyed(v) {
 }
 
 export const progressionStatus = keyed([
-    { id: 'unknown', label: 'Unknown', color: 'secondary', icon: 'question-lg' },
-    { id: 'unblocked', label: 'Unblocked', color: 'light', icon: 'person-walking' },
-    { id: 'bk', isBk: true, label: 'BK', color: 'danger', icon: 'octagon-fill' },
-    { id: 'soft_bk', isBk: true, label: 'Soft BK', color: 'warning', icon: 'octagon-half' },
-    { id: 'go', label: 'Go mode', color: 'success', icon: 'flag' },
+    { id: 'unknown', label: 'Unknown', color: 'secondary', icon: 'question-lg', description: 'Progression not yet assessed' },
+    { id: 'unblocked', label: 'Unblocked', color: 'light', icon: 'person-walking', description: 'Can make progress — items are available to collect' },
+    { id: 'bk', isBk: true, label: 'BK', color: 'danger', icon: 'octagon-fill', description: 'Blocked — cannot progress without receiving a needed item from another player' },
+    { id: 'soft_bk', isBk: true, label: 'Soft BK', color: 'warning', icon: 'octagon-half', description: 'Soft blocked — limited options remaining while waiting on a key item' },
+    { id: 'go', label: 'Go mode', color: 'success', icon: 'flag', description: 'Go mode — has all needed items and is racing to the goal' },
 ]);
 
 export const completionStatus = keyed([
-    { id: 'incomplete', label: 'Incomplete', color: 'light', icon: 'square' },
-    { id: 'all_checks', label: 'All checks', color: 'info', icon: 'check-square' },
-    { id: 'goal', label: 'Goal', color: 'info', icon: 'flag' },
-    { id: 'done', label: 'Done', color: 'success', icon: 'flag-fill', complete: true },
-    { id: 'released', label: 'Forfeit', color: 'secondary', icon: 'escape', complete: true },
+    { id: 'incomplete', label: 'Incomplete', color: 'light', icon: 'square', description: 'Has not finished yet' },
+    { id: 'all_checks', label: 'All checks', color: 'info', icon: 'check-square', description: 'Collected all location checks but has not reached the goal' },
+    { id: 'goal', label: 'Goal', color: 'info', icon: 'flag', description: 'Reached the game goal but has not sent all items yet' },
+    { id: 'done', label: 'Done', color: 'success', icon: 'flag-fill', complete: true, description: 'Fully completed — goal reached and all items sent' },
+    { id: 'released', label: 'Forfeit', color: 'secondary', icon: 'escape', complete: true, description: 'Forfeited — all remaining items have been released to other players' },
 ]);
 
 export const availabilityStatus = keyed([
-    { id: 'unknown', label: 'Unknown', color: 'secondary', icon: 'question-lg' },
-    { id: 'open', label: 'Open', color: 'success', icon: 'person' },
-    { id: 'claimed', label: 'Claimed', color: 'light', icon: 'person-fill' },
-    { id: 'public', label: 'Public', color: 'info', icon: 'people-fill' },
+    { id: 'unknown', label: 'Unknown', color: 'secondary', icon: 'question-lg', description: 'Availability not set' },
+    { id: 'open', label: 'Open', color: 'success', icon: 'person', description: 'Open — available for anyone to claim' },
+    { id: 'claimed', label: 'Claimed', color: 'light', icon: 'person-fill', description: 'Claimed by a specific player' },
+    { id: 'public', label: 'Public', color: 'info', icon: 'people-fill', description: 'Public — anyone may send checks for this slot' },
 ]);
 
 export const hintClassification = keyed([

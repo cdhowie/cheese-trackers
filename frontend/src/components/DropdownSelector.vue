@@ -33,8 +33,8 @@ const { floatingStyles } = useFloating(reference, floating, {
 </script>
 
 <template>
-    <span v-if="props.readonly" :class="`text-${props.value.color}`">
-        <i v-if="props.icons" :title="props.value.label" :class="`bi-${props.value.icon}`"></i>
+    <span v-if="props.readonly" :class="`text-${props.value.color}`" :title="props.value.description">
+        <i v-if="props.icons" :title="props.value.description || props.value.label" :class="`bi-${props.value.icon}`"></i>
         <template v-else>{{ props.value.label }}</template>
     </span>
     <template v-else>
@@ -42,6 +42,7 @@ const { floatingStyles } = useFloating(reference, floating, {
             class="btn btn-sm dropdown-toggle"
             :disabled="props.disabled"
             :class="[`btn-outline-${props.value.color}`]"
+            :title="props.value.description"
             data-bs-toggle="dropdown"
             @[`shown.bs.dropdown`]="dropdownShown = true"
             @[`hidden.bs.dropdown`]="dropdownShown = false"
@@ -67,6 +68,7 @@ const { floatingStyles } = useFloating(reference, floating, {
                             [`bg-${option.color}`]: props.value === option,
                             [`text-bg-${option.color}`]: props.value === option,
                         }"
+                        :title="option.description"
                         :disabled="props.disabled || props.value === option"
                         @click="$emit('selected', option)"
                     ><i v-if="option.icon" :class="`bi-${option.icon}`"></i> {{ option.label }}</button>
